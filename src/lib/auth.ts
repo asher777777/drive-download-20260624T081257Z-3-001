@@ -1,0 +1,147 @@
+import NextAuth, { DefaultSession } from "next-auth";
+import { adminDb } from "@/lib/firebase-admin";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      role?: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    role?: string;
+  }
+}
+import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET || "4c30c8df634f19b22a6bbffeb5e4d2938a16dbd76eaef6b3992b158021b777a8",
+  session: { strategy: "jwt" },
+  cookies: {
+    sessionToken: {
+      name: "__session",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production"
+      }
+    }
+  },
+  pages: {
+    signIn: "/",
+  },
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: { label: "Username", type: "text" },
+        password: { label: "Password", type: "password" },
+        action: { label: "Action", type: "text" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.username || !credentials?.password) return null;
+
+        const username = credentials.username.toString().toLowerCase();
+
+        // 1. Check hardcoded admin as fallback
+        const adminUsername = process.env.ADMIN_USERNAME || "admin";
+        const adminPassword = process.env.ADMIN_PASSWORD || "123456";
+
+        if (username === adminUsername.toLowerCase() && credentials.password === adminPassword) {
+          return { id: "1", name: "thesuperg", email: "admin@habad.local", role: "SUPERADMIN" };
+        }
+
+        // 2. Check Firestore
+        try {
+          const usersRef = adminDb.collection("users");
+          const snapshot = await usersRef.where("username", "==", username).limit(1).get();
+          
+          if (!snapshot.empty) {
+            if (credentials.action === "register") {
+              // User already exists, cannot register
+              throw new Error("User already exists");
+            }
+            
+            const userDoc = snapshot.docs[0];
+            const userData = userDoc.data();
+            
+            if (userData.password === credentials.password) {
+              return { 
+                id: userDoc.id, 
+                name: userData.name || userData.username, 
+                email: userData.email, 
+                role: userData.role 
+              };
+            } else {
+              throw new Error("Invalid password");
+            }
+          } else {
+            // User does not exist
+            if (credentials.action === "register") {
+              // Create new user
+              const newUserRef = usersRef.doc();
+              const newUserData = {
+                username,
+                email: username, // Assuming username is email
+                password: credentials.password,
+                role: "USER",
+                createdAt: new Date().toISOString()
+              };
+              await newUserRef.set(newUserData);
+              
+              return {
+                id: newUserRef.id,
+                name: username,
+                email: username,
+                role: "USER"
+              };
+            }
+          }
+        } catch (error) {
+          console.error("Auth Error querying Firestore:", error);
+          throw error;
+        }
+
+        return null;
+      }
+    }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      checks: ["none"],
+      authorization: {
+        params: {
+          prompt: "select_account"
+        }
+      }
+    })
+  ],
+  callbacks: {
+    jwt({ token, user, account }) {
+      if (user) {
+        token.role = user.role;
+        token.id = user.id;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        if (token.role) (session.user as any).role = token.role;
+        (session.user as any).id = token.id || token.sub;
+      }
+      return session;
+    },
+    authorized: ({ auth, request: { nextUrl } }) => {
+      const isLoggedIn = !!auth?.user;
+      const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
+      if (isOnDashboard) {
+        if (isLoggedIn) return true;
+        return false;
+      }
+      return true;
+    },
+  },
+});
