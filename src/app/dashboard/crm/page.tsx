@@ -15,6 +15,7 @@ import Link from "next/link";
 // Lazy loaded modals
 const ContactModal = dynamic(() => import("./ContactModal").then(m => m.ContactModal), { ssr: false });
 const ImportExportModal = dynamic(() => import("./ImportExportModal").then(m => m.ImportExportModal), { ssr: false });
+import { EXPORT_COLUMNS } from "./ImportExportModal";
 const MessageModal = dynamic(() => import("./MessageModal").then(m => m.MessageModal), { ssr: false });
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -42,7 +43,7 @@ import {
   Menu
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx/xlsx.mjs";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -126,6 +127,7 @@ export default function CRMDashboardPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [actionMenuState, setActionMenuState] = useState<"main" | "kesher_sync">("main");
   const [showFilters, setShowFilters] = useState(false);
   const [tabsMenuOpen, setTabsMenuOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -250,6 +252,13 @@ export default function CRMDashboardPage() {
       setBulkAction("");
       return;
     }
+
+    if (bulkAction === "export") {
+      setIsImportExportOpen(true);
+      setBulkAction("");
+      // Keep selectedIds so they can be exported
+      return;
+    }
     
     let confirmMsg = "";
     let actionType: "trash" | "restore" | "delete_permanent" | "assign_community";
@@ -316,39 +325,120 @@ export default function CRMDashboardPage() {
   };
 
   // Export to Excel
-  const handleExportExcel = () => {
-    if (contacts.length === 0) {
-      alert("אין נתונים לייצוא");
-      return;
+  const handleExportExcel = async (options: {
+    columns: string[] | "all";
+    scope: "all" | "current" | "selected";
+    limit?: number;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+  }) => {
+    setActionLoading(true);
+    try {
+      let exportContacts = contacts;
+
+      if (options.scope === "selected") {
+        exportContacts = contacts.filter(c => selectedIds.includes(c.id || ""));
+      } else if (options.scope === "all" || options.sortBy !== orderby || options.sortOrder !== order) {
+        // Fetch specific data
+        const res = await getContacts({
+          status,
+          search: options.scope === "current" ? debouncedSearch : "",
+          tag_filter: options.scope === "current" ? tagFilter : "",
+          city_filter: options.scope === "current" ? cityFilter : "",
+          lead_source_filter: options.scope === "current" ? leadSourceFilter : "",
+          orderby: options.sortBy,
+          order: options.sortOrder,
+          page: 1,
+          per_page: 0, // 0 = all
+          community_filter: options.scope === "current" ? communityFilter : ""
+        });
+        
+        if ((res as any).error) {
+          alert("שגיאה במשיכת נתוני ייצוא: " + (res as any).error);
+          return;
+        }
+        exportContacts = res.contacts;
+      }
+
+      if (options.limit && options.limit > 0) {
+        exportContacts = exportContacts.slice(0, options.limit);
+      }
+
+      if (exportContacts.length === 0) {
+        alert("אין נתונים לייצוא");
+        return;
+      }
+
+      const exportData = exportContacts.map(c => {
+        const allFields: Record<string, any> = {
+          "id": c.id || "",
+          "conta_name": c.conta_name,
+          "f_m": c.f_m || "",
+          "conta_phone": c.conta_phone,
+          "email": c.email || "",
+          "gender": c.gender || "",
+          "mh_crm_city": c.mh_crm_city || "",
+          "mh_crm_street": c.mh_crm_street || "",
+          "tg1": c.tg1 || "",
+          "tg2": c.tg2 || "",
+          "tg3": c.tg3 || "",
+          "company_name": c.company_name || "",
+          "job_title": c.job_title || "",
+          "lead_source": c.lead_source || "",
+          "work_phone": c.work_phone || "",
+          "website": c.website || "",
+          "birth_date": c.birth_date || "",
+          "notes": c.notes || "",
+        };
+
+        const row: Record<string, any> = {};
+        
+        if (options.columns === "all") {
+           EXPORT_COLUMNS.forEach(col => {
+             row[col.label] = allFields[col.id];
+           });
+        } else {
+           EXPORT_COLUMNS.filter(col => options.columns.includes(col.id)).forEach(col => {
+             row[col.label] = allFields[col.id];
+           });
+        }
+        return row;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "אנשי קשר");
+      XLSX.writeFile(wb, `crm_contacts_${status}_${Date.now()}.xlsx`);
+    } catch (e: any) {
+      alert("שגיאה בייצוא לאקסל");
+    } finally {
+      setActionLoading(false);
     }
-
-    // Map contacts to flat spreadsheet structure
-    const exportData = contacts.map(c => ({
-      "מזהה (ID)": c.id || "",
-      "שם פרטי": c.conta_name,
-      "שם משפחה": c.f_m || "",
-      "טלפון נייד": c.conta_phone,
-      "דוא\"ל": c.email || "",
-      "מגדר": c.gender || "",
-      "עיר": c.mh_crm_city || "",
-      "רחוב": c.mh_crm_street || "",
-      "תג 1": c.tg1 || "",
-      "תג 2": c.tg2 || "",
-      "תג 3": c.tg3 || "",
-      "שם חברה": c.company_name || "",
-      "תפקיד": c.job_title || "",
-      "מקור הליד": c.lead_source || "",
-      "טלפון עבודה": c.work_phone || "",
-      "אתר": c.website || "",
-      "תאריך לידה": c.birth_date || "",
-      "הערות": c.notes || "",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "אנשי קשר");
-    XLSX.writeFile(wb, `crm_contacts_${status}_${Date.now()}.xlsx`);
   };
+
+  // Sync with Kesher
+  const handleKesherSync = async (timeframe: "all" | "year" | "3months" | "week") => {
+    setActionLoading(true);
+    console.log("Starting Kesher Sync from UI with timeframe:", timeframe);
+    try {
+      const { syncKesherClients } = await import("@/features/kesher/actions");
+      const res = await syncKesherClients(timeframe);
+      console.log("Kesher Sync Server Response:", res);
+      
+      if (res.success) {
+        alert(res.message);
+        loadData();
+      } else {
+        alert("שגיאה בסנכרון: " + res.error);
+      }
+    } catch (err: any) {
+      console.error("Error during Kesher Sync:", err);
+      alert("שגיאה בסנכרון: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
 
   // Helper to safely get value from spreadsheet row keys
   const getValue = (row: any, keys: string[]): string => {
@@ -518,7 +608,7 @@ export default function CRMDashboardPage() {
       </div>
 
         {/* Sticky Table Controls (Sorting, Rows, Select All) */}
-        <div className="sticky top-0 z-20 w-full flex items-center justify-between gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-400 font-bold bg-[#181818]/95 backdrop-blur-md p-2 rounded-b-2xl sm:rounded-2xl border border-white/5 shadow-lg mt-2 flex-nowrap overflow-hidden">
+        <div className="sticky top-0 z-20 w-full flex items-center justify-between gap-2 sm:gap-3 text-[10px] sm:text-xs text-gray-400 font-bold bg-[#181818]/95 backdrop-blur-md px-4 py-2.5 rounded-b-2xl sm:rounded-2xl border border-white/5 shadow-lg mt-2 flex-nowrap overflow-visible">
           
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button 
@@ -569,6 +659,7 @@ export default function CRMDashboardPage() {
                   )}
                   <option value="whatsapp">וואטסאפ</option>
                   <option value="email">מייל</option>
+                  <option value="export">ייצא לאקסל</option>
                   <optgroup label="לקהילה">
                     {communities.map(c => (
                       <option key={c.id} value={`assign_community_${c.id}`}>{c.name}</option>
@@ -613,25 +704,33 @@ export default function CRMDashboardPage() {
               {showFilters && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
-                  <div className="absolute top-full left-0 sm:right-0 sm:left-auto mt-2 bg-[#181818] border border-white/5 shadow-2xl rounded-xl p-2 z-50 flex flex-col gap-1 w-36 sm:w-48 animate-in fade-in slide-in-from-top-2">
-                    <button 
-                      onClick={() => { handleSort("conta_name"); setShowFilters(false); }}
-                      className={`text-right px-3 py-2 rounded-lg text-sm transition-colors ${orderby === 'conta_name' ? 'bg-[#222] text-white font-bold' : 'text-gray-400 hover:bg-[#222] hover:text-white'}`}
-                    >
-                      שם {orderby === 'conta_name' && <ArrowUpDown className="w-3 h-3 inline-block mr-1" />}
-                    </button>
-                    <button 
-                      onClick={() => { handleSort("total_spent"); setShowFilters(false); }}
-                      className={`text-right px-3 py-2 rounded-lg text-sm transition-colors ${orderby === 'total_spent' ? 'bg-[#222] text-white font-bold' : 'text-gray-400 hover:bg-[#222] hover:text-white'}`}
-                    >
-                      תרומות {orderby === 'total_spent' && <ArrowUpDown className="w-3 h-3 inline-block mr-1" />}
-                    </button>
-                    <button 
-                      onClick={() => { handleSort("updatedAt"); setShowFilters(false); }}
-                      className={`text-right px-3 py-2 rounded-lg text-sm transition-colors ${orderby === 'updatedAt' ? 'bg-[#222] text-white font-bold' : 'text-gray-400 hover:bg-[#222] hover:text-white'}`}
-                    >
-                      עידכון {orderby === 'updatedAt' && <ArrowUpDown className="w-3 h-3 inline-block mr-1" />}
-                    </button>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-[#181818] border border-white/5 shadow-2xl rounded-xl p-4 z-50 flex flex-col gap-3 w-64 animate-in fade-in slide-in-from-top-2">
+                    <div className="text-xs font-black text-gray-500 mb-1 text-right tracking-wider uppercase">מיון לפי:</div>
+                    {[
+                      { label: 'א-ב (שם)', field: 'conta_name' },
+                      { label: 'תאריך עדכון אחרון', field: 'updatedAt' },
+                      { label: 'שווי תורם', field: 'total_spent' },
+                    ].map(opt => (
+                      <div key={opt.field} className="flex flex-col gap-2 border-b border-white/5 pb-3 last:border-0 last:pb-0">
+                        <div className={`text-sm text-right font-bold ${orderby === opt.field ? 'text-[#9333ea]' : 'text-white'}`}>
+                          {opt.label}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => { setOrderby(opt.field); setOrder("asc"); setPage(1); setShowFilters(false); }}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${orderby === opt.field && order === "asc" ? "bg-[#9333ea]/20 text-[#9333ea] border border-[#9333ea]/30" : "bg-[#222] text-gray-400 hover:text-white hover:bg-[#2a2a2a] border border-transparent"}`}
+                          >
+                            מהתחלה לסוף
+                          </button>
+                          <button 
+                            onClick={() => { setOrderby(opt.field); setOrder("desc"); setPage(1); setShowFilters(false); }}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${orderby === opt.field && order === "desc" ? "bg-[#9333ea]/20 text-[#9333ea] border border-[#9333ea]/30" : "bg-[#222] text-gray-400 hover:text-white hover:bg-[#2a2a2a] border border-transparent"}`}
+                          >
+                            מהסוף להתחלה
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
@@ -790,47 +889,96 @@ export default function CRMDashboardPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div 
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setIsActionMenuOpen(false)}
+            onClick={() => { setIsActionMenuOpen(false); setActionMenuState("main"); }}
           />
           <div className="relative bg-[#1e1e3f] p-6 rounded-[2.5rem] shadow-2xl z-10 w-full max-w-xs flex flex-col gap-4 animate-in zoom-in-95 fade-in duration-200 border border-slate-700">
-            <div className="text-xl font-black !text-white text-center mb-2">פעולות</div>
-            
-            <button 
-              onClick={() => { openAddModal(); setIsActionMenuOpen(false); }}
-              className="w-full h-14 bg-gradient-to-b from-orange-300 to-orange-500 rounded-full text-slate-900 font-black shadow-inner border border-orange-200/50 hover:brightness-105 transition-all text-lg shadow-md flex items-center justify-center gap-2"
-            >
-              <User className="w-5 h-5" />
-              הוסף איש קשר
-            </button>
-            <button 
-              onClick={() => { document.getElementById('import-excel-hidden')?.click(); setIsActionMenuOpen(false); }}
-              className="w-full h-14 bg-gradient-to-b from-emerald-400 to-emerald-500 rounded-full text-white font-black shadow-inner border border-emerald-300/50 hover:brightness-105 transition-all text-lg shadow-md relative flex items-center justify-center gap-2"
-            >
-              <Upload className="w-5 h-5" />
-              ייבא מאקסל
-              <input 
-                id="import-excel-hidden"
-                type="file" 
-                accept=".xlsx, .xls, .csv" 
-                onChange={handleImportExcel} 
-                className="hidden" 
-                disabled={actionLoading}
-              />
-            </button>
-            <button 
-              onClick={() => { handleExportExcel(); setIsActionMenuOpen(false); }}
-              className="w-full h-14 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full text-white font-black shadow-inner border border-blue-300/50 hover:brightness-105 transition-all text-lg shadow-md flex items-center justify-center gap-2"
-            >
-              <Download className="w-5 h-5" />
-              ייצא לאקסל
-            </button>
-            
-            <button 
-              onClick={() => setIsActionMenuOpen(false)}
-              className="mt-2 text-gray-500 font-bold hover:text-white transition-colors h-10"
-            >
-              ביטול
-            </button>
+            {actionMenuState === "main" ? (
+              <>
+                <div className="text-xl font-black !text-white text-center mb-2">פעולות</div>
+                
+                <button 
+                  onClick={() => { openAddModal(); setIsActionMenuOpen(false); }}
+                  className="w-full h-14 bg-gradient-to-b from-orange-300 to-orange-500 rounded-full text-slate-900 font-black shadow-inner border border-orange-200/50 hover:brightness-105 transition-all text-lg shadow-md flex items-center justify-center gap-2"
+                >
+                  <User className="w-5 h-5" />
+                  הוסף איש קשר
+                </button>
+                <button 
+                  onClick={() => { document.getElementById('import-excel-hidden')?.click(); setIsActionMenuOpen(false); }}
+                  className="w-full h-14 bg-gradient-to-b from-emerald-400 to-emerald-500 rounded-full text-white font-black shadow-inner border border-emerald-300/50 hover:brightness-105 transition-all text-lg shadow-md relative flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-5 h-5" />
+                  ייבא מאקסל
+                  <input 
+                    id="import-excel-hidden"
+                    type="file" 
+                    accept=".xlsx, .xls, .csv" 
+                    onChange={handleImportExcel} 
+                    className="hidden" 
+                    disabled={actionLoading}
+                  />
+                </button>
+                <button 
+                  onClick={() => { setIsImportExportOpen(true); setIsActionMenuOpen(false); }}
+                  className="w-full h-14 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full text-white font-black shadow-inner border border-blue-300/50 hover:brightness-105 transition-all text-lg shadow-md flex items-center justify-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  ייצא לאקסל
+                </button>
+                <button 
+                  onClick={() => setActionMenuState("kesher_sync")}
+                  className="w-full h-14 bg-gradient-to-b from-purple-500 to-purple-600 rounded-full text-white font-black shadow-inner border border-purple-400/50 hover:brightness-105 transition-all text-lg shadow-md flex items-center justify-center gap-2"
+                  disabled={actionLoading}
+                >
+                  <RefreshCw className={`w-5 h-5 ${actionLoading ? 'animate-spin' : ''}`} />
+                  סנכרון מקשר
+                </button>
+                
+                <button 
+                  onClick={() => setIsActionMenuOpen(false)}
+                  className="mt-2 text-gray-500 font-bold hover:text-white transition-colors h-10"
+                >
+                  ביטול
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-xl font-black !text-white text-center mb-2">סנכרון מקשר</div>
+                <div className="text-sm text-gray-400 text-center mb-2">ממתי לשלוף נתוני לקוחות?</div>
+                
+                <button 
+                  onClick={() => { handleKesherSync("all"); setIsActionMenuOpen(false); setActionMenuState("main"); }}
+                  className="w-full h-12 bg-[#2a2a4a] hover:bg-[#3a3a5a] rounded-full text-white font-bold transition-all"
+                >
+                  מהקמת החשבון
+                </button>
+                <button 
+                  onClick={() => { handleKesherSync("year"); setIsActionMenuOpen(false); setActionMenuState("main"); }}
+                  className="w-full h-12 bg-[#2a2a4a] hover:bg-[#3a3a5a] rounded-full text-white font-bold transition-all"
+                >
+                  מלפני שנה
+                </button>
+                <button 
+                  onClick={() => { handleKesherSync("3months"); setIsActionMenuOpen(false); setActionMenuState("main"); }}
+                  className="w-full h-12 bg-[#2a2a4a] hover:bg-[#3a3a5a] rounded-full text-white font-bold transition-all"
+                >
+                  מלפני שלושה חודשים
+                </button>
+                <button 
+                  onClick={() => { handleKesherSync("week"); setIsActionMenuOpen(false); setActionMenuState("main"); }}
+                  className="w-full h-12 bg-[#2a2a4a] hover:bg-[#3a3a5a] rounded-full text-white font-bold transition-all"
+                >
+                  מהשבוע
+                </button>
+                
+                <button 
+                  onClick={() => setActionMenuState("main")}
+                  className="mt-2 text-gray-500 font-bold hover:text-white transition-colors h-10"
+                >
+                  חזור
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -841,6 +989,9 @@ export default function CRMDashboardPage() {
         onImport={handleImportExcel}
         onExport={handleExportExcel}
         actionLoading={actionLoading}
+        currentSortBy={orderby}
+        currentSortOrder={order}
+        selectedCount={selectedIds.length}
       />
 
 

@@ -1,6 +1,12 @@
+export interface CustomTab {
+  id: string;
+  title: string;
+  icon: string;
+}
+
 export interface CustomField {
   id: string;
-  category: "details" | "camp" | "tags" | "company" | "events";
+  category: string;
   type: string; // text, date, number, etc.
   label: string;
 }

@@ -38,7 +38,7 @@ export async function getContacts(params: {
     const orderby = params.orderby || "createdAt";
     const order = params.order || "desc";
     const page = params.page || 1;
-    const perPage = params.per_page || 10;
+    const perPage = params.per_page !== undefined ? params.per_page : 10;
 
     // Fetch all contacts for this owner and status from Firestore
     const contactsRef = adminDb.collection("contacts");
@@ -259,7 +259,14 @@ export async function createContact(contactData: Partial<Contact>) {
       communityIds: contactData.communityIds || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    };
+    } as any;
+
+    // Append any dynamic custom fields
+    Object.keys(contactData).forEach((key) => {
+      if (key.startsWith("custom_") && contactData[key as keyof Contact] !== undefined) {
+        newContact[key] = contactData[key as keyof Contact];
+      }
+    });
 
     // Remove general community if other communities are selected
     if (newContact.communityIds && newContact.communityIds.length > 0) {
@@ -275,9 +282,9 @@ export async function createContact(contactData: Partial<Contact>) {
     const docRef = await adminDb.collection("contacts").add(newContact);
     revalidatePath("/dashboard/crm");
     return { success: true, id: docRef.id };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in createContact:", error);
-    throw error;
+    return { success: false, error: error.message || String(error) };
   }
 }
 
@@ -319,9 +326,9 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
     await docRef.update(updatedFields);
     revalidatePath("/dashboard/crm");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in updateContact:", error);
-    throw error;
+    return { success: false, error: error.message || String(error) };
   }
 }
 
@@ -967,6 +974,50 @@ export async function addCustomField(field: Omit<{id: string; category: string; 
     return { success: true, field: newField };
   } catch (error: any) {
     console.error("Error in addCustomField:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
+// 16. Get custom CRM tabs
+export async function getCustomTabs() {
+  try {
+    const ownerId = await getUserId();
+    const docRef = adminDb.collection("crm_settings").doc(`custom_tabs_${ownerId}`);
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      return [];
+    }
+    const data = docSnap.data();
+    return (data?.tabs || []) as import("./types").CustomTab[];
+  } catch (error) {
+    console.error("Error in getCustomTabs:", error);
+    return [];
+  }
+}
+
+// 17. Add custom CRM tab
+export async function addCustomTab(tab: Omit<import("./types").CustomTab, "id">) {
+  try {
+    const ownerId = await getUserId();
+    const docRef = adminDb.collection("crm_settings").doc(`custom_tabs_${ownerId}`);
+    const docSnap = await docRef.get();
+    
+    const newTab = {
+      id: `tab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      ...tab,
+    };
+
+    if (!docSnap.exists) {
+      await docRef.set({ tabs: [newTab] });
+    } else {
+      const data = docSnap.data();
+      const tabs = data?.tabs || [];
+      await docRef.update({ tabs: [...tabs, newTab] });
+    }
+    
+    return { success: true, tab: newTab };
+  } catch (error: any) {
+    console.error("Error in addCustomTab:", error);
     return { success: false, error: error.message || String(error) };
   }
 }

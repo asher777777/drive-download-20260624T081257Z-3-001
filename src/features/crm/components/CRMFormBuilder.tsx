@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { getFormTemplates, saveFormTemplate, FormTemplate } from "../formTemplates";
-import { getCustomFields, addCustomField } from "../actions";
+import { getCustomFields, addCustomField, getCustomTabs } from "../actions";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 
@@ -157,6 +157,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
   const [expandedField, setExpandedField] = useState<number | null>(null);
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [customFields, setCustomFields] = useState<any[]>([]);
+  const [customTabs, setCustomTabs] = useState<any[]>([]);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [showAddCustomFieldModal, setShowAddCustomFieldModal] = useState(false);
@@ -168,6 +169,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
   useEffect(() => {
     getFormTemplates().then(setTemplates);
     getCustomFields().then(setCustomFields);
+    getCustomTabs().then(setCustomTabs);
   }, []);
 
   const handleAddCustomField = async () => {
@@ -1300,6 +1302,13 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 <option value="tags">תיוגים והערות</option>
                 <option value="company">חברה ומקור</option>
                 <option value="events">אירועים ומפגשים</option>
+                {customTabs.length > 0 && (
+                  <optgroup label="לשוניות מותאמות אישית">
+                    {customTabs.map(t => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             

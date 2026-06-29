@@ -28,6 +28,9 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+import { auth } from "@/lib/auth";
+import { AuthSync } from "@/components/auth/AuthSync";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -35,12 +38,14 @@ export default async function RootLayout({
 }>) {
   const settings = await getGlobalSettings("1");
   const faviconUrl = settings?.siteLogoUrl || "/favicon.ico";
+  const session = await auth();
 
   return (
     <html
       lang="he"
       dir="rtl"
       className={`${heebo.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
     >
       <head>
         <link rel="icon" href={faviconUrl} key="dynamic-favicon" />
@@ -48,6 +53,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href={faviconUrl} key="dynamic-apple-favicon" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <AuthSync session={session} />
         <main className="flex-grow">{children}</main>
       </body>
     </html>

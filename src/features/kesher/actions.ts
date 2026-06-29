@@ -243,3 +243,201 @@ export async function connectEasyCount(ezCountToken: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function syncKesherClients(timeframe: "all" | "year" | "3months" | "week" = "all") {
+  try {
+    const { auth } = await import("@/lib/auth");
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    const settings = await getKesherSettings();
+    if (!settings?.userName || !settings?.apiKey) {
+      return { success: false, error: "לא הוגדרו פרטי קשר (שם משתמש וסיסמה)." };
+    }
+
+    const payload = {
+      Json: {
+        userName: settings.userName,
+        password: settings.apiKey, // Kesher password is saved in apiKey
+        func: "GetTrans",
+        format: "json",
+        fromTranId: 0
+      },
+      format: "json"
+    };
+
+    console.log("\n==================================");
+    console.log("[Kesher Sync] Payload to Send:", JSON.stringify(payload, null, 2));
+
+    const response = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text();
+    console.log("[Kesher Sync] Raw Response (first 1000 chars):", responseText.substring(0, 1000));
+    console.log("==================================\n");
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      return { success: false, error: "תשובה לא תקינה מקשר.", payloadSent: payload, rawResponse: responseText };
+    }
+
+    if (result && result.Status === false) {
+      return { success: false, error: `שגיאה מקשר: ${result.Description || "לא ידוע"}`, payloadSent: payload, rawResponse: result };
+    }
+
+    let transactions: any[] = [];
+    if (result?.Transaction) {
+      if (Array.isArray(result.Transaction)) {
+        transactions = result.Transaction;
+      } else {
+        transactions = [result.Transaction];
+      }
+    }
+
+    if (transactions.length === 0) {
+      return { 
+        success: true, 
+        added: 0, 
+        updated: 0, 
+        message: "לא נמצאו עסקאות בקשר.",
+        payloadSent: payload,
+        rawResponse: result
+      };
+    }
+
+    const now = new Date();
+    let cutoffDate = new Date(0); // all
+    if (timeframe === "year") {
+      cutoffDate = new Date(now.setFullYear(now.getFullYear() - 1));
+    } else if (timeframe === "3months") {
+      cutoffDate = new Date(now.setMonth(now.getMonth() - 3));
+    } else if (timeframe === "week") {
+      cutoffDate = new Date(now.setDate(now.getDate() - 7));
+    }
+
+    // Process unique clients from transactions
+    const clientsMap = new Map<string, any>();
+    
+    for (const tx of transactions) {
+      // Filter by timeframe if Date exists
+      if (tx.Date) {
+        const txDate = new Date(tx.Date);
+        if (txDate < cutoffDate) continue;
+      }
+
+      const tz = tx.Tz?.trim() || "";
+      const phone = tx.Phone?.trim() || "";
+      const mail = tx.Mail?.trim() || "";
+      const name = tx.Name?.trim() || `${tx.FirstName || ""} ${tx.LastName || ""}`.trim();
+
+      if (!tz && !phone && !mail) continue; // Skip if no identifying info
+
+      // Prefer Tz, then Phone, then Mail as the unique key for grouping
+      const uniqueKey = tz || phone || mail;
+
+      if (!clientsMap.has(uniqueKey)) {
+        clientsMap.set(uniqueKey, {
+          conta_name: name,
+          f_m: tx.FirstName?.trim() || "",
+          l_m: tx.LastName?.trim() || "",
+          conta_phone: phone,
+          email: mail,
+          tg1: tz, // Assuming tg1 holds Tz
+          mh_crm_city: tx.City?.trim() || "",
+          mh_crm_street: tx.Address?.trim() || "",
+          total_spent: 0,
+        });
+      }
+      
+      // Aggregate total spent
+      const client = clientsMap.get(uniqueKey);
+      client.total_spent += (tx.Total || 0) / 100; // Total is in agorot
+    }
+
+    // Fetch existing contacts for this user
+    const contactsRef = adminDb.collection("contacts");
+    const snapshot = await contactsRef.where("ownerId", "==", userId).get();
+    
+    const existingContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    const batchArray: any[] = [];
+    let currentBatch = adminDb.batch();
+    let batchOperationCount = 0;
+
+    const commitBatch = async () => {
+      if (batchOperationCount > 0) {
+        batchArray.push(currentBatch.commit());
+        currentBatch = adminDb.batch();
+        batchOperationCount = 0;
+      }
+    };
+
+    for (const [key, clientData] of clientsMap.entries()) {
+      // Find match
+      const existing: any = existingContacts.find((c: any) => {
+        if (clientData.tg1 && c.tg1 === clientData.tg1) return true;
+        if (clientData.conta_phone && c.conta_phone === clientData.conta_phone) return true;
+        if (clientData.email && c.email === clientData.email) return true;
+        return false;
+      });
+
+      if (existing) {
+        // Update existing if some fields are missing
+        const updates: any = {};
+        if (!existing.mh_crm_city && clientData.mh_crm_city) updates.mh_crm_city = clientData.mh_crm_city;
+        if (!existing.mh_crm_street && clientData.mh_crm_street) updates.mh_crm_street = clientData.mh_crm_street;
+        if (!existing.email && clientData.email) updates.email = clientData.email;
+        if (!existing.tg1 && clientData.tg1) updates.tg1 = clientData.tg1;
+        if (!existing.f_m && clientData.f_m) updates.f_m = clientData.f_m;
+        
+        if (Object.keys(updates).length > 0) {
+          updates.updatedAt = new Date().toISOString();
+          currentBatch.update(contactsRef.doc(existing.id), updates);
+          batchOperationCount++;
+          updatedCount++;
+        }
+      } else {
+        // Create new
+        const newRef = contactsRef.doc();
+        currentBatch.set(newRef, {
+          ownerId: userId,
+          status: "active",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lead_source: "Kesher Import",
+          ...clientData
+        });
+        batchOperationCount++;
+        addedCount++;
+      }
+
+      if (batchOperationCount >= 400) {
+        await commitBatch();
+      }
+    }
+
+    await commitBatch();
+    await Promise.all(batchArray);
+
+    return { 
+      success: true, 
+      added: addedCount, 
+      updated: updatedCount, 
+      message: `הסנכרון הושלם. ${addedCount} לקוחות נוספו, ${updatedCount} עודכנו.`,
+      payloadSent: payload,
+      rawResponse: result 
+    };
+
+  } catch (error: any) {
+    console.error("Error syncing Kesher clients:", error);
+    return { success: false, error: error.message };
+  }
+}

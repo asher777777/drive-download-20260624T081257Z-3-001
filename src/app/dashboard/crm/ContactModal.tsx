@@ -5,9 +5,10 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Contact, ContactEvent } from "@/features/crm/types";
-import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings } from "@/features/crm/actions";
+import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField } from "@/features/crm/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
-import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2 } from "lucide-react";
+import { uploadMediaFile } from "@/features/media/actions";
+import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud } from "lucide-react";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -112,6 +113,18 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   const [customFieldsConfig, setCustomFieldsConfig] = useState<any[]>([]);
   const [customFieldsValues, setCustomFieldsValues] = useState<Record<string, any>>({});
 
+  // Custom Tabs State
+  const [customTabsConfig, setCustomTabsConfig] = useState<any[]>([]);
+  const [showAddTabModal, setShowAddTabModal] = useState(false);
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [newTabTitle, setNewTabTitle] = useState("");
+  const [newTabIcon, setNewTabIcon] = useState("Folder");
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState("text");
+  const [isAddingTab, setIsAddingTab] = useState(false);
+  const [isAddingField, setIsAddingField] = useState(false);
+  const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
+
   // Super Admin / User Details States
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [userDetailsData, setUserDetailsData] = useState<any>(null);
@@ -123,6 +136,19 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
     getCustomFields().then(setCustomFieldsConfig);
     checkIsSuperAdmin().then(setIsSuperAdmin).catch(() => setIsSuperAdmin(false));
   }, []);
+
+  const loadCustomTabs = async () => {
+    const tabsRes = await getCustomTabs();
+    if (Array.isArray(tabsRes)) {
+       setCustomTabsConfig(tabsRes);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadCustomTabs();
+    }
+  }, [isOpen]);
 
   // Initialize fields on open/contact change
   useEffect(() => {
@@ -350,7 +376,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      <Modal.Content className="w-11/12 max-w-6xl h-[90vh] overflow-y-auto rounded-[2rem] p-8">
+      <Modal.Content className="w-11/12 max-w-[450px] max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-6 sm:p-8 bg-[#0a0a0a] border border-white/10 [&::-webkit-scrollbar]:hidden">
         <div dir="rtl" className="w-full">
           <Modal.Close className="left-4 right-auto" />
           {isEdit ? (
@@ -385,10 +411,10 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
               </div>
             </div>
           ) : (
-            <Modal.Header 
-              title="הוספת איש קשר חדש" 
-              description="מלא את שדות החובה להוספת איש קשר חדש למערכת"
-            />
+            <div className="text-center mb-8 mt-4">
+              <h2 className="text-2xl font-black text-white mb-2">הוספת איש קשר חדש</h2>
+              <p className="text-sm text-gray-400 font-medium">מלא את שדות החובה להוספת איש קשר חדש למערכת</p>
+            </div>
           )}
 
         {error && (
@@ -399,18 +425,20 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Tab Content: Details */}
-          <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
+          <div className="w-full flex flex-col mb-3">
             <button
               type="button"
               id="tab-details"
               onClick={() => handleTabClick("details")}
-              className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "details" ? "ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative" : "border-b border-white/5"}`}
+              className={`w-full h-[68px] px-4 hover:bg-[#1a1a1a] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-all rounded-2xl border border-white/5 bg-[#141414] ${activeTab === "details" ? "ring-1 ring-indigo-500/50" : ""}`}
             >
-              <span className="flex items-center gap-3 text-white">
-                <User className="w-4 h-4" />
-                פרטים כלליים
-              </span>
-              {activeTab === "details" ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <User className="w-4 h-4 text-gray-400" />
+                </div>
+                <span>פרטים כלליים</span>
+              </div>
+              {activeTab === "details" ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
             </button>
             {activeTab === "details" && (
               <div className="p-6 bg-[#111] animate-in fade-in duration-200">
@@ -690,18 +718,20 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
           )}
 
           {/* Tab Content: Tags & Notes */}
-          <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
+          <div className="w-full flex flex-col mb-3">
             <button
               type="button"
               id="tab-tags"
               onClick={() => handleTabClick("tags")}
-              className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "tags" ? "ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative" : "border-b border-white/5"}`}
+              className={`w-full h-[68px] px-4 hover:bg-[#1a1a1a] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-all rounded-2xl border border-white/5 bg-[#141414] ${activeTab === "tags" ? "ring-1 ring-indigo-500/50" : ""}`}
             >
-              <span className="flex items-center gap-3 text-white">
-                <Tag className="w-4 h-4" />
-                תיוגים והערות
-              </span>
-              {activeTab === "tags" ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <Tag className="w-4 h-4 text-gray-400" />
+                </div>
+                <span>תיוגים והערות</span>
+              </div>
+              {activeTab === "tags" ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
             </button>
             {activeTab === "tags" && (
               <div className="p-6 bg-[#111] animate-in fade-in duration-200">
@@ -756,18 +786,20 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
           </div>
 
           {/* Tab Content: Company & Lead Source */}
-          <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
+          <div className="w-full flex flex-col mb-3">
             <button
               type="button"
               id="tab-company"
               onClick={() => handleTabClick("company")}
-              className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "company" ? "ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative" : "border-b border-white/5"}`}
+              className={`w-full h-[68px] px-4 hover:bg-[#1a1a1a] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-all rounded-2xl border border-white/5 bg-[#141414] ${activeTab === "company" ? "ring-1 ring-indigo-500/50" : ""}`}
             >
-              <span className="flex items-center gap-3 text-white">
-                <Building className="w-4 h-4" />
-                חברה ומקור
-              </span>
-              {activeTab === "company" ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <Building className="w-4 h-4 text-gray-400" />
+                </div>
+                <span>חברה ומקור</span>
+              </div>
+              {activeTab === "company" ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
             </button>
             {activeTab === "company" && (
               <div className="p-6 bg-[#111] animate-in fade-in duration-200">
@@ -1095,31 +1127,236 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
           )}
           </div>
 
+          {/* Custom Tabs */}
+          {customTabsConfig.map(tab => {
+             let IconCmp = Plus;
+             if (tab.icon === "Star") IconCmp = require("lucide-react").Star;
+             else if (tab.icon === "Heart") IconCmp = require("lucide-react").Heart;
+             else if (tab.icon === "Briefcase") IconCmp = require("lucide-react").Briefcase;
+             else if (tab.icon === "Zap") IconCmp = require("lucide-react").Zap;
+             else if (tab.icon === "Globe") IconCmp = require("lucide-react").Globe;
+             else IconCmp = require("lucide-react").Folder;
+
+             return (
+              <div key={tab.id} className="w-full flex flex-col mb-3">
+                <button
+                  type="button"
+                  id={`tab-${tab.id}`}
+                  onClick={() => handleTabClick(tab.id as any)}
+                  className={`w-full h-[68px] px-4 hover:bg-[#1a1a1a] flex items-center justify-between font-bold text-emerald-400 text-sm cursor-pointer transition-all rounded-2xl border border-white/5 bg-[#141414] ${activeTab === tab.id ? "ring-1 ring-emerald-500/50" : ""}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      <IconCmp className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span>{tab.title}</span>
+                  </div>
+                  {activeTab === tab.id ? <ChevronUp className="h-5 w-5 text-emerald-500" /> : <ChevronDown className="h-5 w-5 text-emerald-500" />}
+                </button>
+                {activeTab === tab.id && (
+                  <div className="p-6 bg-[#111] animate-in fade-in duration-200">
+                    <div className="flex justify-end mb-4">
+                      <Button type="button" onClick={() => setShowAddFieldModal(true)} className="bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs py-1.5 px-3 flex items-center gap-2">
+                        <Plus className="w-3.5 h-3.5" /> הוסף שדה ללשונית זו
+                      </Button>
+                    </div>
+                    {customFieldsConfig.filter(f => f.category === tab.id).length === 0 ? (
+                      <div className="text-center p-8 border border-dashed border-white/10 rounded-2xl text-slate-500 text-sm">
+                        אין עדיין שדות בלשונית זו.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {customFieldsConfig.filter(f => f.category === tab.id).map((f: any) => (
+                          <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' ? 'col-span-1 md:col-span-2' : ''}`}>
+                            <label className="text-xs font-bold text-slate-600">{f.label}</label>
+                            
+                            {f.type === 'documents' ? (
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {(customFieldsValues[f.id] || []).map((doc: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100 text-xs">
+                                      <a href={typeof doc === 'string' ? doc : doc.url} target="_blank" className="hover:underline max-w-[200px] truncate font-semibold">
+                                        {typeof doc === 'string' ? 'מסמך ' + (i+1) : doc.name}
+                                      </a>
+                                      <button type="button" onClick={() => {
+                                        const newDocs = [...(customFieldsValues[f.id] || [])];
+                                        newDocs.splice(i, 1);
+                                        setCustomFieldsValues({ ...customFieldsValues, [f.id]: newDocs });
+                                      }} className="text-indigo-400 hover:text-red-500 transition-colors">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex items-center gap-2 relative">
+                                  <Input
+                                    type="file"
+                                    multiple
+                                    disabled={uploadingFieldId === f.id}
+                                    onChange={async (e) => {
+                                      const files = e.target.files;
+                                      if (!files || files.length === 0) return;
+                                      setUploadingFieldId(f.id);
+                                      const newDocs = [...(customFieldsValues[f.id] || [])];
+                                      for (let i = 0; i < files.length; i++) {
+                                        const file = files[i];
+                                        const formData = new FormData();
+                                        formData.append("file", file);
+                                        try {
+                                          const res = await uploadMediaFile(formData);
+                                          if (res.success && res.url) {
+                                            newDocs.push({ name: file.name, url: res.url });
+                                          }
+                                        } catch (err) {
+                                          console.error("Upload failed", err);
+                                        }
+                                      }
+                                      setCustomFieldsValues({ ...customFieldsValues, [f.id]: newDocs });
+                                      setUploadingFieldId(null);
+                                      e.target.value = "";
+                                    }}
+                                    className="bg-white border border-slate-200 rounded-xl text-xs py-2 h-auto"
+                                  />
+                                  {uploadingFieldId === f.id && (
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-white px-2 py-1 rounded-md">
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> מעלה...
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <Input
+                                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+                                value={customFieldsValues[f.id] || ""}
+                                onChange={(e) => setCustomFieldsValues({ ...customFieldsValues, [f.id]: e.target.value })}
+                                placeholder={f.label}
+                                className="bg-white border border-slate-200 rounded-xl"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+             )
+          })}
+
+          <div className="flex justify-center mb-6 mt-4">
+             <button type="button" onClick={() => setShowAddTabModal(true)} className="flex items-center gap-2 px-6 py-3 border border-dashed border-white/10 rounded-2xl text-slate-500 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all font-bold text-sm w-full justify-center">
+               <Plus className="w-4 h-4" /> הוסף לשונית מותאמת אישית
+             </button>
+          </div>
+
           {/* Footer buttons */}
-          <Modal.Footer>
-            <div className="flex gap-3 justify-end w-full">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="rounded-xl font-bold h-11 px-6"
-                disabled={loading}
-              >
-                ביטול
-              </Button>
+          <Modal.Footer className="bg-transparent border-t-0 p-0 mt-8">
+            <div className="flex w-full justify-start rtl:justify-end">
               <Button
                 type="submit"
                 variant="primary"
-                className="rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white h-11 px-8 min-w-[120px]"
+                className="rounded-2xl font-black bg-[#5B45F8] hover:bg-[#4a36d6] text-white h-[56px] px-8 min-w-[160px] shadow-lg shadow-indigo-500/20"
                 disabled={loading}
               >
-                {loading ? "שומר..." : "שמור שינויים"}
+                {loading ? "שומר..." : (isEdit ? "שמור שינויים" : "צור איש קשר")}
               </Button>
             </div>
           </Modal.Footer>
         </form>
         </div>
       </Modal.Content>
+      <AddTabModal 
+        isOpen={showAddTabModal} 
+        onClose={() => setShowAddTabModal(false)} 
+        isAdding={isAddingTab}
+        onSave={async (data: any) => {
+          setIsAddingTab(true);
+          const res = await addCustomTab({ title: data.title, icon: data.icon });
+          if (res.success && res.tab) {
+            setCustomTabsConfig([...customTabsConfig, { id: res.tab.id, title: data.title, icon: data.icon }]);
+            setShowAddTabModal(false);
+          }
+          setIsAddingTab(false);
+        }}
+      />
+      <AddFieldModal
+        isOpen={showAddFieldModal}
+        onClose={() => setShowAddFieldModal(false)}
+        isAdding={isAddingField}
+        onSave={async (data: any) => {
+          if (!activeTab) return;
+          setIsAddingField(true);
+          const res = await addCustomField({ category: activeTab as string, label: data.label, type: data.type });
+          if (res.success && res.field) {
+            const newField = { id: res.field.id, category: activeTab as string, label: data.label, type: data.type };
+            setCustomFieldsConfig([...customFieldsConfig, newField]);
+            setShowAddFieldModal(false);
+          }
+          setIsAddingField(false);
+        }}
+      />
     </Modal>
   );
+}
+
+function AddTabModal({ isOpen, onClose, onSave, isAdding }: any) {
+  const [title, setTitle] = useState("");
+  const [icon, setIcon] = useState("Folder");
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-[2rem] p-6 space-y-6 shadow-2xl">
+        <h3 className="text-xl font-black text-white text-right">הוספת לשונית חדשה</h3>
+        <div className="space-y-1.5 text-right">
+          <label className="text-xs font-bold text-slate-400">כותרת הלשונית</label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="לדוגמה: פרטי רכב" />
+        </div>
+        <div className="space-y-1.5 text-right">
+          <label className="text-xs font-bold text-slate-400">אייקון</label>
+          <select value={icon} onChange={(e) => setIcon(e.target.value)} className="w-full bg-[#181818] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+            <option value="Folder">תיקייה</option>
+            <option value="Star">כוכב</option>
+            <option value="Heart">לב</option>
+            <option value="Briefcase">תיק עבודות</option>
+            <option value="Zap">ברק</option>
+            <option value="Globe">כדור הארץ</option>
+          </select>
+        </div>
+        <div className="flex gap-3">
+          <Button type="button" onClick={onClose} className="flex-1 bg-white/10 text-white rounded-xl">ביטול</Button>
+          <Button type="button" onClick={() => onSave({ title, icon })} disabled={isAdding || !title} className="flex-1 bg-emerald-600 text-white rounded-xl">שמור</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AddFieldModal({ isOpen, onClose, onSave, isAdding }: any) {
+  const [label, setLabel] = useState("");
+  const [type, setType] = useState("text");
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-[2rem] p-6 space-y-6 shadow-2xl">
+        <h3 className="text-xl font-black text-white text-right">הוספת שדה ללשונית</h3>
+        <div className="space-y-1.5 text-right">
+          <label className="text-xs font-bold text-slate-400">שם השדה</label>
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="לדוגמה: סוג רכב" />
+        </div>
+        <div className="space-y-1.5 text-right">
+          <label className="text-xs font-bold text-slate-400">סוג נתונים</label>
+          <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-[#181818] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+            <option value="text">טקסט (Text)</option>
+            <option value="number">מספר (Number)</option>
+            <option value="date">תאריך (Date)</option>
+            <option value="documents">מסמכים (קובץ/תמונה מרובים)</option>
+          </select>
+        </div>
+        <div className="flex gap-3">
+          <Button type="button" onClick={onClose} className="flex-1 bg-white/10 text-white rounded-xl">ביטול</Button>
+          <Button type="button" onClick={() => onSave({ label, type })} disabled={isAdding || !label} className="flex-1 bg-emerald-600 text-white rounded-xl">שמור</Button>
+        </div>
+      </div>
+    </div>
+  )
 }

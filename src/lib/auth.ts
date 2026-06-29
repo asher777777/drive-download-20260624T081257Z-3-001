@@ -120,10 +120,90 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })
   ],
   callbacks: {
-    jwt({ token, user, account }) {
-      if (user) {
-        token.role = user.role;
-        token.id = user.id;
+    async jwt({ token, user, account }) {
+      if (user && account) {
+        if (account.provider === "google") {
+          try {
+            const email = user.email;
+            if (email) {
+              const usersRef = adminDb.collection("users");
+              const snapshot = await usersRef.where("email", "==", email).limit(1).get();
+              
+              if (!snapshot.empty) {
+                // User exists, pull role and id from Firestore
+                const userDoc = snapshot.docs[0];
+                const userData = userDoc.data();
+                token.id = userDoc.id;
+                token.role = userData.role || "USER";
+              } else {
+                // User doesn't exist, create a new one
+                const newUserRef = usersRef.doc();
+                const newUserData = {
+                  username: email.split("@")[0],
+                  email: email,
+                  name: user.name || email.split("@")[0],
+                  role: "USER",
+                  createdAt: new Date().toISOString(),
+                  authProvider: "google"
+                };
+                await newUserRef.set(newUserData);
+                
+                // Add as CRM Contact for the admin
+                try {
+                  const communitiesRef = adminDb.collection("communities");
+                  const commSnap = await communitiesRef.where("ownerId", "==", "1").where("name", "==", "קהילת לקוחות").limit(1).get();
+                  let communityId = "";
+                  if (commSnap.empty) {
+                    const newCommRef = communitiesRef.doc();
+                    await newCommRef.set({
+                      ownerId: "1",
+                      name: "קהילת לקוחות",
+                      icon: "Users",
+                      color: "#3b82f6",
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    });
+                    communityId = newCommRef.id;
+                  } else {
+                    communityId = commSnap.docs[0].id;
+                  }
+
+                  const contactsRef = adminDb.collection("contacts");
+                  const nameParts = (user.name || email.split("@")[0]).split(" ");
+                  const firstName = nameParts[0] || "";
+                  const lastName = nameParts.slice(1).join(" ") || "";
+                  
+                  await contactsRef.add({
+                    ownerId: "1",
+                    status: "active",
+                    conta_name: firstName,
+                    f_m: lastName,
+                    email: email,
+                    conta_phone: "",
+                    lead_source: "הרשמה מגוגל",
+                    communityIds: [communityId],
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  });
+                } catch (e) {
+                  console.error("Failed to create CRM contact for new Google user:", e);
+                }
+                
+                token.id = newUserRef.id;
+                token.role = "USER";
+              }
+            }
+          } catch (error) {
+            console.error("Error linking Google account in jwt:", error);
+            // Fallbacks if DB fails
+            token.role = "USER";
+            token.id = user.id;
+          }
+        } else {
+          // Credentials login already provides the exact ID and role
+          token.role = user.role;
+          token.id = user.id;
+        }
       }
       return token;
     },
