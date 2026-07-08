@@ -45,7 +45,7 @@ export function DashboardShell({
     <div className="flex flex-col h-[100dvh] bg-slate-900 md:items-center md:justify-center overflow-hidden" dir="rtl">
       
       {/* Phone Frame Wrapper */}
-      <div className="w-full max-w-[430px] h-[100dvh] md:h-auto md:max-h-[90vh] md:aspect-[9/19] flex flex-col relative overflow-hidden bg-[#0f172a] shadow-2xl mx-auto md:rounded-[3rem] md:border-[8px] md:border-slate-800 text-white">
+      <div className="w-full max-w-[430px] h-[100dvh] md:h-auto md:max-h-[90vh] md:aspect-[9/19] flex flex-col relative overflow-hidden bg-[#0f172a] shadow-2xl mx-auto md:rounded-[3rem] md:border-[8px] md:border-slate-800">
         
         {/* Top Navigation Bar */}
         <header className="h-[100px] shrink-0 bg-[#0f172a] text-white flex items-center justify-between px-4 z-50 relative">
