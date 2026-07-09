@@ -41,6 +41,7 @@ export interface FormField {
   textColor?: string;
   fontSize?: number;
   communityId?: string;
+  autocomplete?: string;
 }
 
 export interface FormStepConfig {
@@ -176,7 +177,8 @@ const FIELD_TYPES = [
 
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
   const value = { ...rawValue, fields: rawValue.fields || [] };
-  const [activeTab, setActiveTab] = useState<"templates" | "type" | "fields" | "whatsapp" | "settings">("templates");
+  const [mainTab, setMainTab] = useState<"settings" | "fields">("settings");
+  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings">("templates");
   const [expandedField, setExpandedField] = useState<number | null>(null);
   const [activeFieldTab, setActiveFieldTab] = useState<"settings" | "design" | "mapping" | "advanced">("settings");
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
@@ -345,8 +347,75 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
         </div>
       )}
 
-      {value.enabled && (
+      {value.enabled && value.fields.length === 0 && (
+        <div className="bg-zinc-950 border border-white/5 rounded-2xl p-10 text-center text-white space-y-6 animate-in fade-in duration-300">
+          <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <LayoutTemplate className="w-8 h-8 text-amber-500" />
+          </div>
+          <h3 className="text-xl font-bold">ברוכים הבאים לעורך הטפסים!</h3>
+          <p className="text-slate-400">נראה שעדיין לא בחרת טופס. האם תרצה לפתוח תבנית קיימת או לייצר טופס חדש מאפס?</p>
+          
+          <div className="flex flex-col gap-4 max-w-sm mx-auto mt-8">
+            <div className="bg-zinc-900 border border-white/10 p-4 rounded-xl space-y-3">
+              <label className="block font-semibold text-sm">טען מתבנית שמורה</label>
+              <select
+                onChange={(e) => {
+                  const t = templates.find(t => t.id === e.target.value);
+                  if (t) {
+                    handleLoadTemplate(t.config);
+                    setMainTab("fields");
+                  }
+                }}
+                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold text-sm"
+              >
+                <option value="">-- בחר תבנית לטעינה --</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-4 py-2">
+              <div className="h-px bg-white/10 flex-1"></div>
+              <span className="text-xs text-slate-500 font-bold">או</span>
+              <div className="h-px bg-white/10 flex-1"></div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => {
+                addField();
+                setMainTab("fields");
+              }}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-amber-500/20 h-auto"
+            >
+              <Plus className="w-5 h-5 ml-2" />
+              ייצר טופס חדש (התחל מאפס)
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {value.enabled && value.fields.length > 0 && (
         <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex bg-zinc-950 p-1 rounded-xl border border-white/5 mb-4 shadow-inner">
+            <button 
+              onClick={() => setMainTab("settings")}
+              className={`flex-1 py-2.5 font-bold text-sm rounded-lg transition-all ${mainTab === "settings" ? "bg-zinc-800 text-amber-400 shadow-sm" : "text-slate-400 hover:text-white"}`}
+            >
+              <Settings2 className="w-4 h-4 inline-block ml-2" />
+              הגדרות טופס
+            </button>
+            <button 
+              onClick={() => setMainTab("fields")}
+              className={`flex-1 py-2.5 font-bold text-sm rounded-lg transition-all ${mainTab === "fields" ? "bg-zinc-800 text-amber-400 shadow-sm" : "text-slate-400 hover:text-white"}`}
+            >
+              <LayoutTemplate className="w-4 h-4 inline-block ml-2" />
+              ניהול שדות
+            </button>
+          </div>
+
+          <div className={mainTab === "settings" ? "space-y-4 animate-in fade-in" : "hidden"}>
           {/* TAB 0: TEMPLATES */}
           <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all">
             <button
@@ -455,20 +524,12 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               </div>
             )}
           </div>
+          </div>
+
+          <div className={mainTab === "fields" ? "w-full animate-in fade-in duration-300" : "hidden"}>
           {/* TAB 1: FIELDS & LOGIC */}
           <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all">
-            <button
-              type="button"
-              onClick={() => setActiveTab(activeTab === "fields" ? ("" as any) : "fields")}
-              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer sticky top-0 z-10 bg-zinc-950"
-            >
-              <span className="flex items-center gap-3">
-                <LayoutTemplate className="w-4 h-4 text-amber-400" /> שדות ולוגיקה
-              </span>
-              <ChevronDown className={`w-4 h-4 transition-transform text-gray-400 ${activeTab === "fields" ? "rotate-180 text-white" : ""}`} />
-            </button>
-            {activeTab === "fields" && (
-              <div className="p-4 bg-zinc-900 border-t border-white/5 space-y-4 max-w-3xl mx-auto">
+            <div className="p-4 bg-zinc-900 border-white/5 space-y-4 max-w-3xl mx-auto">
               <div className="flex justify-between items-center bg-zinc-950 border border-white/5 p-4 rounded-2xl">
                 <span className="text-xs font-bold text-slate-400">
                   סה"כ פריטים בטופס: {value.fields.length}
@@ -652,7 +713,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                         )}
                                       </div>
                                     ) : (
-                                      <div className="grid grid-cols-2 gap-4">
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div>
                                           <label className="block font-semibold mb-1 text-slate-400">ערך ברירת מחדל</label>
                                           <input
@@ -672,6 +733,24 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                             className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                                             placeholder="הזן טקסט שומר מקום..."
                                           />
+                                        </div>
+                                        <div>
+                                          <label className="block font-semibold mb-1 text-slate-400">מילוי אוטומטי (דפדפן)</label>
+                                          <select
+                                            value={field.autocomplete || ""}
+                                            onChange={(e) => handleFieldChange(idx, { autocomplete: e.target.value })}
+                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                          >
+                                            <option value="">ללא (כבוי)</option>
+                                            <option value="name">שם מלא</option>
+                                            <option value="given-name">שם פרטי</option>
+                                            <option value="family-name">שם משפחה</option>
+                                            <option value="tel">טלפון נייד</option>
+                                            <option value="email">אימייל</option>
+                                            <option value="organization">חברה/ארגון</option>
+                                            <option value="street-address">כתובת</option>
+                                            <option value="bday">תאריך לידה</option>
+                                          </select>
                                         </div>
                                       </div>
                                     )}
@@ -985,10 +1064,11 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   );
                 })}
               </div>
-              </div>
-            )}
+            </div>
+          </div>
           </div>
 
+          <div className={mainTab === "settings" ? "space-y-4 animate-in fade-in" : "hidden"}>
           {/* TAB 2: WHATSAPP AUTOMATION */}
           <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
             <button
@@ -1567,6 +1647,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
             </div>
             </div>
           )}
+          </div>
           </div>
         </div>
       )}

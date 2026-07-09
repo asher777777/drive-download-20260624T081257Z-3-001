@@ -612,6 +612,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           style={customFieldStyle}
                           required={field.required}
                           placeholder={field.label}
+                          autoComplete={field.autocomplete || undefined}
                         />
                         <label
                           htmlFor={`field-${idx}`}
@@ -683,6 +684,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                             )}
                             style={fieldBgStyle}
                             required={field.required}
+                            autoComplete={field.autocomplete || undefined}
                           >
                             <option value="" disabled hidden></option>
                             {(field.options || "").split("\n").map(opt => {
@@ -726,6 +728,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           style={customFieldStyle}
                           required={field.required}
                           placeholder={field.label}
+                          autoComplete={field.autocomplete || undefined}
                         />
                         <label
                           htmlFor={`field-${idx}`}

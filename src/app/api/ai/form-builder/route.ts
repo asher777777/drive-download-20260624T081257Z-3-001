@@ -68,6 +68,7 @@ interface FormField {
   calc_formula?: string;
   icon?: string; // "user" | "phone" | "mail" | "map-pin" | "building" | "briefcase" | "calendar" | "file-text" | "heart" | "smile" | "alert-circle" | "credit-card" | "coins"
   widthPercentage: 100; // ALWAYS 100 — single column mandatory
+  autocomplete?: string; // e.g., "name", "given-name", "tel", "email", "organization"
 }
 
 interface FormConfig {
