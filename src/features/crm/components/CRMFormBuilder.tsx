@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { 
   Plus, Trash2, Settings, Check, Sparkles, 
-  Settings2, MoveUp, MoveDown, Clock, Coins, Save, ChevronDown, LayoutTemplate, MessageCircle, Palette
+  Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -32,6 +32,12 @@ export interface FormField {
   widthPercentage?: number;
 }
 
+export interface FormStepConfig {
+  step: number;
+  title: string;
+  icon: string;
+}
+
 export interface LogicAction {
   id: string;
   field_index: number;
@@ -47,6 +53,9 @@ export interface FormConfig {
   submit_button_text: string;
   submit_button_bg_color: string;
   submit_button_text_color: string;
+  continue_button_text?: string;
+  continue_button_icon?: string;
+  step_configs?: FormStepConfig[];
   form_bg_color?: string;
   field_bg_color?: string;
   fields: FormField[];
@@ -148,7 +157,9 @@ const FIELD_TYPES = [
   { id: "number", label: "מספר (סכום להזנה)" },
   { id: "fixed_amount", label: "סכום קבוע" },
   { id: "hidden", label: "שדה מוסתר" },
-  { id: "calculated", label: "שדה חישוב (נוסחה)" }
+  { id: "calculated", label: "שדה חישוב (נוסחה)" },
+  { id: "image_display", label: "תמונה לתצוגה (ללא קלט)" },
+  { id: "rich_text_display", label: "טקסט מעוצב (WYSIWYG) לתצוגה" }
 ];
 
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
@@ -282,12 +293,12 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
     .filter(f => f.type === "select");
 
   return (
-    <div className="bg-[#0e0e10] border border-white/5 rounded-2xl p-6 space-y-6 text-right text-white" dir="rtl">
+    <div className="bg-black border border-white/5 rounded-2xl p-6 space-y-6 text-right text-white" dir="rtl">
       {/* Header Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/10 pb-4 gap-4">
         <div>
           <h3 className="text-xl font-black text-white flex items-center gap-2">
-            <Settings2 className="w-5 h-5 text-indigo-400 animate-spin-slow" />
+            <Settings2 className="w-5 h-5 text-amber-400 animate-spin-slow" />
             מחולל טפסים ומחבר CRM מובנה
           </h3>
           <p className="text-xs text-slate-400 mt-1">
@@ -295,7 +306,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="flex items-center gap-2 bg-[#181818] border border-white/5 px-4 py-2.5 rounded-full shadow-sm">
+          <div className="flex items-center gap-2 bg-zinc-950 border border-white/5 px-4 py-2.5 rounded-xl shadow-sm">
             <label className="text-sm font-bold text-white cursor-pointer" htmlFor="form-enabled-toggle">
               הפעל טופס בעמוד:
             </label>
@@ -304,14 +315,14 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               type="checkbox"
               checked={value.enabled}
               onChange={(e) => updateConfig({ enabled: e.target.checked })}
-              className="w-4 h-4 text-indigo-600 border-slate-700 bg-slate-800 rounded focus:ring-indigo-500 cursor-pointer"
+              className="w-4 h-4 text-amber-500 border-slate-700 bg-slate-800 rounded focus:ring-amber-500 cursor-pointer"
             />
           </div>
           {value.enabled && (
             <>
-              <div className={`flex items-center gap-2 px-4 py-2.5 rounded-full border shadow-sm transition-all ${value.form_type === 'payment' ? 'bg-indigo-900/30 border-indigo-500/50' : 'bg-[#181818] border-white/5'}`}>
-                <label className={`text-sm font-bold cursor-pointer flex items-center gap-1.5 ${value.form_type === 'payment' ? 'text-indigo-300' : 'text-slate-300'}`} htmlFor="form-payment-toggle">
-                  <Coins className={`w-4 h-4 ${value.form_type === 'payment' ? 'text-indigo-400' : 'text-slate-500'}`} />
+              <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-sm transition-all ${value.form_type === 'payment' ? 'bg-amber-900/30 border-amber-500/50' : 'bg-zinc-950 border-white/5'}`}>
+                <label className={`text-sm font-bold cursor-pointer flex items-center gap-1.5 ${value.form_type === 'payment' ? 'text-amber-300' : 'text-slate-300'}`} htmlFor="form-payment-toggle">
+                  <Coins className={`w-4 h-4 ${value.form_type === 'payment' ? 'text-amber-400' : 'text-slate-500'}`} />
                   טופס תשלום:
                 </label>
                 <input
@@ -319,12 +330,12 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   type="checkbox"
                   checked={value.form_type === "payment"}
                   onChange={(e) => updateConfig({ form_type: e.target.checked ? "payment" : "standard" })}
-                  className="w-4 h-4 text-indigo-600 border-slate-700 bg-slate-800 rounded focus:ring-indigo-500 cursor-pointer"
+                  className="w-4 h-4 text-amber-500 border-slate-700 bg-slate-800 rounded focus:ring-amber-500 cursor-pointer"
                 />
               </div>
-              <div className={`flex items-center gap-2 px-4 py-2.5 rounded-full border shadow-sm transition-all ${value.form_type === 'register' ? 'bg-indigo-900/30 border-indigo-500/50' : 'bg-[#181818] border-white/5'}`}>
-                <label className={`text-sm font-bold cursor-pointer flex items-center gap-1.5 ${value.form_type === 'register' ? 'text-indigo-300' : 'text-slate-300'}`} htmlFor="form-register-toggle">
-                  <Sparkles className={`w-4 h-4 ${value.form_type === 'register' ? 'text-indigo-400' : 'text-slate-500'}`} />
+              <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-sm transition-all ${value.form_type === 'register' ? 'bg-amber-900/30 border-amber-500/50' : 'bg-zinc-950 border-white/5'}`}>
+                <label className={`text-sm font-bold cursor-pointer flex items-center gap-1.5 ${value.form_type === 'register' ? 'text-amber-300' : 'text-slate-300'}`} htmlFor="form-register-toggle">
+                  <Sparkles className={`w-4 h-4 ${value.form_type === 'register' ? 'text-amber-400' : 'text-slate-500'}`} />
                   הרשמת משתמש:
                 </label>
                 <input
@@ -332,7 +343,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   type="checkbox"
                   checked={value.form_type === "register"}
                   onChange={(e) => updateConfig({ form_type: e.target.checked ? "register" : "standard" })}
-                  className="w-4 h-4 text-indigo-600 border-slate-700 bg-slate-800 rounded focus:ring-indigo-500 cursor-pointer"
+                  className="w-4 h-4 text-amber-500 border-slate-700 bg-slate-800 rounded focus:ring-amber-500 cursor-pointer"
                 />
               </div>
             </>
@@ -343,27 +354,27 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
       {value.enabled && (
         <div className="space-y-6 animate-in fade-in duration-300">
           {/* TAB 1: FIELDS & LOGIC */}
-          <div className="w-full bg-[#181818] border border-white/5 rounded-2xl overflow-hidden transition-all">
+          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all">
             <button
               type="button"
               onClick={() => setActiveTab(activeTab === "fields" ? ("" as any) : "fields")}
-              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer"
+              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer sticky top-0 z-10 bg-zinc-950"
             >
               <span className="flex items-center gap-3">
-                <LayoutTemplate className="w-4 h-4 text-indigo-400" /> שדות ולוגיקה
+                <LayoutTemplate className="w-4 h-4 text-amber-400" /> שדות ולוגיקה
               </span>
               <ChevronDown className={`w-4 h-4 transition-transform text-gray-400 ${activeTab === "fields" ? "rotate-180 text-white" : ""}`} />
             </button>
             {activeTab === "fields" && (
-              <div className="p-4 bg-[#111] border-t border-white/5 space-y-4">
-              <div className="flex justify-between items-center bg-[#181818] border border-white/5 p-4 rounded-2xl">
+              <div className="p-4 bg-zinc-900 border-t border-white/5 space-y-4 max-w-3xl mx-auto">
+              <div className="flex justify-between items-center bg-zinc-950 border border-white/5 p-4 rounded-2xl">
                 <span className="text-xs font-bold text-slate-400">
                   סה"כ שדות בטופס: {value.fields.length}
                 </span>
                 <Button
                   type="button"
                   onClick={addField}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1 text-xs font-bold py-2 rounded-xl"
+                  className="bg-amber-500 hover:bg-amber-700 text-white gap-1 text-xs font-bold py-2 rounded-xl"
                 >
                   <Plus className="w-4 h-4" /> הוסף שדה חדש
                 </Button>
@@ -375,14 +386,14 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   return (
                     <div 
                       key={idx}
-                      className={`bg-[#181818] rounded-2xl border transition-all shadow-sm ${
-                        isExpanded ? "ring-2 ring-indigo-500/20 border-indigo-500/50" : "border-white/5"
+                      className={`bg-zinc-950 rounded-2xl border transition-all shadow-sm ${
+                        isExpanded ? "ring-2 ring-amber-500/20 border-amber-500/50" : "border-white/5"
                       }`}
                     >
                       {/* Accordion Trigger */}
                       <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div className="flex flex-wrap items-center gap-2 flex-1">
-                          <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs font-black text-slate-400">
+                          <span className="w-6 h-6 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-black text-slate-400">
                             {idx + 1}
                           </span>
                           <input
@@ -444,13 +455,13 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       {/* Expandable options details */}
                       {isExpanded && (
                         <div className="p-4 border-t border-white/5 bg-black/20 rounded-b-2xl space-y-4 text-xs">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="flex flex-col gap-4">
                             <div>
                               <label className="block font-semibold mb-1 text-slate-400">סוג שדה</label>
                               <select
                                 value={field.type}
                                 onChange={(e) => handleFieldChange(idx, { type: e.target.value })}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                               >
                                 {FIELD_TYPES.map(t => (
                                   <option key={t.id} value={t.id}>{t.label}</option>
@@ -468,7 +479,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                     handleFieldChange(idx, { map_to: e.target.value });
                                   }
                                 }}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                               >
                                 {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
                                   <option key={k} value={k}>{v}</option>
@@ -478,7 +489,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                     <option key={cf.id} value={cf.id}>{cf.label}</option>
                                   ))}
                                 </optgroup>}
-                                <option value="__other__" className="font-bold text-indigo-600">אחר (הוסף שדה חדש)...</option>
+                                <option value="__other__" className="font-bold text-amber-500">אחר (הוסף שדה חדש)...</option>
                               </select>
                             </div>
                             
@@ -489,7 +500,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                   type="checkbox"
                                   checked={!!field.map_to_2}
                                   onChange={(e) => handleFieldChange(idx, { map_to_2: e.target.checked ? "notes" : undefined })}
-                                  className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-800"
+                                  className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
                                 />
                                 <label htmlFor={`field-map-2-${idx}`} className="font-bold text-white cursor-pointer">
                                   מפה לשדה נוסף ב-CRM (מיפוי כפול)
@@ -507,7 +518,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                         handleFieldChange(idx, { map_to_2: e.target.value });
                                       }
                                     }}
-                                    className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                    className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                                   >
                                     {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
                                       <option key={k} value={k}>{v}</option>
@@ -517,7 +528,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                         <option key={cf.id} value={cf.id}>{cf.label}</option>
                                       ))}
                                     </optgroup>}
-                                    <option value="__other__" className="font-bold text-indigo-400">אחר (הוסף שדה חדש)...</option>
+                                    <option value="__other__" className="font-bold text-amber-400">אחר (הוסף שדה חדש)...</option>
                                   </select>
                                 </div>
                               )}
@@ -527,7 +538,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                               <select
                                 value={field.widthPercentage || 100}
                                 onChange={(e) => handleFieldChange(idx, { widthPercentage: Number(e.target.value) })}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                               >
                                 {WIDTH_OPTIONS.map(w => (
                                   <option key={w.id} value={w.id}>{w.label}</option>
@@ -539,7 +550,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                               <select
                                 value={field.icon || ""}
                                 onChange={(e) => handleFieldChange(idx, { icon: e.target.value })}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                               >
                                 {ICON_OPTIONS.map(i => (
                                   <option key={i.id} value={i.id}>{i.label}</option>
@@ -552,7 +563,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 type="checkbox"
                                 checked={field.required}
                                 onChange={(e) => handleFieldChange(idx, { required: e.target.checked })}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-800"
+                                className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
                               />
                               <label htmlFor={`field-required-${idx}`} className="font-bold text-white cursor-pointer">
                                 שדה חובה למילוי?
@@ -566,7 +577,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 max="10"
                                 value={field.step || 1}
                                 onChange={(e) => handleFieldChange(idx, { step: parseInt(e.target.value) || 1 })}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                               />
                             </div>
                           </div>
@@ -578,7 +589,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 value={field.options}
                                 onChange={(e) => handleFieldChange(idx, { options: e.target.value })}
                                 rows={3}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-3 outline-none resize-none font-mono"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-3 outline-none resize-none font-mono"
                                 placeholder="אפשרות א'&#10;אפשרות ב'&#10;אפשרות ג'"
                               />
                             </div>
@@ -591,16 +602,16 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 type="text"
                                 value={field.default_value}
                                 onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
-                                className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                                 placeholder="הזן ערך מוגדר מראש"
                               />
                             </div>
                           )}
 
                           {field.type === "calculated" && (
-                            <div className="bg-indigo-900/20 p-4 rounded-xl border border-indigo-500/30">
-                              <label className="block font-semibold mb-1 text-indigo-300">נוסחת חישוב חשבונית</label>
-                              <p className="text-indigo-400 mb-2 text-xs">
+                            <div className="bg-amber-900/20 p-4 rounded-xl border border-amber-500/30">
+                              <label className="block font-semibold mb-1 text-amber-300">נוסחת חישוב חשבונית</label>
+                              <p className="text-amber-400 mb-2 text-xs">
                                 כתוב נוסחה חשבונית (כפל <code>*</code>, חילוק <code>/</code>, חיבור <code>+</code>, חיסור <code>-</code>).<br/>
                                 כדי להשתמש בערך של שדה אחר, הקלד את שם השדה בתוך סוגריים מרובעים. לדוגמה: <code>[כמות משתתפים] * 50 + 10</code>
                               </p>
@@ -608,7 +619,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 type="text"
                                 value={field.calc_formula || ""}
                                 onChange={(e) => handleFieldChange(idx, { calc_formula: e.target.value })}
-                                className="w-full bg-[#181818] text-white border border-indigo-500/30 rounded-xl p-3 outline-none font-mono text-left"
+                                className="w-full bg-zinc-950 text-white border border-amber-500/30 rounded-xl p-3 outline-none font-mono text-left"
                                 placeholder="e.g. [amount] * 0.17"
                                 dir="ltr"
                               />
@@ -623,7 +634,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 type="checkbox"
                                 checked={field.url_param_enable}
                                 onChange={(e) => handleFieldChange(idx, { url_param_enable: e.target.checked })}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-800"
+                                className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
                               />
                               <label htmlFor={`field-url-${idx}`} className="font-bold text-white cursor-pointer">
                                 משיכת ערך מפרמטר בכתובת URL?
@@ -636,7 +647,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                   type="text"
                                   value={field.url_param_name}
                                   onChange={(e) => handleFieldChange(idx, { url_param_name: e.target.value })}
-                                  className="bg-[#181818] text-white border border-white/10 rounded-xl p-2 outline-none w-32"
+                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none w-32"
                                   placeholder="e.g. promo"
                                 />
                               </div>
@@ -651,7 +662,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 type="checkbox"
                                 checked={field.cond_enable}
                                 onChange={(e) => handleFieldChange(idx, { cond_enable: e.target.checked })}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-800"
+                                className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
                               />
                               <label htmlFor={`field-cond-${idx}`} className="font-bold text-white cursor-pointer">
                                 הפעל לוגיקה תנאית (Conditional Logic)?
@@ -659,12 +670,12 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                             </div>
                             
                             {field.cond_enable && (
-                              <div className="bg-indigo-900/20 border border-indigo-500/30 p-3.5 rounded-2xl flex flex-wrap gap-3 items-center">
+                              <div className="bg-amber-900/20 border border-amber-500/30 p-3.5 rounded-2xl flex flex-wrap gap-3 items-center">
                                 <span className="text-white">הצג שדה זה רק אם שדה:</span>
                                 <select
                                   value={field.cond_field_index}
                                   onChange={(e) => handleFieldChange(idx, { cond_field_index: parseInt(e.target.value) })}
-                                  className="bg-[#181818] text-white border border-white/10 rounded-xl p-2 outline-none min-w-[120px]"
+                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none min-w-[120px]"
                                 >
                                   <option value="">בחר שדה...</option>
                                   {selectFields
@@ -677,7 +688,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 <select
                                   value={field.cond_operator}
                                   onChange={(e) => handleFieldChange(idx, { cond_operator: e.target.value })}
-                                  className="bg-[#181818] text-white border border-white/10 rounded-xl p-2 outline-none"
+                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
                                 >
                                   <option value="is">שווה ל-</option>
                                   <option value="is_not">שונה מ-</option>
@@ -687,7 +698,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                   value={field.cond_value}
                                   onChange={(e) => handleFieldChange(idx, { cond_value: e.target.value })}
                                   placeholder="הזן ערך"
-                                  className="bg-[#181818] text-white border border-white/10 rounded-xl p-2 outline-none w-32"
+                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none w-32"
                                 />
                               </div>
                             )}
@@ -703,11 +714,11 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
           </div>
 
           {/* TAB 2: WHATSAPP AUTOMATION */}
-          <div className="w-full bg-[#181818] border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
+          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
             <button
               type="button"
               onClick={() => setActiveTab(activeTab === "whatsapp" ? ("" as any) : "whatsapp")}
-              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer"
+              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer sticky top-0 z-10 bg-zinc-950"
             >
               <span className="flex items-center gap-3">
                 <MessageCircle className="w-4 h-4 text-green-400" /> הודעות WhatsApp
@@ -715,13 +726,13 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               <ChevronDown className={`w-4 h-4 transition-transform text-gray-400 ${activeTab === "whatsapp" ? "rotate-180 text-white" : ""}`} />
             </button>
             {activeTab === "whatsapp" && (
-              <div className="p-4 bg-[#111] border-t border-white/5 space-y-6">
-              <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-2xl text-xs space-y-2">
-                <h4 className="font-bold text-indigo-300 flex items-center gap-1.5">
-                  <Sparkles className="w-4.5 h-4.5 text-indigo-400" />
+              <div className="p-4 bg-zinc-900 border-t border-white/5 space-y-6 max-w-3xl mx-auto">
+              <div className="bg-amber-900/20 border border-amber-500/30 p-4 rounded-2xl text-xs space-y-2">
+                <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Sparkles className="w-4.5 h-4.5 text-amber-400" />
                   הסבר על מנגנון הוואטסאפ האוטומטי
                 </h4>
-                <p className="text-indigo-400 leading-relaxed">
+                <p className="text-amber-400 leading-relaxed">
                   הודעות וואטסאפ יישלחו אוטומטית למספר הטלפון שיוזן בשדה הממופה ל-<strong>"טלפון נייד"</strong> בטופס.
                   תוכלו להשתמש בפלייסהולדרים המייצגים את שדות הטופס על ידי לחיצה על כפתורי השדות למטה, והמערכת תחלץ את התוכן של המשתמש.
                 </p>
@@ -733,7 +744,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       onClick={() => handlePlaceholderClick(`{${f.label}}`, 
                         value.form_type === "payment" ? "payment_success_message" : "standard_whatsapp_message"
                       )}
-                      className="px-2.5 py-1 rounded bg-indigo-900/50 hover:bg-indigo-800 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold"
+                      className="px-2.5 py-1 rounded bg-amber-900/50 hover:bg-amber-800 border border-amber-500/30 text-amber-300 text-[10px] font-bold"
                     >
                       {`{${f.label}}`}
                     </button>
@@ -762,7 +773,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               {value.form_type === "standard" ? (
                 /* Standard Lead Form WhatsApp Settings */
                 <div className="space-y-4">
-                  <div className="bg-[#181818] p-5 rounded-3xl border border-white/5 space-y-4">
+                  <div className="bg-zinc-950 p-5 rounded-2xl border border-white/5 space-y-4">
                     <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
                       וואטסאפ לאחר שליחת ליד מוצלחת
                     </h4>
@@ -773,7 +784,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                         value={value.standard_whatsapp_message}
                         onChange={(e) => updateConfig({ standard_whatsapp_message: e.target.value })}
                         rows={4}
-                        className="w-full bg-[#111] text-white border border-white/10 rounded-xl p-3 outline-none resize-none text-xs"
+                        className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-3 outline-none resize-none text-xs"
                         placeholder="שלום {שם מלא}, קיבלנו את פרטיך..."
                       />
                     </div>
@@ -788,9 +799,9 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 </div>
               ) : (
                 /* Payment Form WhatsApp Settings (Pending & Success) */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-6">
                   {/* Pending Form message */}
-                  <div className="bg-[#181818] p-5 rounded-3xl border border-white/5 space-y-4 flex flex-col justify-between">
+                  <div className="bg-zinc-950 p-5 rounded-2xl border border-white/5 space-y-4 flex flex-col justify-between">
                     <div className="space-y-3">
                       <h4 className="font-bold text-amber-500 text-sm border-b border-white/10 pb-2 flex items-center gap-1.5">
                         <Clock className="w-4 h-4" />
@@ -803,7 +814,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                           value={value.payment_pending_message}
                           onChange={(e) => updateConfig({ payment_pending_message: e.target.value })}
                           rows={4}
-                          className="w-full bg-[#111] text-white border border-white/10 rounded-xl p-3 outline-none resize-none text-xs"
+                          className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-3 outline-none resize-none text-xs"
                           placeholder="שלום {שם מלא}, ההזמנה שלך נוצרה וממתינה לתשלום..."
                         />
                       </div>
@@ -818,7 +829,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   </div>
 
                   {/* Success Form message */}
-                  <div className="bg-[#181818] p-5 rounded-3xl border border-white/5 space-y-4 flex flex-col justify-between">
+                  <div className="bg-zinc-950 p-5 rounded-2xl border border-white/5 space-y-4 flex flex-col justify-between">
                     <div className="space-y-3">
                       <h4 className="font-bold text-emerald-400 text-sm border-b border-white/10 pb-2 flex items-center gap-1.5">
                         <Check className="w-4 h-4" />
@@ -831,7 +842,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                           value={value.payment_success_message}
                           onChange={(e) => updateConfig({ payment_success_message: e.target.value })}
                           rows={4}
-                          className="w-full bg-[#111] text-white border border-white/10 rounded-xl p-3 outline-none resize-none text-xs"
+                          className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-3 outline-none resize-none text-xs"
                           placeholder="שלום {שם מלא}, התשלום בסך {סכום} שח בוצע בהצלחה..."
                         />
                       </div>
@@ -851,11 +862,11 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
           </div>
 
           {/* TAB 3: GENERAL SETTINGS & DESIGN */}
-          <div className="w-full bg-[#181818] border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
+          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
             <button
               type="button"
               onClick={() => setActiveTab(activeTab === "settings" ? ("" as any) : "settings")}
-              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer"
+              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer sticky top-0 z-10 bg-zinc-950"
             >
               <span className="flex items-center gap-3">
                 <Palette className="w-4 h-4 text-pink-400" /> הגדרות ועיצוב
@@ -863,10 +874,10 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               <ChevronDown className={`w-4 h-4 transition-transform text-gray-400 ${activeTab === "settings" ? "rotate-180 text-white" : ""}`} />
             </button>
             {activeTab === "settings" && (
-              <div className="p-4 bg-[#111] border-t border-white/5 space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="p-4 bg-zinc-900 border-t border-white/5 space-y-6 max-w-3xl mx-auto">
+            <div className="flex flex-col gap-6">
               {/* Left Column: Settings */}
-              <div className="bg-[#181818] p-6 rounded-3xl border border-white/5 space-y-4 text-xs">
+              <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs">
                 <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
                   תבניות טפסים
                 </h4>
@@ -879,7 +890,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                         if (t) handleLoadTemplate(t.config);
                         e.target.value = "";
                       }}
-                      className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
                     >
                       <option value="">-- בחר תבנית לטעינה --</option>
                       {templates.map(t => (
@@ -895,10 +906,10 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                         value={templateName}
                         onChange={(e) => setTemplateName(e.target.value)}
                         placeholder="שם התבנית (למשל: טופס הרשמה לקייטנה)"
-                        className="flex-1 bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
+                        className="flex-1 bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
                       />
-                      <Button type="button" onClick={handleSaveTemplate} disabled={isSavingTemplate} size="sm" className="rounded-xl h-auto flex gap-1 bg-indigo-600 hover:bg-indigo-700 text-white">
-                        <Save className="w-4 h-4" /> שמור
+                      <Button type="button" onClick={handleSaveTemplate} disabled={isSavingTemplate} size="sm" className="rounded-xl h-auto flex gap-1 bg-transparent border border-white/10 hover:bg-white/5 text-white p-2.5">
+                        <Folder className={`w-5 h-5 ${isSavingTemplate ? 'text-white animate-pulse' : 'text-amber-500'}`} />
                       </Button>
                     </div>
                   </div>
@@ -913,7 +924,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   <select
                     value={value.form_type}
                     onChange={(e) => updateConfig({ form_type: e.target.value as any })}
-                    className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                    className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
                   >
                     <option value="standard">טופס לידים / יצירת קשר רגיל</option>
                     <option value="payment">טופס תרומות ותשלום (Nedarim API)</option>
@@ -927,7 +938,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                     <select
                       value={value.register_role || "TRIAL"}
                       onChange={(e) => updateConfig({ register_role: e.target.value as "DEVELOPING" | "TRIAL" })}
-                      className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
                     >
                       <option value="TRIAL">משתמש ניסיון ל-14 יום (Trial)</option>
                       <option value="DEVELOPING">משתמש מתפתח (Developing)</option>
@@ -939,14 +950,14 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 )}
 
                 {value.form_type === "payment" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
                     <div>
                       <label className="block font-semibold mb-1 text-slate-400">סכום ברירת מחדל לתשלום (ש"ח)</label>
                       <input
                         type="number"
                         value={value.payment_amount}
                         onChange={(e) => updateConfig({ payment_amount: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono"
                         placeholder="180"
                         min="1"
                       />
@@ -956,7 +967,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       <select
                         value={value.payment_receipt_type || "405"}
                         onChange={(e) => updateConfig({ payment_receipt_type: e.target.value })}
-                        className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
                       >
                         <option value="405">קבלת תרומה (למלכ"ר / עמותה)</option>
                         <option value="400">קבלה רגילה (עוסק פטור / מורשה / בע"מ)</option>
@@ -972,7 +983,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       <select
                         value={value.payment_frequency || "one-time"}
                         onChange={(e) => updateConfig({ payment_frequency: e.target.value as any })}
-                        className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
                       >
                         <option value="one-time">רק תרומה חד פעמית</option>
                         <option value="user-choice">בחירת תורם (הצג מתג "תרומה חודשית קבועה")</option>
@@ -987,7 +998,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       <select
                         value={value.payment_amount_crm_map}
                         onChange={(e) => updateConfig({ payment_amount_crm_map: e.target.value })}
-                        className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                       >
                         {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
                           <option key={k} value={k}>{v}</option>
@@ -1007,7 +1018,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       min="1"
                       value={value.crm_save_step || ""}
                       onChange={(e) => updateConfig({ crm_save_step: parseInt(e.target.value) || undefined })}
-                      className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                       placeholder="לדוגמה: 1"
                     />
                     <p className="text-[10px] text-slate-500 mt-1">
@@ -1026,7 +1037,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                         type="text"
                         value={value.standard_success_message}
                         onChange={(e) => updateConfig({ standard_success_message: e.target.value })}
-                        className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
                         placeholder="הטופס נשלח בהצלחה."
                       />
                     </div>
@@ -1036,7 +1047,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                         type="url"
                         value={value.standard_redirect_url}
                         onChange={(e) => updateConfig({ standard_redirect_url: e.target.value })}
-                        className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono"
                         placeholder="https://example.com/thank-you"
                       />
                     </div>
@@ -1054,7 +1065,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       type="checkbox"
                       checked={value.custom_success_modal_enable}
                       onChange={(e) => updateConfig({ custom_success_modal_enable: e.target.checked })}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-800"
+                      className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
                     />
                     <label htmlFor="custom-modal-check" className="font-bold text-white cursor-pointer">
                       הצג מודל תודה מעוצב מותאם אישית (מחליף הודעת תודה רגילה)
@@ -1075,7 +1086,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                         <textarea
                           value={value.custom_success_modal_content || ""}
                           onChange={(e) => updateConfig({ custom_success_modal_content: e.target.value })}
-                          className="w-full bg-[#181818] text-white border border-white/10 rounded-xl p-3 outline-none min-h-[100px] resize-y"
+                          className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-3 outline-none min-h-[100px] resize-y"
                           placeholder="תודה רבה! נציג יחזור אליך בהקדם."
                         />
                       </div>
@@ -1098,7 +1109,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                     </div>
 
                     {(value.action_rules || []).map((rule, rIdx) => (
-                      <div key={rule.id} className="bg-[#111] p-3 rounded-xl border border-white/5 mb-3 space-y-3 relative">
+                      <div key={rule.id} className="bg-zinc-900 p-3 rounded-xl border border-white/5 mb-3 space-y-3 relative">
                         <button
                           type="button"
                           onClick={() => {
@@ -1120,7 +1131,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                               newRules[rIdx].field_index = parseInt(e.target.value);
                               updateConfig({ action_rules: newRules });
                             }}
-                            className="bg-[#181818] border border-white/10 text-white rounded px-2 py-1"
+                            className="bg-zinc-950 border border-white/10 text-white rounded px-2 py-1"
                           >
                             {selectFields.map(f => (
                               <option key={f.index} value={f.index}>{f.label}</option>
@@ -1133,7 +1144,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                               newRules[rIdx].operator = e.target.value as "is" | "is_not";
                               updateConfig({ action_rules: newRules });
                             }}
-                            className="bg-[#181818] border border-white/10 text-white rounded px-2 py-1"
+                            className="bg-zinc-950 border border-white/10 text-white rounded px-2 py-1"
                           >
                             <option value="is">שווה ל-</option>
                             <option value="is_not">שונה מ-</option>
@@ -1147,7 +1158,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                               updateConfig({ action_rules: newRules });
                             }}
                             placeholder="ערך"
-                            className="bg-[#181818] border border-white/10 text-white rounded px-2 py-1 w-24"
+                            className="bg-zinc-950 border border-white/10 text-white rounded px-2 py-1 w-24"
                           />
                         </div>
 
@@ -1160,7 +1171,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                               newRules[rIdx].action_type = e.target.value as any;
                               updateConfig({ action_rules: newRules });
                             }}
-                            className="bg-[#181818] border border-white/10 text-white rounded px-2 py-1"
+                            className="bg-zinc-950 border border-white/10 text-white rounded px-2 py-1"
                           >
                             <option value="redirect">העבר לקישור (Redirect)</option>
                             <option value="modal">הצג מודל תודה אישי (HTML)</option>
@@ -1176,7 +1187,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 updateConfig({ action_rules: newRules });
                               }}
                               placeholder={rule.action_type === "redirect" ? "https://..." : "<h1>תודה</h1>"}
-                              className="bg-[#181818] border border-white/10 text-white rounded px-2 py-1 flex-1"
+                              className="bg-zinc-950 border border-white/10 text-white rounded px-2 py-1 flex-1"
                               dir="ltr"
                             />
                           )}
@@ -1190,23 +1201,94 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 </div>
               </div>
 
+              {/* Step Configurations */}
+              <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs">
+                <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
+                  הגדרות שלבים (כותרות ואייקונים)
+                </h4>
+                <div className="space-y-4">
+                  {Array.from({ length: Math.max(1, ...(value.fields || []).map(f => f.step || 1)) }).map((_, i) => {
+                    const stepNum = i + 1;
+                    const config = (value.step_configs || []).find(c => c.step === stepNum) || { step: stepNum, title: `שלב ${stepNum}`, icon: "" };
+                    return (
+                      <div key={stepNum} className="flex gap-4 p-4 border border-white/5 bg-zinc-900 rounded-xl">
+                        <div className="flex-1">
+                          <label className="block font-semibold mb-1 text-slate-400">כותרת שלב {stepNum}</label>
+                          <input
+                            type="text"
+                            value={config.title}
+                            onChange={(e) => {
+                              const newConfigs = [...(value.step_configs || [])];
+                              const existingIndex = newConfigs.findIndex(c => c.step === stepNum);
+                              if (existingIndex >= 0) newConfigs[existingIndex].title = e.target.value;
+                              else newConfigs.push({ step: stepNum, title: e.target.value, icon: config.icon });
+                              updateConfig({ step_configs: newConfigs });
+                            }}
+                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
+                          />
+                        </div>
+                        <div className="w-1/3">
+                          <label className="block font-semibold mb-1 text-slate-400">אייקון</label>
+                          <select
+                            value={config.icon}
+                            onChange={(e) => {
+                              const newConfigs = [...(value.step_configs || [])];
+                              const existingIndex = newConfigs.findIndex(c => c.step === stepNum);
+                              if (existingIndex >= 0) newConfigs[existingIndex].icon = e.target.value;
+                              else newConfigs.push({ step: stepNum, title: config.title, icon: e.target.value });
+                              updateConfig({ step_configs: newConfigs });
+                            }}
+                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
+                          >
+                            {ICON_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Right Column: Submit Button Customizer & Preview */}
-              <div className="bg-[#181818] p-6 rounded-3xl border border-white/5 space-y-4 text-xs flex flex-col justify-between">
+              <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs flex flex-col justify-between">
                 <div className="space-y-4">
                   <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
                     עיצוב כפתור השליחה
                   </h4>
                   <div>
-                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור שליחה</label>
+                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור שליחה (סיום טופס)</label>
                     <input
                       type="text"
                       value={value.submit_button_text}
                       onChange={(e) => updateConfig({ submit_button_text: e.target.value })}
-                      className="w-full bg-[#111] text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
                       placeholder="המשך לתשלום מאובטח"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור המשך (מעבר שלב)</label>
+                    <input
+                      type="text"
+                      value={value.continue_button_text || ""}
+                      onChange={(e) => updateConfig({ continue_button_text: e.target.value })}
+                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      placeholder="המשך לשלב הבא"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">אייקון כפתור המשך</label>
+                    <select
+                      value={value.continue_button_icon || "arrow-left"}
+                      onChange={(e) => updateConfig({ continue_button_icon: e.target.value })}
+                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                    >
+                      <option value="">ללא אייקון</option>
+                      <option value="arrow-left">חץ שמאלה</option>
+                      <option value="chevron-left">חץ קטן שמאלה</option>
+                      <option value="check">וי (Check)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-4">
                     <div>
                       <label className="block font-semibold mb-1 text-slate-400">צבע רקע כפתור</label>
                       <div className="flex gap-2 items-center">
@@ -1234,17 +1316,17 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   </div>
                   
                   {/* Form & Field background color settings */}
-                  <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
+                  <div className="flex flex-col gap-4 border-t border-white/10 pt-4">
                     <div>
                       <label className="block font-semibold mb-1 text-slate-400">צבע רקע הטופס</label>
                       <div className="flex gap-2 items-center">
                         <input
                           type="color"
-                          value={value.form_bg_color || "#ffffff"}
+                          value={value.form_bg_color || "#09090b"}
                           onChange={(e) => updateConfig({ form_bg_color: e.target.value })}
                           className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
                         />
-                        <span className="font-mono text-[10px] text-white">{value.form_bg_color || "#ffffff"}</span>
+                        <span className="font-mono text-[10px] text-white">{value.form_bg_color || "#09090b"}</span>
                       </div>
                     </div>
                     <div>
@@ -1252,11 +1334,11 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                       <div className="flex gap-2 items-center">
                         <input
                           type="color"
-                          value={value.field_bg_color || "#f8fafc"}
+                          value={value.field_bg_color || "#18181b"}
                           onChange={(e) => updateConfig({ field_bg_color: e.target.value })}
                           className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
                         />
-                        <span className="font-mono text-[10px] text-white">{value.field_bg_color || "#f8fafc"}</span>
+                        <span className="font-mono text-[10px] text-white">{value.field_bg_color || "#18181b"}</span>
                       </div>
                     </div>
                   </div>
@@ -1285,7 +1367,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
       
       {/* Add Custom Field Modal */}
       <Modal isOpen={showAddCustomFieldModal} onClose={() => setShowAddCustomFieldModal(false)}>
-        <Modal.Content className="max-w-md rounded-[2rem] p-6 text-right bg-[#181818] border border-white/5 text-white">
+        <Modal.Content className="max-w-md rounded-[2rem] p-6 text-right bg-zinc-950 border border-white/5 text-white">
           <Modal.Close className="left-4 right-auto text-white/50 hover:text-white" />
           <Modal.Header title="הוספת שדה חדש ל-CRM" description="צור שדה מותאם אישית שיוצג בכרטיס איש הקשר ויהיה זמין למיפוי בטפסים." />
           
@@ -1295,7 +1377,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               <select 
                 value={newCustomFieldCategory}
                 onChange={(e) => setNewCustomFieldCategory(e.target.value)}
-                className="w-full rounded-xl border border-white/10 p-2.5 bg-[#111] text-white outline-none"
+                className="w-full rounded-xl border border-white/10 p-2.5 bg-zinc-900 text-white outline-none"
               >
                 <option value="details">פרטים כלליים</option>
                 <option value="camp">משפחה וקייטנה</option>
@@ -1317,7 +1399,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               <select 
                 value={newCustomFieldType}
                 onChange={(e) => setNewCustomFieldType(e.target.value)}
-                className="w-full rounded-xl border border-white/10 p-2.5 bg-[#111] text-white outline-none"
+                className="w-full rounded-xl border border-white/10 p-2.5 bg-zinc-900 text-white outline-none"
               >
                 <option value="text">שדה טקסט</option>
                 <option value="textarea">אזור טקסט ארוך</option>
@@ -1332,7 +1414,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 value={newCustomFieldLabel}
                 onChange={(e) => setNewCustomFieldLabel(e.target.value)}
                 placeholder="למשל: שם החיה, מצב משפחתי..."
-                className="rounded-xl bg-[#111] border-white/10 text-white placeholder-slate-500"
+                className="rounded-xl bg-zinc-900 border-white/10 text-white placeholder-slate-500"
               />
             </div>
           </div>
@@ -1340,7 +1422,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
           <Modal.Footer>
             <div className="flex gap-3 justify-end w-full">
               <Button onClick={() => setShowAddCustomFieldModal(false)} className="bg-white/10 text-white hover:bg-white/20">ביטול</Button>
-              <Button onClick={handleAddCustomField} disabled={isAddingCustomField} className="bg-indigo-600 text-white hover:bg-indigo-700">
+              <Button onClick={handleAddCustomField} disabled={isAddingCustomField} className="bg-amber-500 text-white hover:bg-amber-700">
                 {isAddingCustomField ? "שומר..." : "הוסף שדה"}
               </Button>
             </div>

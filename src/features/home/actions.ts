@@ -582,15 +582,8 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
     contact: { ...DEFAULT_HOME_CONFIG.contact, ...data.contact },
     landingSection: { ...DEFAULT_HOME_CONFIG.landingSection, ...data.landingSection },
     richContent: { ...DEFAULT_HOME_CONFIG.richContent, ...data.richContent },
-    imageListing: {
-      visible: false,
-      images: [],
-      imagesPerRow: 4,
-      form: { ...DEFAULT_FORM_CONFIG },
-      anchorId: "imageListing",
-      backgroundColor: "#ffffff",
-      hoverColor: "rgba(59, 130, 246, 0.1)"
-    },
+    imageListing: { ...DEFAULT_HOME_CONFIG.imageListing, ...data.imageListing },
+    videoGallery: { ...DEFAULT_HOME_CONFIG.videoGallery, ...data.videoGallery },
     timer: { ...DEFAULT_HOME_CONFIG.timer, ...data.timer },
     pricing: { ...DEFAULT_HOME_CONFIG.pricing, ...data.pricing },
     mobileHiddenSections: data.mobileHiddenSections || DEFAULT_HOME_CONFIG.mobileHiddenSections || [],

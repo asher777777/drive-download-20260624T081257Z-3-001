@@ -465,35 +465,35 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
   };
 
   const btnStyle = {
-    backgroundColor: config.submit_button_bg_color || "#25D366",
+    backgroundColor: config.submit_button_bg_color || "#f59e0b",
     color: config.submit_button_text_color || "#ffffff"
   };
 
   // Success UI is now a Modal rendered at the bottom
 
-  const fieldBgStyle = config.field_bg_color ? { backgroundColor: config.field_bg_color } : undefined;
+  const fieldBgStyle = config.field_bg_color && config.field_bg_color !== "#f8fafc" ? { backgroundColor: config.field_bg_color } : undefined;
 
   return (
     <div 
-      style={{ backgroundColor: config.form_bg_color || "#ffffff" }}
-      className="w-full max-w-[480px] mx-auto border border-slate-100 rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden transition-all duration-350 text-right" 
+      style={config.form_bg_color && config.form_bg_color !== "#ffffff" ? { backgroundColor: config.form_bg_color } : undefined}
+      className="w-full max-w-[480px] mx-auto border border-amber-500/20 bg-zinc-950 rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden transition-all duration-350 text-right" 
       dir="rtl"
     >
-      <div className="absolute -top-10 -left-10 w-24 h-24 bg-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
-      <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-emerald-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
+      <div className="absolute -top-10 -left-10 w-24 h-24 bg-amber-900/20 rounded-full blur-3xl opacity-60 pointer-events-none" />
+      <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-amber-900/10 rounded-full blur-3xl opacity-60 pointer-events-none" />
 
       {showCheckout && checkoutData ? (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 relative z-10">
-          <div className="flex items-center gap-2 text-indigo-900 border-b pb-3 mb-4">
-            <Coins className="w-5 h-5 text-indigo-650" />
+          <div className="flex items-center gap-2 text-amber-500 border-b pb-3 mb-4">
+            <Coins className="w-5 h-5 text-amber-400" />
             <h4 className="font-bold text-base">תשלום מאובטח</h4>
           </div>
           
           <div className="bg-slate-50 p-4 rounded-2xl border text-xs space-y-1.5 mb-2">
-            <div><strong className="text-slate-500">עבור:</strong> <span className="text-slate-800">{formTitle}</span></div>
-            <div><strong className="text-slate-500">משלם:</strong> <span className="text-slate-800">{checkoutData.clientName || "-- ללא שם --"}</span></div>
-            <div><strong className="text-slate-500">טלפון:</strong> <span className="text-slate-800">{checkoutData.phone}</span></div>
-            <div><strong className="text-slate-500">סכום לחיוב:</strong> <span className="font-black text-indigo-700">₪{checkoutData.amount}</span></div>
+            <div><strong className="text-slate-400">עבור:</strong> <span className="text-white">{formTitle}</span></div>
+            <div><strong className="text-slate-400">משלם:</strong> <span className="text-white">{checkoutData.clientName || "-- ללא שם --"}</span></div>
+            <div><strong className="text-slate-400">טלפון:</strong> <span className="text-white">{checkoutData.phone}</span></div>
+            <div><strong className="text-slate-400">סכום לחיוב:</strong> <span className="font-black text-amber-500">₪{checkoutData.amount}</span></div>
           </div>
 
           <KesherCheckout
@@ -514,12 +514,12 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           {/* Steps Progress Bar Indicator */}
           {totalSteps > 1 && (
             <div className="flex items-center justify-between mb-10 relative">
-              <div className="absolute left-0 right-0 top-1/2 h-1 bg-slate-100 -z-10 -translate-y-1/2 rounded-full"></div>
+              <div className="absolute left-0 right-0 top-1/2 h-1 bg-zinc-800 -z-10 -translate-y-1/2 rounded-full"></div>
               <div 
                 className="absolute right-0 top-1/2 h-1 -z-10 -translate-y-1/2 rounded-full transition-all duration-300" 
                 style={{ 
                   width: `${((currentStep - 1) / (totalSteps - 1 || 1)) * 100}%`,
-                  backgroundColor: config.submit_button_bg_color || "#fb923c"
+                  backgroundColor: config.submit_button_bg_color || "#f59e0b"
                 }}
               ></div>
               
@@ -531,9 +531,9 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                     key={s} 
                     className={cn(
                       "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors",
-                      isActive ? "text-white shadow-md" : "bg-white border-2 border-slate-200 text-slate-400"
+                      isActive ? "text-white shadow-md" : "bg-zinc-900 border-2 border-white/10 text-slate-500"
                     )}
-                    style={isActive ? { backgroundColor: config.submit_button_bg_color || "#fb923c" } : {}}
+                    style={isActive ? { backgroundColor: config.submit_button_bg_color || "#f59e0b" } : {}}
                   >
                     {s}
                   </div>
@@ -541,6 +541,19 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
               })}
             </div>
           )}
+
+          {/* Current Step Header */}
+          {(() => {
+            const stepConf = (config.step_configs || []).find(c => c.step === currentStep);
+            if (!stepConf) return null;
+            const StepIcon = stepConf.icon ? IconMap[stepConf.icon] : null;
+            return (
+              <div className="mb-6 pb-4 border-b border-white/10 flex items-center justify-center gap-3">
+                {StepIcon && <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30"><StepIcon className="w-5 h-5" /></div>}
+                <h3 className="text-xl font-bold text-white">{stepConf.title}</h3>
+              </div>
+            );
+          })()}
 
           <div className="flex flex-wrap -mx-2 w-[calc(100%+1rem)]">
           {config.fields.map((field, idx) => {
@@ -559,20 +572,26 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 {field.type === "hidden" ? (
                   <input type="hidden" name={field.label} value={formData[field.label] || ""} />
                 ) : field.type === "fixed_amount" ? (
-                  <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex justify-between items-center text-xs" style={fieldBgStyle}>
-                    <span className="font-semibold text-slate-500">{field.label}:</span>
-                    <span className="font-mono font-bold text-slate-800">₪{formData[field.label] || field.default_value}</span>
+                  <div className="bg-zinc-900 border border-white/5 text-white p-3 rounded-xl flex justify-between items-center text-xs" style={fieldBgStyle}>
+                    <span className="font-semibold text-slate-400">{field.label}:</span>
+                    <span className="font-mono font-bold text-white">₪{formData[field.label] || field.default_value}</span>
                   </div>
                 ) : field.type === "calculated" ? (
-                  <div className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl flex justify-between items-center text-xs" style={fieldBgStyle}>
-                    <span className="font-semibold text-indigo-900">{field.label}:</span>
-                    <span className="font-mono font-bold text-indigo-700 text-sm">
+                  <div className="bg-amber-900/20/50 border border-indigo-100 p-3 rounded-xl flex justify-between items-center text-xs" style={fieldBgStyle}>
+                    <span className="font-semibold text-amber-500">{field.label}:</span>
+                    <span className="font-mono font-bold text-amber-500 text-sm">
                       ₪{evaluateFormula(field.calc_formula || "", formData)}
                     </span>
                   </div>
+                ) : field.type === "image_display" ? (
+                  <div className="w-full rounded-xl overflow-hidden my-4 border border-white/5">
+                    <img src={field.default_value} alt={field.label} className="w-full h-auto object-cover" />
+                  </div>
+                ) : field.type === "rich_text_display" ? (
+                  <div className="prose prose-invert prose-sm max-w-none text-slate-300 my-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 leading-relaxed" dangerouslySetInnerHTML={{ __html: field.default_value }} />
                 ) : (
                   <>
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                       {FieldIcon && <FieldIcon className="w-3.5 h-3.5 text-slate-400" />}
                       {field.label}
                       {field.required && <span className="text-red-500 mr-1">*</span>}
@@ -583,8 +602,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                         value={formData[field.label] || ""}
                         onChange={(e) => handleInputChange(field.label, e.target.value)}
                         className={cn(
-                          "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-slate-800 border rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none min-h-[80px]",
-                          hasError ? "border-red-500 bg-red-50/10 focus:ring-red-500/20" : "border-slate-200 focus:border-indigo-500"
+                          "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-white border rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none min-h-[80px]",
+                          hasError ? "border-red-500 bg-red-50/10 focus:ring-red-500/20" : "border-white/10 focus:border-amber-500"
                         )}
                         style={fieldBgStyle}
                         required={field.required}
@@ -601,8 +620,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                                 className={cn(
                                   "relative flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all",
                                   isSelected 
-                                    ? "border-orange-400 bg-orange-50/50" 
-                                    : "border-slate-200 bg-white hover:border-orange-200"
+                                    ? "border-amber-500 bg-amber-500/10" 
+                                    : "border-white/10 bg-zinc-900 hover:border-amber-500/50"
                                 )}
                                 style={fieldBgStyle}
                               >
@@ -612,10 +631,10 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                                   value={clean}
                                   checked={isSelected}
                                   onChange={(e) => handleInputChange(field.label, e.target.value)}
-                                  className="w-5 h-5 text-orange-500 border-slate-300 ml-3"
+                                  className="w-5 h-5 text-amber-500 border-white/20 ml-3"
                                   required={field.required && !formData[field.label]}
                                 />
-                                <span className="font-bold text-slate-700 leading-tight">{clean}</span>
+                                <span className="font-bold text-slate-300 leading-tight">{clean}</span>
                               </label>
                             );
                           })}
@@ -625,8 +644,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           value={formData[field.label] || ""}
                           onChange={(e) => handleInputChange(field.label, e.target.value)}
                           className={cn(
-                            "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-slate-800 border rounded-xl p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all",
-                            hasError ? "border-red-500 bg-red-50/10 focus:ring-red-500/20" : "border-slate-200 focus:border-indigo-500"
+                            "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-white border rounded-xl p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all",
+                            hasError ? "border-red-500 bg-red-50/10 focus:ring-red-500/20" : "border-white/10 focus:border-amber-500"
                           )}
                           style={fieldBgStyle}
                           required={field.required}
@@ -645,8 +664,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                         value={formData[field.label] || ""}
                         onChange={(e) => handleInputChange(field.label, e.target.value)}
                         className={cn(
-                          "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-slate-800 border rounded-xl p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all",
-                          hasError ? "border-red-500 bg-red-50/10" : "border-slate-200 focus:border-indigo-500"
+                          "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-white border rounded-xl p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all",
+                          hasError ? "border-red-500 bg-red-50/10" : "border-white/10 focus:border-amber-500"
                         )}
                         style={fieldBgStyle}
                         required={field.required}
@@ -697,7 +716,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 type="button"
                 onClick={handlePrevStep}
                 variant="outline"
-                className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-slate-200 hover:bg-slate-50 cursor-pointer"
+                className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border border-white/10 text-slate-300 hover:bg-white/5 cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
                 חזור
@@ -711,8 +730,11 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 style={btnStyle}
                 className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
               >
-                המשך
-                <ChevronLeft className="w-4 h-4" />
+                {config.continue_button_text || "המשך"}
+                {config.continue_button_icon === "arrow-left" && <ChevronLeft className="w-4 h-4" />}
+                {config.continue_button_icon === "chevron-left" && <ChevronLeft className="w-4 h-4" />}
+                {config.continue_button_icon === "check" && <CheckCircle2 className="w-4 h-4" />}
+                {!config.continue_button_icon && <ChevronLeft className="w-4 h-4" />}
               </Button>
             ) : (
               <Button
@@ -740,7 +762,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
         <Modal.Content className="max-w-md rounded-[2rem] p-8 text-center bg-white border border-slate-100 shadow-2xl relative">
           <Modal.Close className="absolute left-4 top-4 right-auto" />
           
-          <div className="w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 border-2 border-emerald-500/20 flex items-center justify-center mx-auto shadow-inner animate-bounce mb-6">
+          <div className="w-20 h-20 rounded-full bg-amber-900/100/10 text-emerald-600 border-2 border-emerald-500/20 flex items-center justify-center mx-auto shadow-inner animate-bounce mb-6">
             <CheckCircle2 className="w-12 h-12" />
           </div>
           
@@ -752,12 +774,12 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
 
           {/<[a-z][\s\S]*>/i.test(successMsg) ? (
             <div 
-              className="text-slate-800 leading-relaxed text-right prose prose-sm max-w-none mx-auto"
+              className="text-white leading-relaxed text-right prose prose-sm max-w-none mx-auto"
               dangerouslySetInnerHTML={{ __html: successMsg }} 
             />
           ) : (
             <div className="space-y-3">
-              <h3 className="text-2xl font-black text-slate-800 leading-tight">הפעולה בוצעה בהצלחה!</h3>
+              <h3 className="text-2xl font-black text-white leading-tight">הפעולה בוצעה בהצלחה!</h3>
               <p className="text-slate-600 text-sm leading-relaxed px-4 whitespace-pre-line font-medium">
                 {successMsg}
               </p>
@@ -766,7 +788,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           
           <Button
             onClick={() => setIsSubmitted(false)}
-            className="mt-8 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-8 py-3 rounded-xl border border-slate-200 w-full shadow-sm transition-all hover:shadow"
+            className="mt-8 bg-zinc-800 hover:bg-slate-200 text-slate-300 font-bold px-8 py-3 rounded-xl border border-slate-200 w-full shadow-sm transition-all hover:shadow"
           >
             סגור והמשך
           </Button>
