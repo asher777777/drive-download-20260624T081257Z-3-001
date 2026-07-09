@@ -203,11 +203,12 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
   // Validate only the current step fields
   const validateCurrentStep = () => {
     const newErrors: Record<string, string> = {};
-    const currentStepFields = visibleFields.filter((f) => (f.step || 1) === currentStep);
+    const currentStepFields = visibleFields.filter((f) => f._calculatedStep === currentStep);
 
     currentStepFields.forEach((f) => {
       const val = formData[f.label] || "";
-      if (f.required && !val.trim() && f.type !== "calculated") {
+      const excludedTypes = ["calculated", "payment_summary", "payment_cc", "rich_text_display"];
+      if (f.required && !val.trim() && !excludedTypes.includes(f.type)) {
         newErrors[f.label] = "שדה זה הוא חובה";
       }
       if (f.type === "email" && val.trim() && !/\S+@\S+\.\S+/.test(val)) {
@@ -276,7 +277,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     const newErrors: Record<string, string> = {};
     visibleFields.forEach((f) => {
       const val = formData[f.label] || "";
-      if (f.required && !val.trim() && f.type !== "calculated") {
+      const excludedTypes = ["calculated", "payment_summary", "payment_cc", "rich_text_display"];
+      if (f.required && !val.trim() && !excludedTypes.includes(f.type)) {
         newErrors[f.label] = "שדה זה הוא חובה";
       }
       if (f.type === "email" && val.trim() && !/\S+@\S+\.\S+/.test(val)) {
