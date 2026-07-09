@@ -164,7 +164,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           step: f._calculatedStep,
           title: f.label,
           icon: f.icon || "user",
-          submitOnNext: f.submitOnNext || false
+          submitOnNext: f.submitOnNext || false,
+          textColor: f.textColor || "#ffffff"
         });
       }
     });
@@ -184,7 +185,18 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     let amt = config.payment_amount || 0;
     
     enrichedFields.forEach((f) => {
-      if (isFieldVisible(f) && !f._isStepDivider) {
+      const logicallyVisible = (() => {
+        if (!f.cond_enable) return true;
+        const triggerField = config.fields[f.cond_field_index];
+        if (!triggerField) return true;
+        const currentValue = formData[triggerField.label] || "";
+        const operator = f.cond_operator || "is";
+        if (operator === "is") return currentValue === f.cond_value;
+        if (operator === "is_not") return currentValue !== f.cond_value;
+        return true;
+      })();
+
+      if (logicallyVisible && !f._isStepDivider) {
         if (f.map_to === "payment_amount" || f.type === "fixed_amount") {
           let valStr = formData[f.label];
           if (f.type === "calculated") {
@@ -632,6 +644,9 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             amount={checkoutData.amount}
             description={formTitle}
             onSuccess={handlePaymentSuccess}
+            paymentFrequency={ccData.paymentMethod === "recurring" ? "recurring" : "one-time"}
+            installments={ccData.installments}
+            isInstallmentsMapped={!!visibleFields.find(f => f.type === "payment_summary")}
           />
         </div>
       ) : (
@@ -682,7 +697,9 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                   {(() => { const StepIcon = IconMap[currentStepConf.icon]; return <StepIcon className="w-5 h-5" />; })()}
                 </div>
               )}
-              <h3 className="text-xl font-bold text-white">{currentStepConf.title}</h3>
+              <h3 className="text-xl font-bold" style={{ color: currentStepConf.textColor || '#ffffff' }}>
+                {currentStepConf.title}
+              </h3>
             </div>
           ) : null}
 
@@ -704,6 +721,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
               '--field-bg': (field as any).bgColor || '#09090b',
               '--field-border': (field as any).borderColor || 'rgba(255,255,255,0.2)',
               '--field-focus': (field as any).focusColor || '#f59e0b',
+              '--field-text': (field as any).textColor || '#ffffff',
             } as any;
 
             return (
@@ -902,7 +920,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           value={formData[field.label] || ""}
                           onChange={(e) => handleInputChange(field.label, e.target.value)}
                           className={cn(
-                            "peer w-full text-white border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all resize-none min-h-[100px] placeholder-transparent",
+                            "peer w-full text-[var(--field-text)] border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all resize-none min-h-[100px] placeholder-transparent",
                             "bg-[var(--field-bg)] border-[var(--field-border)] focus:border-[var(--field-focus)] focus:text-[var(--field-focus)]",
                             hasError && "border-red-500 focus:border-red-500"
                           )}
@@ -976,8 +994,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                             value={formData[field.label] || ""}
                             onChange={(e) => handleInputChange(field.label, e.target.value)}
                             className={cn(
-                              "peer w-full bg-zinc-950 text-white border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all appearance-none",
-                              hasError ? "border-red-500 focus:border-red-500" : "border-white/20 focus:border-amber-500 focus:text-amber-500"
+                              "peer w-full bg-[var(--field-bg)] text-[var(--field-text)] border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all appearance-none",
+                              hasError ? "border-red-500 focus:border-red-500" : "border-[var(--field-border)] focus:border-[var(--field-focus)] focus:text-[var(--field-focus)]"
                             )}
                             style={fieldBgStyle}
                             required={field.required}
@@ -1018,7 +1036,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           value={formData[field.label] || ""}
                           onChange={(e) => handleInputChange(field.label, e.target.value)}
                           className={cn(
-                            "peer w-full text-white border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all placeholder-transparent",
+                            "peer w-full text-[var(--field-text)] border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all placeholder-transparent",
                             "bg-[var(--field-bg)] border-[var(--field-border)] focus:border-[var(--field-focus)] focus:text-[var(--field-focus)]",
                             hasError && "border-red-500 focus:border-red-500"
                           )}
