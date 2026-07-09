@@ -567,6 +567,13 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             const hasError = errors[field.label];
             const FieldIcon = field.icon ? IconMap[field.icon] : null;
 
+            const customFieldStyle = {
+              ...fieldBgStyle,
+              '--field-bg': (field as any).bgColor || '#09090b',
+              '--field-border': (field as any).borderColor || 'rgba(255,255,255,0.2)',
+              '--field-focus': (field as any).focusColor || '#f59e0b',
+            } as any;
+
             return (
               <div key={idx} className="space-y-1 px-2 mb-4" style={{ width: `${field.widthPercentage || 100}%` }}>
                 {field.type === "hidden" ? (
@@ -591,90 +598,159 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                   <div className="prose prose-invert prose-sm max-w-none text-slate-300 my-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 leading-relaxed" dangerouslySetInnerHTML={{ __html: field.default_value }} />
                 ) : (
                   <>
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-                      {FieldIcon && <FieldIcon className="w-3.5 h-3.5 text-slate-400" />}
-                      {field.label}
-                      {field.required && <span className="text-red-500 mr-1">*</span>}
-                    </label>
-
                     {field.type === "textarea" ? (
-                      <textarea
-                        value={formData[field.label] || ""}
-                        onChange={(e) => handleInputChange(field.label, e.target.value)}
-                        className={cn(
-                          "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-white border rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none min-h-[80px]",
-                          hasError ? "border-red-500 bg-red-50/10 focus:ring-red-500/20" : "border-white/10 focus:border-amber-500"
-                        )}
-                        style={fieldBgStyle}
-                        required={field.required}
-                      />
-                    ) : field.type === "select" ? (
-                      (field.options || "").split("\n").filter(o => o.trim()).length <= 4 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                          {(field.options || "").split("\n").filter(o => o.trim()).map(opt => {
-                            const clean = opt.trim();
-                            const isSelected = formData[field.label] === clean;
-                            return (
-                              <label
-                                key={clean}
-                                className={cn(
-                                  "relative flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all",
-                                  isSelected 
-                                    ? "border-amber-500 bg-amber-500/10" 
-                                    : "border-white/10 bg-zinc-900 hover:border-amber-500/50"
-                                )}
-                                style={fieldBgStyle}
-                              >
-                                <input
-                                  type="radio"
-                                  name={field.label}
-                                  value={clean}
-                                  checked={isSelected}
-                                  onChange={(e) => handleInputChange(field.label, e.target.value)}
-                                  className="w-5 h-5 text-amber-500 border-white/20 ml-3"
-                                  required={field.required && !formData[field.label]}
-                                />
-                                <span className="font-bold text-slate-300 leading-tight">{clean}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <select
+                      <div className="relative mt-3">
+                        <textarea
+                          id={`field-${idx}`}
                           value={formData[field.label] || ""}
                           onChange={(e) => handleInputChange(field.label, e.target.value)}
                           className={cn(
-                            "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-white border rounded-xl p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all",
-                            hasError ? "border-red-500 bg-red-50/10 focus:ring-red-500/20" : "border-white/10 focus:border-amber-500"
+                            "peer w-full text-white border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all resize-none min-h-[100px] placeholder-transparent",
+                            "bg-[var(--field-bg)] border-[var(--field-border)] focus:border-[var(--field-focus)] focus:text-[var(--field-focus)]",
+                            hasError && "border-red-500 focus:border-red-500"
                           )}
-                          style={fieldBgStyle}
+                          style={customFieldStyle}
                           required={field.required}
+                          placeholder={field.label}
+                        />
+                        <label
+                          htmlFor={`field-${idx}`}
+                          className={cn(
+                            "absolute right-4 transition-all pointer-events-none flex items-center gap-1 bg-[var(--field-bg)] px-1 rounded-sm",
+                            !!formData[field.label]
+                              ? (hasError ? "top-0 -translate-y-1/2 text-xs text-red-500" : "top-0 -translate-y-1/2 text-xs text-[var(--field-focus)]")
+                              : cn(
+                                  "top-4 text-sm",
+                                  hasError ? "text-red-500" : "text-slate-400",
+                                  "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:text-xs",
+                                  hasError ? "peer-focus:text-red-500" : "peer-focus:text-[var(--field-focus)]"
+                                )
+                          )}
+                          style={customFieldStyle}
                         >
-                          <option value="">בחר...</option>
-                          {(field.options || "").split("\n").map(opt => {
-                            const clean = opt.trim();
-                            if (!clean) return null;
-                            return <option key={clean} value={clean}>{clean}</option>;
-                          })}
-                        </select>
+                          {FieldIcon && <FieldIcon className="w-3.5 h-3.5" />}
+                          {field.label}
+                          {field.required && <span className="text-red-500 mr-1">*</span>}
+                        </label>
+                      </div>
+                    ) : field.type === "select" ? (
+                      (field.options || "").split("\n").filter(o => o.trim()).length <= 4 ? (
+                        <div className="mt-3">
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-300 mb-2">
+                            {FieldIcon && <FieldIcon className="w-3.5 h-3.5 text-slate-400" />}
+                            {field.label}
+                            {field.required && <span className="text-red-500 mr-1">*</span>}
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(field.options || "").split("\n").filter(o => o.trim()).map(opt => {
+                              const clean = opt.trim();
+                              const isSelected = formData[field.label] === clean;
+                              return (
+                                <label
+                                  key={clean}
+                                  className={cn(
+                                    "relative flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                    isSelected 
+                                      ? "border-amber-500 bg-amber-500/10 text-amber-500" 
+                                      : "border-white/20 bg-zinc-950 hover:border-amber-500/50 text-slate-300 hover:text-amber-500"
+                                  )}
+                                  style={fieldBgStyle}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={field.label}
+                                    value={clean}
+                                    checked={isSelected}
+                                    onChange={(e) => handleInputChange(field.label, e.target.value)}
+                                    className="w-5 h-5 text-amber-500 border-white/20 ml-3"
+                                    required={field.required && !formData[field.label]}
+                                  />
+                                  <span className="font-bold leading-tight">{clean}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative mt-3">
+                          <select
+                            id={`field-${idx}`}
+                            value={formData[field.label] || ""}
+                            onChange={(e) => handleInputChange(field.label, e.target.value)}
+                            className={cn(
+                              "peer w-full bg-zinc-950 text-white border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all appearance-none",
+                              hasError ? "border-red-500 focus:border-red-500" : "border-white/20 focus:border-amber-500 focus:text-amber-500"
+                            )}
+                            style={fieldBgStyle}
+                            required={field.required}
+                          >
+                            <option value="" disabled hidden></option>
+                            {(field.options || "").split("\n").map(opt => {
+                              const clean = opt.trim();
+                              if (!clean) return null;
+                              return <option key={clean} value={clean}>{clean}</option>;
+                            })}
+                          </select>
+                          <label
+                            htmlFor={`field-${idx}`}
+                            className={cn(
+                              "absolute right-4 transition-all pointer-events-none flex items-center gap-1 bg-zinc-950 px-1 rounded-sm",
+                              !!formData[field.label]
+                                ? (hasError ? "top-0 -translate-y-1/2 text-xs text-red-500" : "top-0 -translate-y-1/2 text-xs text-amber-500")
+                                : cn(
+                                    "top-1/2 -translate-y-1/2 text-sm",
+                                    hasError ? "text-red-500" : "text-slate-400",
+                                    "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:text-xs",
+                                    hasError ? "peer-focus:text-red-500" : "peer-focus:text-amber-500"
+                                  )
+                            )}
+                          >
+                            {FieldIcon && <FieldIcon className="w-3.5 h-3.5" />}
+                            {field.label}
+                            {field.required && <span className="text-red-500 mr-1">*</span>}
+                          </label>
+                        </div>
                       )
                     ) : (
-                      <input
-                        type={field.type === "email" ? "email" : field.type === "tel" ? "tel" : field.type === "number" ? "number" : "text"}
-                        value={formData[field.label] || ""}
-                        onChange={(e) => handleInputChange(field.label, e.target.value)}
-                        className={cn(
-                          "w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white text-white border rounded-xl p-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all",
-                          hasError ? "border-red-500 bg-red-50/10" : "border-white/10 focus:border-amber-500"
-                        )}
-                        style={fieldBgStyle}
-                        required={field.required}
-                        placeholder={field.type === "tel" ? "למשל: 0501234567" : ""}
-                      />
+                      <div className="relative mt-3">
+                        <input
+                          id={`field-${idx}`}
+                          type={field.type === "email" ? "email" : field.type === "tel" ? "tel" : field.type === "number" ? "number" : "text"}
+                          value={formData[field.label] || ""}
+                          onChange={(e) => handleInputChange(field.label, e.target.value)}
+                          className={cn(
+                            "peer w-full text-white border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all placeholder-transparent",
+                            "bg-[var(--field-bg)] border-[var(--field-border)] focus:border-[var(--field-focus)] focus:text-[var(--field-focus)]",
+                            hasError && "border-red-500 focus:border-red-500"
+                          )}
+                          style={customFieldStyle}
+                          required={field.required}
+                          placeholder={field.label}
+                        />
+                        <label
+                          htmlFor={`field-${idx}`}
+                          className={cn(
+                            "absolute right-4 transition-all pointer-events-none flex items-center gap-1 bg-[var(--field-bg)] px-1 rounded-sm",
+                            !!formData[field.label]
+                              ? (hasError ? "top-0 -translate-y-1/2 text-xs text-red-500" : "top-0 -translate-y-1/2 text-xs text-[var(--field-focus)]")
+                              : cn(
+                                  "top-1/2 -translate-y-1/2 text-sm",
+                                  hasError ? "text-red-500" : "text-slate-400",
+                                  "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:text-xs",
+                                  hasError ? "peer-focus:text-red-500" : "peer-focus:text-[var(--field-focus)]"
+                                )
+                          )}
+                          style={customFieldStyle}
+                        >
+                          {FieldIcon && <FieldIcon className="w-3.5 h-3.5" />}
+                          {field.label}
+                          {field.required && <span className="text-red-500 mr-1">*</span>}
+                        </label>
+                      </div>
                     )}
 
                     {hasError && (
-                      <p className="text-[10px] text-red-500 font-bold mt-0.5 animate-in slide-in-from-top-1">
+                      <p className="text-[10px] text-red-500 font-bold mt-1 ml-1 animate-in slide-in-from-top-1">
                         {hasError}
                       </p>
                     )}
