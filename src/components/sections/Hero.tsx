@@ -56,6 +56,7 @@ interface HeroProps {
   form?: FormConfig;
   formMode?: "visible" | "modal";
   onUpdateHero?: (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "form" | "formMode", value: any) => void;
+  priority?: boolean;
 }
 
 import { AITextHelper } from "@/components/ui/AITextHelper";
@@ -126,7 +127,8 @@ export const Hero = ({
   flexDirection = "row",
   formMode = "visible",
   form,
-  onUpdateHero
+  onUpdateHero,
+  priority
 }: HeroProps) => {
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -196,16 +198,23 @@ export const Hero = ({
                 <EditableText tag="h2" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 leading-tight text-foreground" />
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-xl md:text-2xl font-medium mb-8 text-foreground" style={{ opacity: 0.8 }} />
                 <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-lg text-foreground mb-12" style={{ opacity: 0.8 }} />
-                <HeroActions />
+                <div className="hidden md:block">
+                  <HeroActions />
+                </div>
               </div>
             </div>
             {/* Image side */}
             <div className="w-full md:w-1/2 min-h-[400px] md:min-h-full relative z-10">
-              <div className="absolute inset-0 pb-16 md:pb-0 pl-0 md:pl-0 pr-0 md:pr-4 pt-0 md:pt-10 z-10">
+              <div className="absolute inset-0 pb-0 pl-0 md:pl-0 pr-0 md:pr-4 pt-0 md:pt-10 z-10">
                 <div className={cn("w-full h-full relative overflow-hidden shadow-2xl border-t-8 border-white", flexDirection === "row-reverse" ? "rounded-t-[50px] md:rounded-tl-[250px] md:border-l-8 md:border-r-0" : "rounded-t-[50px] md:rounded-tr-[250px] border-r-8 md:border-b-0")}>
-                  <MediaBackground src={bgImage} className="object-cover" />
+                  <MediaBackground src={bgImage} priority={priority} className="object-cover" />
                 </div>
               </div>
+            </div>
+            
+            {/* Mobile Actions */}
+            <div className="md:hidden w-full px-8 pb-20 pt-4 z-20 flex justify-center relative">
+              <HeroActions className="w-full justify-center" />
             </div>
           </div>
           <div className="w-full h-16 md:h-12 absolute bottom-0 left-0 z-0" style={{ backgroundColor: "var(--primary)" }} />
@@ -218,7 +227,7 @@ export const Hero = ({
       return (
         <section className={`relative pt-24 pb-36 overflow-hidden ${activeTheme.bg} ${activeTheme.text} min-h-[65vh] flex items-center`}>
           <div className="absolute inset-0 z-0">
-            <img src={bgImage} alt="Background" className="absolute inset-0 w-full h-full object-cover animate-fade-in" />
+            <Image src={bgImage} alt="Background" fill className="absolute inset-0 w-full h-full object-cover animate-fade-in" priority={priority} />
             <div className={`absolute inset-0 ${activeTheme.bg}/85 mix-blend-multiply`} />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/30" />
           </div>
@@ -270,7 +279,7 @@ export const Hero = ({
       return (
         <section className="relative min-h-screen w-full flex items-center pt-24 pb-12 overflow-hidden">
           <div className="absolute inset-0 z-0">
-            <MediaBackground src={bgImage} className="object-cover" priority sizes="100vw" />
+            <MediaBackground src={bgImage} priority={priority} className="object-cover" sizes="100vw" />
             {backgroundColor ? (
               <div 
                 className="absolute inset-0" 
@@ -300,7 +309,7 @@ export const Hero = ({
           <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 auto-rows-[200px] md:auto-rows-[250px]">
             {/* Main Title Box (Span 2 cols, 2 rows) */}
             <div className="md:col-span-2 md:row-span-2 relative rounded-[2rem] overflow-hidden group">
-              <MediaBackground src={bgImage} className="object-cover transition-transform duration-700 group-hover:scale-105" priority sizes="(max-width: 1024px) 100vw, 50vw" />
+              <MediaBackground src={bgImage} priority={priority} className="object-cover transition-transform duration-700 group-hover:scale-105" sizes="(max-width: 1024px) 100vw, 50vw" />
               <div 
                 className={cn("absolute inset-0 p-8 md:p-12 flex flex-col justify-end", !backgroundColor && "bg-primary/60")}
                 style={backgroundColor ? { backgroundColor: `${backgroundColor}99` } : undefined}
@@ -356,7 +365,7 @@ export const Hero = ({
               </div>
               
               <div className="lg:col-span-4 bg-slate-900 rounded-2xl shadow-xl overflow-hidden relative min-h-[300px] cursor-move">
-                <MediaBackground src={bgImage} className="object-cover opacity-80 mix-blend-overlay" sizes="(max-width: 1024px) 100vw, 33vw" />
+                <MediaBackground src={bgImage} priority={priority} className="object-cover opacity-80 mix-blend-overlay" sizes="(max-width: 1024px) 100vw, 33vw" />
                 <div className="absolute inset-0 p-8 flex flex-col justify-end">
                    <HeroActions className="flex-col" />
                 </div>
@@ -405,11 +414,16 @@ export const Hero = ({
               </div>
               <div className="w-full h-[1px] bg-gradient-to-r from-white/20 to-transparent" />
               <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl text-white/60 font-light leading-relaxed prose prose-invert max-w-none" />
-              <HeroActions />
+              <div className="hidden lg:block">
+                <HeroActions />
+              </div>
             </div>
             <div className="lg:col-span-7 h-[60vh] lg:h-[80vh] relative rounded-3xl overflow-hidden transform perspective-1000 rotate-y-[-5deg] hover:rotate-y-0 transition-transform duration-1000 shadow-[0_0_100px_rgba(255,255,255,0.05)]">
-              <MediaBackground src={bgImage} className="object-cover" priority sizes="(max-width: 1024px) 100vw, 60vw" />
+              <MediaBackground src={bgImage} priority={priority} className="object-cover" sizes="(max-width: 1024px) 100vw, 60vw" />
               <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-transparent" />
+            </div>
+            <div className="lg:hidden w-full flex justify-center pb-8 z-20">
+              <HeroActions className="w-full justify-center" />
             </div>
           </div>
         </section>
@@ -420,7 +434,7 @@ export const Hero = ({
       return (
         <section className="relative h-screen w-full flex flex-col bg-background overflow-hidden">
           <div className="relative h-[55vh] md:h-[65vh] w-full shrink-0 rounded-b-[3rem] overflow-hidden shadow-2xl">
-            <MediaBackground src={bgImage} className="object-cover" priority sizes="(max-width: 1024px) 100vw, 50vw" />
+            <MediaBackground src={bgImage} priority={priority} className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw" />
             {backgroundColor ? (
               <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${backgroundColor}e6, ${backgroundColor}66, transparent)` }} />
             ) : (

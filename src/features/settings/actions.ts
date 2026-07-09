@@ -8,7 +8,22 @@ export interface NavLink {
   href: string;
 }
 
+export interface CommunityGoal {
+  name: string;
+  icon: string;
+}
+
+export interface CommunityData {
+  id: string;
+  name: string;
+  icon?: string;
+  targetAudiences?: string[];
+  goals?: CommunityGoal[];
+  brandColor: string;
+}
+
 export interface GlobalSettings {
+  communities?: CommunityData[];
   siteLogoUrl: string;
   headerLayout: "classic" | "center" | "left";
   theme: "navy" | "emerald" | "rose" | "violet" | "charcoal";
@@ -39,6 +54,8 @@ export interface GlobalSettings {
   slogan?: string;
   shortVision?: string;
   companyVision?: string;
+  logoUrl?: string;
+  memberCount?: string;
   personalName?: string;
   personalEmail?: string;
   personalPhone?: string;
@@ -54,6 +71,15 @@ export interface GlobalSettings {
   contactInstagram?: string;
   contactYouTube?: string;
   contactWhatsApp?: string;
+  contactTikTok?: string;
+  contactLinkedIn?: string;
+
+  hasFacebook?: "yes" | "no" | null;
+  hasInstagram?: "yes" | "no" | null;
+  hasTikTok?: "yes" | "no" | null;
+  hasYouTube?: "yes" | "no" | null;
+  hasLinkedIn?: "yes" | "no" | null;
+  socialSetupCompleted?: boolean;
   
   // Mini Site
   miniSiteSlug?: string;
@@ -75,10 +101,10 @@ const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   secondaryColor: "#10354b",
   backgroundColor: "#f8f9fa",
   textColor: "#1f2937",
-  contactPhone: "054-000-0000",
-  contactEmail: "info@community-generator.co.il",
-  contactFacebook: "https://www.facebook.com/",
-  contactAddress: "רחוב החדשנות 1, אזור ההייטק",
+  contactPhone: "",
+  contactEmail: "",
+  contactFacebook: "",
+  contactAddress: "",
   contactInstagram: "",
   contactYouTube: "",
   contactWhatsApp: "",
@@ -138,6 +164,7 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         organizationPurpose: data?.organizationPurpose || "",
         slogan: data?.slogan || "",
         personalTitle: data?.personalTitle || "",
+        memberCount: data?.memberCount || "",
 
         // Contact Info
         contactPhone: data?.contactPhone || DEFAULT_GLOBAL_SETTINGS.contactPhone,
@@ -145,13 +172,23 @@ export async function getGlobalSettings(userId?: string): Promise<GlobalSettings
         contactAddress: data?.contactAddress || DEFAULT_GLOBAL_SETTINGS.contactAddress,
 
         // Social Networks
-        contactFacebook: data?.contactFacebook || DEFAULT_GLOBAL_SETTINGS.contactFacebook,
+        contactFacebook: data?.contactFacebook || "",
         contactInstagram: data?.contactInstagram || "",
         contactYouTube: data?.contactYouTube || "",
         contactWhatsApp: data?.contactWhatsApp || "",
-        
+        contactTikTok: data?.contactTikTok || "",
+        contactLinkedIn: data?.contactLinkedIn || "",
+        hasFacebook: data?.hasFacebook || null,
+        hasInstagram: data?.hasInstagram || null,
+        hasTikTok: data?.hasTikTok || null,
+        hasYouTube: data?.hasYouTube || null,
+        hasLinkedIn: data?.hasLinkedIn || null,
+        socialSetupCompleted: data?.socialSetupCompleted || false,
         // Mini Site
         miniSiteSlug: data?.miniSiteSlug || "",
+
+        // Communities
+        communities: data?.communities || [],
       } as GlobalSettings;
   } catch (error) {
     console.warn(`Error fetching global settings:`, (error as Error).message);
@@ -164,10 +201,26 @@ export async function saveGlobalSettings(settings: Partial<GlobalSettings>) {
     const { auth } = await import("@/lib/auth");
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-    const { getUserDb } = await import("@/lib/firebase-admin");
+    const { getUserDb, adminDb } = await import("@/lib/firebase-admin");
 
     const docRef = getUserDb(session.user.id).collection("settings").doc("global");
     await docRef.set({ ...settings, updatedAt: new Date().toISOString() }, { merge: true });
+
+    // Also mirror to users/{userId} document
+    const userUpdate: any = {};
+    if (settings.companyName !== undefined) userUpdate.companyName = settings.companyName;
+    if (settings.organizationPurpose !== undefined) userUpdate.organizationPurpose = settings.organizationPurpose;
+    if (settings.memberCount !== undefined) userUpdate.memberCount = settings.memberCount;
+    if (settings.contactFacebook !== undefined) userUpdate.contactFacebook = settings.contactFacebook;
+    if (settings.contactInstagram !== undefined) userUpdate.contactInstagram = settings.contactInstagram;
+    if (settings.contactTikTok !== undefined) userUpdate.contactTikTok = settings.contactTikTok;
+    if (settings.contactYouTube !== undefined) userUpdate.contactYouTube = settings.contactYouTube;
+    if (settings.contactLinkedIn !== undefined) userUpdate.contactLinkedIn = settings.contactLinkedIn;
+
+    if (Object.keys(userUpdate).length > 0) {
+      await adminDb.collection("users").doc(session.user.id).set(userUpdate, { merge: true });
+    }
+
     revalidatePath("/", "layout");
     return { success: true };
   } catch (error) {

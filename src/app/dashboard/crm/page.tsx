@@ -785,6 +785,11 @@ export default function CRMDashboardPage() {
                     <span className="text-[16px] font-bold text-white whitespace-nowrap truncate">
                       {c.conta_name} {c.f_m}
                     </span>
+                    {c.isUser && (
+                      <div className="bg-emerald-500/20 px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-emerald-500/30" title="משתמש מערכת רשום">
+                        <LucideIcons.UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                    )}
                     {(() => {
                       let IconComponent = theme.Icon;
                       let color = theme.iconText;

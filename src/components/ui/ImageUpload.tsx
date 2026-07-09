@@ -30,13 +30,15 @@ import {
 } from "@/features/media/actions";
 
 interface ImageUploadProps {
-  onSelect: (url: string) => void;
+  onSelect: (url: any) => void;
   currentImage?: string;
   preserveFormat?: boolean;
   compact?: boolean;
+  multiple?: boolean;
+  customTrigger?: (onClick: () => void) => React.ReactNode;
 }
 
-export function ImageUpload({ onSelect, currentImage, preserveFormat = false, compact = false }: ImageUploadProps) {
+export function ImageUpload({ onSelect, currentImage, preserveFormat = false, compact = false, multiple = false, customTrigger }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
@@ -49,6 +51,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
   
   // New States
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [tempAlt, setTempAlt] = useState("");
   const [tempDesc, setTempDesc] = useState("");
@@ -73,6 +76,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
     if (showGallery) {
       loadLibrary();
       setSelectedItem(null);
+      setSelectedItems([]);
       setSearchQuery("");
     }
   }, [showGallery]);
@@ -139,75 +143,81 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     setIsUploading(true);
     try {
-      const isVideo = file.type.startsWith('video/');
-      let fileToUpload: File | Blob = file;
-      let extension = file.name.split('.').pop()?.toLowerCase() || '';
+      const uploadedUrls: string[] = [];
+      
+      for (const file of files) {
+        const isVideo = file.type.startsWith('video/');
+        let fileToUpload: File | Blob = file;
+        let extension = file.name.split('.').pop()?.toLowerCase() || '';
 
-      if (!isVideo) {
-        // 1. Image Compression
-        let maxSizeMB = preserveFormat ? 0.25 : 0.095; // Allow larger size for preserved formats like 250KB
-        let maxWidthOrHeight = 1920;
-        
-        // Use original file type if preserving format, otherwise WebP
-        const targetFileType = preserveFormat ? file.type : 'image/webp';
-        
-        const options = {
-          maxSizeMB: maxSizeMB,
-          maxWidthOrHeight: maxWidthOrHeight,
-          useWebWorker: true,
-          fileType: targetFileType
-        };
-        
-        let compressedFile = await imageCompression(file, options);
-        
-        // If not preserving format, try more aggressive compression
-        if (!preserveFormat) {
-          let attempts = 0;
-          while (compressedFile.size >= 100 * 1024 && attempts < 3) {
-            attempts++;
-            maxWidthOrHeight = Math.floor(maxWidthOrHeight * 0.75);
-            maxSizeMB = maxSizeMB * 0.8;
-            compressedFile = await imageCompression(compressedFile as File, {
-              maxSizeMB: maxSizeMB,
-              maxWidthOrHeight: maxWidthOrHeight,
-              useWebWorker: true,
-              fileType: 'image/webp'
-            });
+        if (!isVideo) {
+          // 1. Image Compression
+          let maxSizeMB = preserveFormat ? 0.25 : 0.095;
+          let maxWidthOrHeight = 1920;
+          
+          const targetFileType = preserveFormat ? file.type : 'image/webp';
+          
+          const options = {
+            maxSizeMB: maxSizeMB,
+            maxWidthOrHeight: maxWidthOrHeight,
+            useWebWorker: true,
+            fileType: targetFileType
+          };
+          
+          let compressedFile = await imageCompression(file, options);
+          
+          if (!preserveFormat) {
+            let attempts = 0;
+            while (compressedFile.size >= 100 * 1024 && attempts < 3) {
+              attempts++;
+              maxWidthOrHeight = Math.floor(maxWidthOrHeight * 0.75);
+              maxSizeMB = maxSizeMB * 0.8;
+              compressedFile = await imageCompression(compressedFile as File, {
+                maxSizeMB: maxSizeMB,
+                maxWidthOrHeight: maxWidthOrHeight,
+                useWebWorker: true,
+                fileType: 'image/webp'
+              });
+            }
+          }
+
+          fileToUpload = compressedFile;
+          if (!preserveFormat) {
+            extension = 'webp';
           }
         }
-
-        fileToUpload = compressedFile;
-        // If not preserving format, force webp extension
-        if (!preserveFormat) {
-          extension = 'webp';
+        
+        // 2. Upload to Firebase Storage via Server Action
+        const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+        const formData = new FormData();
+        formData.append("file", fileToUpload, `${baseName}.${extension}`);
+        
+        const uploadRes = await uploadMediaFile(formData);
+        if (!uploadRes.success || !uploadRes.url) {
+          throw new Error(uploadRes.error || "Upload failed on server");
         }
-      }
-      
-      // 2. Upload to Firebase Storage via Server Action
-      const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-      const formData = new FormData();
-      formData.append("file", fileToUpload, `${baseName}.${extension}`);
-      
-      const uploadRes = await uploadMediaFile(formData);
-      if (!uploadRes.success || !uploadRes.url) {
-        throw new Error(uploadRes.error || "Upload failed on server");
-      }
-      const url = uploadRes.url;
+        const url = uploadRes.url;
 
-      // 3. Add to Media Library
-      const libraryName = isVideo ? file.name : `${baseName}.${extension}`;
-      await addMediaToLibrary(url, libraryName);
+        // 3. Add to Media Library
+        const libraryName = isVideo ? file.name : `${baseName}.${extension}`;
+        await addMediaToLibrary(url, libraryName);
+        uploadedUrls.push(url);
+      }
       
-      // Reload library to show new item and select it
+      // Reload library to show new items
       const items = await getMediaLibrary();
       setMediaItems(items || []);
       
-      onSelect(url);
+      if (multiple) {
+        onSelect(uploadedUrls);
+      } else {
+        onSelect(uploadedUrls[0]);
+      }
     } catch (error) {
       console.error("Upload failed:", error);
       alert("העלאה נכשלה. וודא שחוקי ה-Storage ב-Firebase מאפשרים כתיבה.");
@@ -218,9 +228,23 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
   };
 
   const handleSelectGridItem = (item: any) => {
-    setSelectedItem(item);
-    setTempAlt(item.alt || "");
-    setTempDesc(item.description || "");
+    if (multiple) {
+      if (selectedItems.find(i => i.id === item.id)) {
+        setSelectedItems(prev => prev.filter(i => i.id !== item.id));
+        if (selectedItem?.id === item.id) {
+          setSelectedItem(null);
+        }
+      } else {
+        setSelectedItems(prev => [...prev, item]);
+        setSelectedItem(item);
+        setTempAlt(item.alt || "");
+        setTempDesc(item.description || "");
+      }
+    } else {
+      setSelectedItem(item);
+      setTempAlt(item.alt || "");
+      setTempDesc(item.description || "");
+    }
   };
 
   const handleSaveMetadata = async () => {
@@ -392,53 +416,58 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
 
   return (
     <>
-      <div className={`flex ${compact ? "flex-col" : "gap-2"}`}>
-      <div className="flex gap-2">
-        <div className={`relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary transition-colors flex flex-col items-center justify-center bg-muted/30 ${compact ? "h-16 w-full max-w-xs" : "h-32 w-32"}`}>
-          <input
-            type="file"
-            accept="image/*,video/mp4,video/webm,video/quicktime"
-            onChange={handleUpload}
-            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-            disabled={isUploading}
-          />
-          {isUploading ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="animate-spin text-secondary" />
-              <span className="text-[8px] font-bold text-secondary animate-pulse">מעבד...</span>
+      {customTrigger ? (
+        customTrigger(() => setShowGallery(true))
+      ) : (
+        <div className={`flex ${compact ? "flex-col" : "gap-2"}`}>
+          <div className="flex gap-2">
+            <div className={`relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary transition-colors flex flex-col items-center justify-center bg-muted/30 ${compact ? "h-16 w-full max-w-xs" : "h-32 w-32"}`}>
+              <input
+                type="file"
+                accept="image/*,video/mp4,video/webm,video/quicktime"
+                multiple={multiple}
+                onChange={handleUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                disabled={isUploading}
+              />
+              {isUploading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="animate-spin text-secondary" />
+                  <span className="text-[8px] font-bold text-secondary animate-pulse">מעבד...</span>
+                </div>
+              ) : (
+                <>
+                  <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact ? "h-4 w-4" : ""}`} />
+                  <span className={`font-bold mt-1 uppercase ${compact ? "text-[8px]" : "text-[10px] mt-2"}`}>העלאה חדשה</span>
+                </>
+              )}
             </div>
-          ) : (
-            <>
-              <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact ? "h-4 w-4" : ""}`} />
-              <span className={`font-bold mt-1 uppercase ${compact ? "text-[8px]" : "text-[10px] mt-2"}`}>העלאה חדשה</span>
-            </>
-          )}
-        </div>
 
-        <Button
-          variant="outline"
-          className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 ${compact ? "h-16 w-full max-w-xs gap-1" : "h-32 w-32 gap-2"}`}
-          onClick={() => setShowGallery(true)}
-          disabled={isUploading}
-        >
-          <Library className={`text-primary/40 ${compact ? "h-4 w-4" : "h-6 w-6"}`} />
-          <span className={`font-bold uppercase ${compact ? "text-[8px]" : "text-[10px]"}`}>גלריית מדיה</span>
-        </Button>
-      </div>
-
-      {currentImage && (
-        <div className={`rounded-xl overflow-hidden border relative group ${compact ? "h-32 w-full max-w-sm mt-3" : "h-32 w-32"}`}>
-          {isVideoUrl(currentImage) ? (
-            <video src={currentImage} className="absolute inset-0 w-full h-full object-cover" muted loop playsInline />
-          ) : (
-            <img src={currentImage} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-          )}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-            <Check className="text-white" />
+            <Button
+              variant="outline"
+              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 ${compact ? "h-16 w-full max-w-xs gap-1" : "h-32 w-32 gap-2"}`}
+              onClick={() => setShowGallery(true)}
+              disabled={isUploading}
+            >
+              <Library className={`text-primary/40 ${compact ? "h-4 w-4" : "h-6 w-6"}`} />
+              <span className={`font-bold uppercase ${compact ? "text-[8px]" : "text-[10px]"}`}>גלריית מדיה</span>
+            </Button>
           </div>
+
+          {currentImage && (
+            <div className={`rounded-xl overflow-hidden border relative group ${compact ? "h-32 w-full max-w-sm mt-3" : "h-32 w-32"}`}>
+              {isVideoUrl(currentImage) ? (
+                <video src={currentImage} className="absolute inset-0 w-full h-full object-cover" muted loop playsInline />
+              ) : (
+                <img src={currentImage} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <Check className="text-white" />
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
 
       {/* Gallery Modal */}
       {showGallery && mounted && createPortal(
@@ -483,7 +512,9 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {filteredMediaItems.map((item: any) => {
-                      const isSelected = selectedItem?.id === item.id;
+                      const isSelected = multiple 
+                        ? selectedItems.some((i: any) => i.id === item.id) 
+                        : selectedItem?.id === item.id;
                       return (
                         <button
                           key={item.id}
@@ -516,144 +547,162 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
               </div>
 
               {/* Details & Actions Pane (Right Side) */}
-              {selectedItem && (
+              {(selectedItem || (multiple && selectedItems.length > 0)) && (
                 <div className="w-80 border-r border-slate-100 bg-slate-50/50 p-6 overflow-y-auto flex flex-col gap-5 text-right shrink-0" dir="rtl">
-                  <h4 className="font-bold text-lg border-b pb-2 text-primary">פרטי המדיה</h4>
-                  
-                  {/* Preview */}
-                  <div className="aspect-video w-full rounded-xl overflow-hidden border bg-white flex items-center justify-center relative shadow-inner">
-                    {isVideoUrl(selectedItem.url) ? (
-                      <video src={selectedItem.url} className="w-full h-full object-contain" controls />
-                    ) : (
-                      <img src={selectedItem.url} alt={selectedItem.alt || selectedItem.name} className="w-full h-full object-contain" />
-                    )}
-                  </div>
+                  {selectedItem ? (
+                    <>
+                      <h4 className="font-bold text-lg border-b pb-2 text-primary">פרטי המדיה</h4>
+                      
+                      {/* Preview */}
+                      <div className="aspect-video w-full rounded-xl overflow-hidden border bg-white flex items-center justify-center relative shadow-inner">
+                        {isVideoUrl(selectedItem.url) ? (
+                          <video src={selectedItem.url} className="w-full h-full object-contain" controls />
+                        ) : (
+                          <img src={selectedItem.url} alt={selectedItem.alt || selectedItem.name} className="w-full h-full object-contain" />
+                        )}
+                      </div>
 
-                  {/* Text details */}
-                  <div className="space-y-1 text-xs text-muted-foreground break-all">
-                    <p className="font-semibold text-foreground text-sm truncate" title={selectedItem.name}>{selectedItem.name}</p>
-                    <p>תאריך: {new Date(selectedItem.createdAt).toLocaleDateString('he-IL')}</p>
-                    <p>משקל קובץ: {isLoadingMetadata ? 'טוען...' : fileSize || 'לא ידוע'}</p>
-                    {dimensions && (
-                      <p>מידות: {dimensions.width} × {dimensions.height} פיקסלים</p>
-                    )}
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedItem.url);
-                        alert("הקישור הועתק!");
-                      }}
-                      className="text-secondary hover:text-secondary/80 font-semibold flex items-center gap-1 mt-2 transition-colors cursor-pointer"
-                    >
-                      <Copy className="h-3 w-3" />
-                      העתק קישור
-                    </button>
-                  </div>
+                      {/* Text details */}
+                      <div className="space-y-1 text-xs text-muted-foreground break-all">
+                        <p className="font-semibold text-foreground text-sm truncate" title={selectedItem.name}>{selectedItem.name}</p>
+                        <p>תאריך: {new Date(selectedItem.createdAt).toLocaleDateString('he-IL')}</p>
+                        <p>משקל קובץ: {isLoadingMetadata ? 'טוען...' : fileSize || 'לא ידוע'}</p>
+                        {dimensions && (
+                          <p>מידות: {dimensions.width} × {dimensions.height} פיקסלים</p>
+                        )}
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedItem.url);
+                            alert("הקישור הועתק!");
+                          }}
+                          className="text-secondary hover:text-secondary/80 font-semibold flex items-center gap-1 mt-2 transition-colors cursor-pointer"
+                        >
+                          <Copy className="h-3 w-3" />
+                          העתק קישור
+                        </button>
+                      </div>
 
-                  <hr className="border-slate-100" />
+                      <hr className="border-slate-100" />
 
-                  {/* Form */}
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-foreground">ALT Tag (טקסט אלטרנטיבי לגוגל)</label>
-                      <input
-                        type="text"
-                        value={tempAlt}
-                        onChange={(e) => setTempAlt(e.target.value)}
-                        placeholder="טקסט לקידום נגישות ו-SEO..."
-                        className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary"
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-foreground">תיאור קובץ</label>
-                      <textarea
-                        value={tempDesc}
-                        onChange={(e) => setTempDesc(e.target.value)}
-                        placeholder="תיאור מפורט..."
-                        rows={3}
-                        className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary resize-none"
-                      />
-                    </div>
-
-                    <Button 
-                      onClick={handleSaveMetadata} 
-                      disabled={isUpdatingMetadata}
-                      className="w-full py-2 flex items-center justify-center gap-2 bg-primary hover:bg-primary/95 text-white rounded-lg text-sm font-semibold cursor-pointer"
-                    >
-                      {isUpdatingMetadata ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      שמור פרטים
-                    </Button>
-                  </div>
-
-                  <hr className="border-slate-100" />
-
-                  {/* Actions */}
-                  <div className="space-y-2">
-                    {/* Optimize existing item */}
-                    {!isVideoUrl(selectedItem.url) && (
-                      <div className="space-y-3 p-3 bg-slate-100/60 rounded-xl border border-slate-200/50 mb-1">
+                      {/* Form */}
+                      <div className="space-y-4">
                         <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500 block">פורמט המרה</label>
-                          <select
-                            value={targetFormat}
-                            onChange={(e) => setTargetFormat(e.target.value as any)}
-                            className="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary cursor-pointer"
-                          >
-                            <option value="webp">WebP (מומלץ)</option>
-                            <option value="jpeg">JPEG</option>
-                            <option value="png">PNG</option>
-                          </select>
+                          <label className="text-xs font-bold text-foreground">ALT Tag (טקסט אלטרנטיבי לגוגל)</label>
+                          <input
+                            type="text"
+                            value={tempAlt}
+                            onChange={(e) => setTempAlt(e.target.value)}
+                            placeholder="טקסט לקידום נגישות ו-SEO..."
+                            className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary"
+                          />
                         </div>
                         
-                        <div className="flex items-center gap-2 select-none cursor-pointer">
-                          <input
-                            type="checkbox"
-                            id="keepOriginalCheckbox"
-                            checked={keepOriginal}
-                            onChange={(e) => setKeepOriginal(e.target.checked)}
-                            className="rounded border-slate-300 text-secondary focus:ring-secondary/50 h-3.5 w-3.5 cursor-pointer"
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-foreground">תיאור קובץ</label>
+                          <textarea
+                            value={tempDesc}
+                            onChange={(e) => setTempDesc(e.target.value)}
+                            placeholder="תיאור מפורט..."
+                            rows={3}
+                            className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary resize-none"
                           />
-                          <label htmlFor="keepOriginalCheckbox" className="text-xs text-foreground font-semibold cursor-pointer">
-                            שמור קובץ מקורי בגלריה
-                          </label>
                         </div>
 
-                        <Button
-                          variant="outline"
-                          onClick={handleOptimizeExistingItem}
-                          disabled={isOptimizing}
-                          className="w-full py-2 flex items-center justify-center gap-2 border-secondary/20 hover:border-secondary/50 text-secondary hover:bg-secondary/5 bg-white rounded-lg text-sm font-semibold cursor-pointer"
+                        <Button 
+                          onClick={handleSaveMetadata} 
+                          disabled={isUpdatingMetadata}
+                          className="w-full py-2 flex items-center justify-center gap-2 bg-primary hover:bg-primary/95 text-white rounded-lg text-sm font-semibold cursor-pointer"
                         >
-                          {isOptimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                          {isOptimizing ? 'מבצע אופטימיזציה...' : 'בצע אופטימיזציה וכיווץ'}
+                          {isUpdatingMetadata ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          שמור פרטים
                         </Button>
                       </div>
-                    )}
 
-                    <Button
-                      variant="ghost"
-                      onClick={handleDeleteItem}
-                      disabled={isDeleting}
-                      className="w-full py-2 flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg text-sm font-semibold cursor-pointer"
-                    >
-                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      מחק קובץ לצמיתות
-                    </Button>
-                  </div>
+                      <hr className="border-slate-100" />
 
-                  <hr className="border-slate-100" />
+                      {/* Actions */}
+                      <div className="space-y-2">
+                        {/* Optimize existing item */}
+                        {!isVideoUrl(selectedItem.url) && (
+                          <div className="space-y-3 p-3 bg-slate-100/60 rounded-xl border border-slate-200/50 mb-1">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-500 block">פורמט המרה</label>
+                              <select
+                                value={targetFormat}
+                                onChange={(e) => setTargetFormat(e.target.value as any)}
+                                className="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-secondary cursor-pointer"
+                              >
+                                <option value="webp">WebP (מומלץ)</option>
+                                <option value="jpeg">JPEG</option>
+                                <option value="png">PNG</option>
+                              </select>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 select-none cursor-pointer">
+                              <input
+                                type="checkbox"
+                                id="keepOriginalCheckbox"
+                                checked={keepOriginal}
+                                onChange={(e) => setKeepOriginal(e.target.checked)}
+                                className="rounded border-slate-300 text-secondary focus:ring-secondary/50 h-3.5 w-3.5 cursor-pointer"
+                              />
+                              <label htmlFor="keepOriginalCheckbox" className="text-xs text-foreground font-semibold cursor-pointer">
+                                שמור קובץ מקורי בגלריה
+                              </label>
+                            </div>
+
+                            <Button
+                              variant="outline"
+                              onClick={handleOptimizeExistingItem}
+                              disabled={isOptimizing}
+                              className="w-full py-2 flex items-center justify-center gap-2 border-secondary/20 hover:border-secondary/50 text-secondary hover:bg-secondary/5 bg-white rounded-lg text-sm font-semibold cursor-pointer"
+                            >
+                              {isOptimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                              {isOptimizing ? 'מבצע אופטימיזציה...' : 'בצע אופטימיזציה וכיווץ'}
+                            </Button>
+                          </div>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          onClick={handleDeleteItem}
+                          disabled={isDeleting}
+                          className="w-full py-2 flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg text-sm font-semibold cursor-pointer"
+                        >
+                          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          מחק קובץ לצמיתות
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                      <Check className="h-12 w-12 text-secondary mb-4 opacity-50" />
+                      <h4 className="font-bold text-lg text-primary">{selectedItems.length} קבצים נבחרו</h4>
+                      <p className="text-sm text-muted-foreground mt-2">לחץ על 'בחר קבצים' למטה כדי להוסיף את כולם.</p>
+                    </div>
+                  )}
 
                   {/* Select main action */}
-                  <Button
-                    onClick={() => {
-                      onSelect(selectedItem.url);
-                      setShowGallery(false);
-                    }}
-                    className="w-full py-3 bg-secondary hover:bg-secondary/95 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Check className="h-5 w-5" />
-                    בחר תמונה זו
-                  </Button>
+                  <div className="mt-auto pt-4 border-t border-slate-100">
+                    <Button
+                      onClick={() => {
+                        if (multiple) {
+                          if (selectedItems.length > 0) {
+                            onSelect(selectedItems.map((i: any) => i.url));
+                          } else if (selectedItem) {
+                            onSelect([selectedItem.url]);
+                          }
+                        } else if (selectedItem) {
+                          onSelect(selectedItem.url);
+                        }
+                        setShowGallery(false);
+                      }}
+                      className="w-full py-3 bg-secondary hover:bg-secondary/95 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Check className="h-5 w-5" />
+                      {multiple && selectedItems.length > 0 ? `בחר ${selectedItems.length} קבצים` : 'בחר תמונה זו'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

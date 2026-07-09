@@ -60,7 +60,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         setFullName("");
         setPhone("");
         onClose();
-        router.push("/dashboard");
+        window.location.href = "/auth-redirect";
       }
     } catch (err) {
       setError("שגיאה בהרשמה, נסה שוב");
@@ -119,7 +119,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             className="w-full gap-2 relative h-11" 
             onClick={() => {
               setLoading(true);
-              signIn("google", { callbackUrl: "/dashboard" });
+              signIn("google", { callbackUrl: "/auth-redirect" });
             }}
             disabled={loading}
           >

@@ -161,3 +161,46 @@ export async function addAudience(name: string) {
     return { success: false, error: error.message };
   }
 }
+
+// Goals Glossary
+export interface GoalGlossaryItem {
+  id?: string;
+  name: string;
+  icon: string;
+  ownerId: string;
+}
+
+export async function getGoals() {
+  try {
+    const ownerId = await getUserId();
+    const snapshot = await adminDb
+      .collection("goals")
+      .where("ownerId", "==", ownerId)
+      .get();
+
+    return snapshot.docs.map((doc: any) => ({
+      id: doc.id,
+      ...doc.data()
+    })) as GoalGlossaryItem[];
+  } catch (error) {
+    console.error("Error in getGoals:", error);
+    return [];
+  }
+}
+
+export async function addGoal(name: string, icon: string) {
+  try {
+    const ownerId = await getUserId();
+    const newDoc = {
+      name,
+      icon,
+      ownerId,
+      createdAt: new Date().toISOString()
+    };
+    const docRef = await adminDb.collection("goals").add(newDoc);
+    return { success: true, id: docRef.id };
+  } catch (error: any) {
+    console.error("Error in addGoal:", error);
+    return { success: false, error: error.message };
+  }
+}

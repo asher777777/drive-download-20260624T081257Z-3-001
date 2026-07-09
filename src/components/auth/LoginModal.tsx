@@ -47,7 +47,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setUsername("");
         setPassword("");
         onClose();
-        router.push("/dashboard");
+        window.location.href = "/auth-redirect";
       }
     } catch (err) {
       setError("שגיאה בהתחברות, נסה שוב");
@@ -115,7 +115,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             className="w-full gap-2 relative h-11" 
             onClick={() => {
               setLoading(true);
-              signIn("google", { callbackUrl: "/dashboard" });
+              signIn("google", { callbackUrl: "/auth-redirect" });
             }}
             disabled={loading}
           >

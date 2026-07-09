@@ -17,24 +17,27 @@ async function getUserId(): Promise<string> {
 export async function getCommunities() {
   try {
     const ownerId = await getUserId();
-    const snapshot = await adminDb
-      .collection("communities")
-      .where("ownerId", "==", ownerId)
-      .orderBy("createdAt", "desc")
-      .get();
+    
+    // Fetch from GlobalSettings instead of 'communities' collection
+    const docRef = adminDb.collection("users").doc(ownerId).collection("settings").doc("global");
+    const docSnap = await docRef.get();
+    let communitiesData = docSnap.exists ? (docSnap.data()?.communities || []) : [];
 
     const communitiesWithCount = await Promise.all(
-      snapshot.docs.map(async (doc: any) => {
+      communitiesData.map(async (comm: any) => {
         const countSnap = await adminDb
           .collection("contacts")
           .where("ownerId", "==", ownerId)
-          .where("communityIds", "array-contains", doc.id)
+          .where("communityIds", "array-contains", comm.id)
           .count()
           .get();
         
         return {
-          id: doc.id,
-          ...doc.data(),
+          id: comm.id,
+          name: comm.name,
+          color: comm.brandColor || comm.color || "#4f46e5",
+          icon: comm.icon || "Users",
+          ownerId: ownerId,
           memberCount: countSnap.data().count,
         };
       })
@@ -51,19 +54,31 @@ export async function createCommunity(data: Partial<Community>) {
   try {
     const ownerId = await getUserId();
     
+    const docRef = adminDb.collection("users").doc(ownerId).collection("settings").doc("global");
+    const docSnap = await docRef.get();
+    const currentData = docSnap.exists ? docSnap.data() : {};
+    const currentCommunities = currentData?.communities || [];
+
+    const newId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+    
     const newDoc = {
-      ...data,
-      ownerId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      id: newId,
+      name: data.name || "",
+      icon: data.icon || "Users",
+      brandColor: data.color || "#4f46e5",
+      targetAudiences: [],
+      goals: [],
     };
 
-    const docRef = await adminDb.collection("communities").add(newDoc);
+    await docRef.set({
+      ...currentData,
+      communities: [newDoc, ...currentCommunities]
+    });
     
     revalidatePath("/dashboard/communities");
     revalidatePath("/dashboard/crm");
     
-    return { success: true, id: docRef.id };
+    return { success: true, id: newId };
   } catch (error: any) {
     console.error("Error in createCommunity:", error);
     return { success: false, error: error.message };
@@ -73,23 +88,34 @@ export async function createCommunity(data: Partial<Community>) {
 export async function updateCommunity(id: string, data: Partial<Community>) {
   try {
     const ownerId = await getUserId();
-    const docRef = adminDb.collection("communities").doc(id);
+    const docRef = adminDb.collection("users").doc(ownerId).collection("settings").doc("global");
     const docSnap = await docRef.get();
-
+    
     if (!docSnap.exists) {
+      throw new Error("Global settings not found");
+    }
+    
+    const currentData = docSnap.data() || {};
+    const currentCommunities = currentData.communities || [];
+    
+    const index = currentCommunities.findIndex((c: any) => c.id === id);
+    if (index === -1) {
       throw new Error("Community not found");
     }
 
-    if (docSnap.data()?.ownerId !== ownerId) {
-      throw new Error("Unauthorized");
-    }
-
-    const updateData = {
-      ...data,
-      updatedAt: new Date().toISOString(),
+    const updatedCommunity = {
+      ...currentCommunities[index],
     };
+    
+    if (data.name !== undefined) updatedCommunity.name = data.name;
+    if (data.icon !== undefined) updatedCommunity.icon = data.icon;
+    if (data.color !== undefined) updatedCommunity.brandColor = data.color;
+    
+    currentCommunities[index] = updatedCommunity;
 
-    await docRef.update(updateData);
+    await docRef.update({
+      communities: currentCommunities
+    });
     
     revalidatePath("/dashboard/communities");
     revalidatePath("/dashboard/crm");
@@ -104,18 +130,19 @@ export async function updateCommunity(id: string, data: Partial<Community>) {
 export async function deleteCommunity(id: string) {
   try {
     const ownerId = await getUserId();
-    const docRef = adminDb.collection("communities").doc(id);
+    const docRef = adminDb.collection("users").doc(ownerId).collection("settings").doc("global");
     const docSnap = await docRef.get();
+    
+    if (!docSnap.exists) return { success: true };
+    
+    const currentData = docSnap.data() || {};
+    const currentCommunities = currentData.communities || [];
+    
+    const updatedCommunities = currentCommunities.filter((c: any) => c.id !== id);
 
-    if (!docSnap.exists) {
-      throw new Error("Community not found");
-    }
-
-    if (docSnap.data()?.ownerId !== ownerId) {
-      throw new Error("Unauthorized");
-    }
-
-    await docRef.delete();
+    await docRef.update({
+      communities: updatedCommunities
+    });
     
     revalidatePath("/dashboard/communities");
     revalidatePath("/dashboard/crm");

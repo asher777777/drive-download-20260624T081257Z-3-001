@@ -7,6 +7,9 @@ import { Search, X } from "lucide-react";
 interface IconPickerProps {
   value: string;
   onChange: (iconName: string) => void;
+  triggerClassName?: string;
+  iconClassName?: string;
+  placeholder?: string;
 }
 
 // A curated list of popular icons to avoid rendering 1000+ icons
@@ -27,7 +30,7 @@ const POPULAR_ICONS = [
   "VolumeX", "Watch", "Wifi", "WifiOff", "Wind", "ZoomIn", "ZoomOut"
 ];
 
-export function IconPicker({ value, onChange }: IconPickerProps) {
+export function IconPicker({ value, onChange, triggerClassName, iconClassName, placeholder }: IconPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -35,18 +38,18 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
     icon.toLowerCase().includes(search.toLowerCase())
   );
 
-  const CurrentIcon = (LucideIcons as any)[value] || LucideIcons.Star;
+  const CurrentIcon = value ? ((LucideIcons as any)[value] || LucideIcons.Star) : LucideIcons.Image;
 
   return (
     <div className="relative">
       <div 
-        className="flex items-center gap-2 border rounded-lg p-2 bg-white cursor-pointer hover:border-primary transition-colors"
+        className={triggerClassName || "flex items-center gap-2 border rounded-lg p-2 bg-white cursor-pointer hover:border-primary transition-colors"}
         onClick={() => setIsOpen(true)}
       >
-        <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
+        <div className={iconClassName || "w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0"}>
           <CurrentIcon className="w-5 h-5 text-primary" />
         </div>
-        <span className="text-sm font-medium flex-1" dir="ltr">{value || "בחר אייקון"}</span>
+        <span className="text-sm font-medium flex-1" dir="ltr">{value || placeholder || "בחר אייקון"}</span>
         <LucideIcons.ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
       </div>
 

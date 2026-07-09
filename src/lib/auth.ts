@@ -32,6 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: "/",
+    error: "/",
   },
   providers: [
     CredentialsProvider({
@@ -207,16 +208,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
-    session({ session, token }) {
+    async session({ session, token }) {
       if (session.user) {
         if (token.role) (session.user as any).role = token.role;
         (session.user as any).id = token.id || token.sub;
+
+        // Impersonation logic
+        if (token.role === "SUPERADMIN") {
+          try {
+            const { cookies } = require("next/headers");
+            const cookieStore = await cookies();
+            const impersonatedId = cookieStore.get("impersonated_user_id")?.value;
+            if (impersonatedId) {
+              (session.user as any).originalAdminId = token.id || token.sub;
+              (session.user as any).id = impersonatedId;
+              (session.user as any).isImpersonating = true;
+            }
+          } catch (e) {
+            // Ignore error if cookies() is called outside request context
+          }
+        }
       }
       return session;
     },
     authorized: ({ auth, request: { nextUrl } }) => {
       const isLoggedIn = !!auth?.user;
+      const userRole = (auth?.user as any)?.role;
       const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
+      const isOnAdmin = nextUrl.pathname.startsWith("/admin");
+
+      if (isOnAdmin) {
+        if (isLoggedIn && userRole === "SUPERADMIN") return true;
+        return false;
+      }
       if (isOnDashboard) {
         if (isLoggedIn) return true;
         return false;

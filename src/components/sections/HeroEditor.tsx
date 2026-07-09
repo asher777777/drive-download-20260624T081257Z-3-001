@@ -21,7 +21,9 @@ interface HeroEditorProps {
   heroStyle?: "hero" | "content" | "landing";
   flexDirection?: "row" | "row-reverse" | "col" | "col-reverse";
   formMode?: "visible" | "modal";
-  onUpdateHero: (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "formMode", value: any) => void;
+  form?: any;
+  priority?: boolean;
+  onUpdateHero: (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "formMode" | "form", value: any) => void;
 }
 
 export function HeroEditor({
@@ -36,6 +38,8 @@ export function HeroEditor({
   heroStyle = "hero",
   flexDirection = "row",
   formMode = "visible",
+  form,
+  priority,
   onUpdateHero
 }: HeroEditorProps) {
   const [sitePages, setSitePages] = useState<any[]>([]);

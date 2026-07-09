@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Community } from "@/features/communities/types";
 import { createCommunity, updateCommunity, deleteCommunity } from "@/features/communities/actions";
-import { OnboardingWizard } from "@/app/dashboard/welcome/OnboardingWizard";
+import { CommunityEditor } from "@/components/dashboard/CommunityEditor";
+import { getGlobalSettings, saveGlobalSettings } from "@/features/settings/actions";
+import { addAudience, addGoal } from "@/features/company-services/actions";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Plus, Edit2, Trash2, Users, User, Menu } from "lucide-react";
 import * as LucideIcons from "lucide-react";
@@ -18,7 +21,16 @@ export function CommunitiesClient({ initialCommunities, initialStats }: Communit
   const [communities, setCommunities] = useState<Community[]>(initialCommunities);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tabsMenuOpen, setTabsMenuOpen] = useState(false);
-  const [editingCommunity, setEditingCommunity] = useState<Community | undefined>();
+  const [editingCommunity, setEditingCommunity] = useState<any | undefined>();
+  const [settings, setSettings] = useState<any>(null);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+
+  useEffect(() => {
+    if (isModalOpen && !settings && !loadingSettings) {
+      setLoadingSettings(true);
+      getGlobalSettings().then(data => { setSettings(data); setLoadingSettings(false); });
+    }
+  }, [isModalOpen, settings, loadingSettings]);
 
   const handleCreate = () => {
     setEditingCommunity(undefined);
@@ -196,12 +208,73 @@ export function CommunitiesClient({ initialCommunities, initialStats }: Communit
 
       {isModalOpen && (
         <div className="absolute inset-0 z-50 flex flex-col bg-[#111]">
-          <OnboardingWizard 
-            initialData={editingCommunity}
-            onClose={() => setIsModalOpen(false)}
-            onSaveAction={handleSave}
-            showStrategyOnSuccess={false}
-          />
+          <div className="p-4 border-b border-white/10 flex justify-between items-center" dir="rtl">
+            <h2 className="text-white font-bold">{editingCommunity ? "ערוך קהילה" : "צור קהילה"}</h2>
+            <button onClick={() => setIsModalOpen(false)}><LucideIcons.X className="text-white" /></button>
+          </div>
+          <div className="p-4 flex-1 overflow-y-auto" dir="rtl">
+            {loadingSettings || !settings ? (
+              <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+            ) : (
+              <CommunityEditor 
+                community={
+                  editingCommunity 
+                    ? (settings.communities?.find((c: any) => c.id === editingCommunity.id) || { 
+                        id: editingCommunity.id, 
+                        name: editingCommunity.name, 
+                        icon: editingCommunity.icon, 
+                        brandColor: editingCommunity.color || "#4f46e5", 
+                        targetAudiences: [], 
+                        goals: [] 
+                      })
+                    : { id: Date.now().toString(), name: "", icon: "", targetAudiences: [], goals: [], brandColor: "#4f46e5" }
+                }
+                isOpen={true}
+                onToggle={() => {}}
+                isCompleted={false}
+                audiencesList={settings.audiences || []}
+                goalsList={settings.goals || []}
+                onAddAudience={async (name) => {
+                  const res = await addAudience(name);
+                  if (res.success && res.id) {
+                    setSettings({...settings, audiences: [...(settings.audiences||[]), {id: res.id, name}]});
+                    return res.id;
+                  }
+                  return null;
+                }}
+                onAddGoal={async (name, icon) => {
+                  const res = await addGoal(name, icon);
+                  if (res.success && res.id) {
+                    setSettings({...settings, goals: [...(settings.goals||[]), {id: res.id, name, icon}]});
+                    return res.id;
+                  }
+                  return null;
+                }}
+                onUpdate={async (updated, nextField) => {
+                  const currentComms = settings.communities || [];
+                  const idx = currentComms.findIndex((c: any) => c.id === updated.id);
+                  let newComms = [...currentComms];
+                  if (idx >= 0) newComms[idx] = updated;
+                  else newComms.unshift(updated);
+                  
+                  await saveGlobalSettings({ communities: newComms });
+                  setSettings({ ...settings, communities: newComms });
+                  
+                  setCommunities(newComms.map((c: any) => ({
+                    id: c.id,
+                    name: c.name,
+                    color: c.brandColor || c.color || "#4f46e5",
+                    icon: c.icon || "Users",
+                    memberCount: c.memberCount || 0
+                  })) as any);
+                  
+                  if (!nextField || nextField === "null") {
+                    setIsModalOpen(false);
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

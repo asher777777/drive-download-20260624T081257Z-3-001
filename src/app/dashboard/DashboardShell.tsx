@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DashboardQuickActions } from "./DashboardQuickActions";
+import { stopImpersonating } from "@/features/users/impersonate";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface DashboardShellProps {
   dbActive: boolean;
   userLogoUrl?: string | null;
   miniSiteSlug?: string | null;
+  isImpersonating?: boolean;
 }
 
 export function DashboardShell({
@@ -22,6 +24,7 @@ export function DashboardShell({
   modal,
   userLogoUrl,
   miniSiteSlug,
+  isImpersonating,
 }: DashboardShellProps) {
   const pathname = usePathname();
 
@@ -47,6 +50,22 @@ export function DashboardShell({
       {/* Phone Frame Wrapper */}
       <div className="w-full max-w-[430px] h-[100dvh] md:h-auto md:max-h-[90vh] md:aspect-[9/19] flex flex-col relative overflow-hidden bg-[#0f172a] shadow-2xl mx-auto md:rounded-[3rem] md:border-[8px] md:border-slate-800">
         
+        {isImpersonating && (
+          <div className="bg-amber-500 text-black text-center text-xs py-1.5 font-bold flex justify-center items-center gap-2">
+            אתה מחובר כרגע כמשתמש
+            <button
+              onClick={async () => {
+                await stopImpersonating();
+                window.location.href = "/admin/users";
+              }}
+              className="px-2 py-0.5 bg-black/10 hover:bg-black/20 rounded-md transition-colors text-black flex items-center gap-1 cursor-pointer"
+            >
+              <LayoutDashboard className="w-3 h-3" />
+              חזור לאדמין
+            </button>
+          </div>
+        )}
+
         {/* Top Navigation Bar */}
         <header className="h-[100px] shrink-0 bg-[#0f172a] text-white flex items-center justify-between px-4 z-50 relative">
           {userLogoUrl && (
@@ -86,7 +105,7 @@ export function DashboardShell({
         {/* Main Content Area (The Canvas) */}
         <main className={cn(
           "flex-1 min-h-0 relative w-full flex flex-col rounded-t-[2.5rem] shadow-2xl overflow-hidden border-t border-slate-700/50",
-          "bg-[#0f172a]"
+          "bg-[#0f172a] text-white"
         )}>
           <AnimatePresence mode="wait">
             <motion.div

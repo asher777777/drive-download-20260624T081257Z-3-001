@@ -18,6 +18,27 @@ async function getUserId(): Promise<string> {
 export async function getWhatsAppSettings(): Promise<WhatsAppSettings> {
   try {
     const userId = await getUserId();
+    
+    // Check user overrides
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    const userData = userDoc.data();
+    
+    if (userData?.useAdminGreenApi) {
+      const globalDoc = await adminDb.collection("configs").doc("global").get();
+      const globalConfig = globalDoc.data() || {};
+      return {
+        idInstance: globalConfig.greenApiInstanceId || "",
+        apiToken: globalConfig.greenApiToken || "",
+      };
+    }
+    
+    if (userData?.greenApiSettings?.instanceId || userData?.greenApiSettings?.apiTokenInstance) {
+      return {
+        idInstance: userData.greenApiSettings.instanceId || "",
+        apiToken: userData.greenApiSettings.apiTokenInstance || "",
+      };
+    }
+
     const docRef = adminDb.collection("whatsapp_settings").doc(userId);
     const docSnap = await docRef.get();
     

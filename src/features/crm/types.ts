@@ -75,6 +75,8 @@ export interface Contact {
   
   // Community Fields
   communityIds?: string[];
+  isUser?: boolean;
+  systemUserId?: string;
   
   // Message Tracking Fields
   last_message_read_status?: string;

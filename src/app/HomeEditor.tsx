@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/sections/Hero";
@@ -14,6 +15,10 @@ import { PricingSection } from "@/components/sections/PricingSection";
 import { CourseBanner } from "@/components/sections/CourseBanner";
 import { CourseBannerEditor } from "@/components/sections/CourseBannerEditor";
 import { HeroEditor } from "@/components/sections/HeroEditor";
+import { VideoGallery } from "@/components/sections/VideoGallery";
+import { VideoGalleryEditor } from "@/components/sections/VideoGalleryEditor";
+import { ImageListingSection } from "@/components/sections/ImageListingSection";
+import { ImageListingEditor } from "@/components/sections/ImageListingEditor";
 import { HomePageConfig, savePageConfig, getAllSitePages } from "@/features/home/actions";
 import { GlobalSettings, saveGlobalSettings } from "@/features/settings/actions";
 import { generateSeoTagsWithAI, generateSeoImageWithAI } from "@/features/ai/actions";
@@ -44,7 +49,8 @@ import {
   Globe,
   Edit3,
   Eye,
-  EyeOff
+  EyeOff,
+  Monitor
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -63,6 +69,46 @@ interface HomeEditorProps {
   collectionName?: string;
 }
 
+const IframePreview = ({ children, isMobile }: { children: React.ReactNode, isMobile: boolean }) => {
+  const [contentRef, setContentRef] = useState<HTMLIFrameElement | null>(null);
+  const mountNode = contentRef?.contentWindow?.document?.body;
+
+  useEffect(() => {
+    if (contentRef && contentRef.contentWindow) {
+      const doc = contentRef.contentWindow.document;
+      const existingStyles = doc.head.querySelectorAll('style, link[rel="stylesheet"]');
+      existingStyles.forEach(s => s.remove());
+      
+      const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
+      styles.forEach(style => {
+        doc.head.appendChild(style.cloneNode(true));
+      });
+      doc.documentElement.dir = "rtl";
+      doc.documentElement.className = document.documentElement.className;
+      doc.body.className = "bg-transparent m-0 p-0 overflow-x-hidden custom-scrollbar text-white";
+    }
+  }, [contentRef]);
+
+  return (
+    <iframe
+      ref={setContentRef}
+      className={cn(
+        "transition-all duration-300 border-white/10 bg-[#0e0e10]",
+        isMobile ? "w-[375px] border-x border-b shadow-2xl mx-auto h-[600px] rounded-b-3xl" : "w-full border-none h-[400px]"
+      )}
+      style={{ border: 'none' }}
+      title="preview"
+    >
+      {mountNode && createPortal(
+        <div className={cn("pointer-events-none origin-top", !isMobile ? "min-w-[800px]" : "w-full")}>
+          {children}
+        </div>, 
+        mountNode
+      )}
+    </iframe>
+  );
+};
+
 const SortableSectionItem = ({ 
   sectionId, 
   isMobileHidden, 
@@ -78,10 +124,14 @@ const SortableSectionItem = ({
   previewNode,
   contentNode,
   designNode,
-  isSaving
+  isSaving,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast
 }: any) => {
-  const dragControls = useDragControls();
   const [openTab, setOpenTab] = useState<"preview" | "content" | "design">("preview");
+  const [isMobilePreview, setIsMobilePreview] = useState(false);
 
   // Keep header sticky when open
   const scrollToTop = (e: React.MouseEvent) => {
@@ -99,7 +149,6 @@ const SortableSectionItem = ({
       value={sectionId} 
       id={`wrapper-${sectionId}`}
       dragListener={false}
-      dragControls={dragControls}
       className={cn(
         "border border-slate-800 bg-[#0f172a] rounded-3xl overflow-hidden shadow-2xl transition-all duration-500",
         isOpen ? "ring-1 ring-indigo-500/50 scroll-mt-24" : ""
@@ -107,13 +156,25 @@ const SortableSectionItem = ({
     >
       <div className="flex items-center justify-between p-4 bg-[#1e293b] border-b border-slate-800 select-none sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <div 
-            onPointerDown={(e) => dragControls.start(e)}
-            className="cursor-grab active:cursor-grabbing p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white" 
-            title="גרור לשינוי סדר"
-            style={{ touchAction: "none" }}
-          >
-            <GripVertical className="w-4 h-4" />
+          <div className="flex flex-col gap-1 items-center justify-center p-1 bg-white/5 rounded-lg border border-white/10">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (onMoveUp) onMoveUp(); }}
+              disabled={isFirst}
+              className={cn("p-1 rounded text-slate-400 transition-colors", isFirst ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 hover:text-white cursor-pointer")}
+              title="הזז למעלה"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (onMoveDown) onMoveDown(); }}
+              disabled={isLast}
+              className={cn("p-1 rounded text-slate-400 transition-colors", isLast ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 hover:text-white cursor-pointer")}
+              title="הזז למטה"
+            >
+              <ArrowDown className="w-4 h-4" />
+            </button>
           </div>
           <button
             type="button"
@@ -170,21 +231,38 @@ const SortableSectionItem = ({
             
             {/* Preview Accordion */}
             <div className="w-full border-b border-white/5 bg-[#181818] transition-all">
-              <button
-                type="button"
-                onClick={() => setOpenTab("preview")}
-                className="w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
-              >
-                <span className="flex items-center gap-3">
+              <div className="w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setOpenTab("preview")}
+                  className="flex items-center gap-3 cursor-pointer flex-1 text-right"
+                >
                   <LayoutTemplate className="w-4 h-4 text-indigo-400" /> תצוגה מקדימה
-                </span>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", openTab === "preview" || openTab === "content" || openTab === "design" ? "rotate-180 text-white" : "text-gray-400")} />
-              </button>
+                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsMobilePreview(!isMobilePreview); }}
+                    className={cn(
+                      "flex items-center justify-center w-7 h-7 rounded-lg transition-all border cursor-pointer",
+                      isMobilePreview 
+                        ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" 
+                        : "bg-slate-800/50 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700"
+                    )}
+                    title={isMobilePreview ? "תצוגת מחשב" : "תצוגת נייד"}
+                  >
+                    {isMobilePreview ? <Monitor className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+                  </button>
+                  <button type="button" onClick={() => setOpenTab("preview")}>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", openTab === "preview" || openTab === "content" || openTab === "design" ? "rotate-180 text-white" : "text-gray-400")} />
+                  </button>
+                </div>
+              </div>
               {(true) && (
-                <div className="p-4 bg-black border-t border-white/5 relative max-h-[35vh] overflow-y-auto overflow-x-auto custom-scrollbar">
-                  <div className="min-w-[800px] pointer-events-none origin-top transform scale-75 md:scale-100 md:transform-none">
+                <div className="bg-[#0a0a0a] border-t border-white/5 relative w-full flex justify-center overflow-x-auto custom-scrollbar transition-all duration-300">
+                  <IframePreview isMobile={isMobilePreview}>
                     {previewNode}
-                  </div>
+                  </IframePreview>
                 </div>
               )}
             </div>
@@ -262,7 +340,7 @@ export function HomeEditor({
   const [isLoadingPages, setIsLoadingPages] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
-  const allAvailableSections = ["hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent"];
+  const allAvailableSections = ["hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing"];
   const currentSectionOrder = Array.from(new Set([...(config.sectionOrder || []), ...allAvailableSections]));
 
   const availableAnchors = [
@@ -273,7 +351,8 @@ export function HomeEditor({
     { id: config.livePosts?.anchorId || "livePosts", label: "עדכונים ואירועים" },
     ...(config.richContent ? [{ id: config.richContent.anchorId || "richContent", label: "תוכן מעוצב" }] : []),
     ...(config.timer ? [{ id: config.timer.anchorId || "timer", label: "אזור טיימר" }] : []),
-    ...(config.landingSection ? [{ id: config.landingSection.anchorId || "landingSection", label: "דף נחיתה" }] : [])
+    ...(config.landingSection ? [{ id: config.landingSection.anchorId || "landingSection", label: "דף נחיתה" }] : []),
+    ...(config.videoGallery ? [{ id: config.videoGallery.anchorId || "videoGallery", label: "גלריית וידאו" }] : [])
   ];
 
   // Load site pages and restore scroll on mount
@@ -595,7 +674,9 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             availableAnchors={availableAnchors}
             heroStyle={config.hero.heroStyle}
             flexDirection={config.hero.flexDirection}
+            form={config.hero.form}
             formMode={config.hero.formMode}
+            priority={true}
             onUpdateHero={updateHero}
           />
         );
@@ -619,6 +700,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               formMode={config.hero.formMode}
               isEditing={false}
               onUpdateHero={updateHero}
+              priority={true}
             />
           </div>
         );
@@ -1453,6 +1535,115 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
         );
 
         return { previewNode: landingPreviewNode, contentNode: landingContentNode, designNode: landingDesignNode };
+
+      case "videoGallery":
+        const vGalleryConf = config.videoGallery || {
+          visible: true,
+          images: [],
+          videoUrl: "",
+          videoType: "auto",
+          effect: "fade",
+          anchorId: "videoGallery",
+          backgroundColor: "#0f172a"
+        };
+
+        const videoGalleryDesignNode = (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
+              <label className="text-xs text-slate-400 font-medium">מזהה עוגן (ID)</label>
+              <input 
+                type="text" 
+                value={vGalleryConf.anchorId || ""}
+                onChange={(e) => setConfig({ ...config, videoGallery: { ...vGalleryConf, anchorId: e.target.value }})}
+                className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
+                placeholder="videoGallery"
+                dir="ltr"
+              />
+            </div>
+          </div>
+        );
+
+        const videoGalleryContentNode = (
+          <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto px-0 pb-8 mt-4 text-right" dir="rtl">
+            <div className="w-full pt-2">
+              <h5 className="text-sm font-bold text-white mb-4">ניהול גלריית וידאו</h5>
+              <div className="bg-white rounded-xl overflow-hidden p-4">
+                <VideoGalleryEditor
+                  config={vGalleryConf}
+                  onChange={(newConf) => setConfig({ ...config, videoGallery: newConf })}
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+        const videoGalleryPreviewNode = (
+          <div className="pointer-events-none opacity-80">
+            <VideoGallery
+              id={vGalleryConf.anchorId || "videoGallery"}
+              images={vGalleryConf.images}
+              videoUrl={vGalleryConf.videoUrl}
+              videoType={vGalleryConf.videoType}
+              effect={vGalleryConf.effect}
+              backgroundColor={vGalleryConf.backgroundColor || globalSettings.backgroundColor}
+            />
+          </div>
+        );
+
+        return { previewNode: videoGalleryPreviewNode, contentNode: videoGalleryContentNode, designNode: videoGalleryDesignNode };
+
+      case "imageListing":
+        const imgListingConf = config.imageListing || {
+          visible: true,
+          images: [],
+          imagesPerRow: 4,
+          form: { enabled: false, fields: [], title: "" } as any,
+          anchorId: "imageListing",
+          backgroundColor: "#ffffff"
+        };
+
+        const imgListingDesignNode = (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
+              <label className="text-xs text-slate-400 font-medium">מזהה עוגן (ID)</label>
+              <input 
+                type="text" 
+                value={imgListingConf.anchorId || ""}
+                onChange={(e) => setConfig({ ...config, imageListing: { ...imgListingConf, anchorId: e.target.value }})}
+                className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
+                placeholder="imageListing"
+                dir="ltr"
+              />
+            </div>
+          </div>
+        );
+
+        const imgListingContentNode = (
+          <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto px-0 pb-8 mt-4 text-right" dir="rtl">
+            <div className="w-full pt-2">
+              <ImageListingEditor
+                config={imgListingConf}
+                onChange={(newConf) => setConfig({ ...config, imageListing: newConf })}
+              />
+            </div>
+          </div>
+        );
+
+        const imgListingPreviewNode = (
+          <div className="pointer-events-none opacity-80">
+            <ImageListingSection
+              id={imgListingConf.anchorId || "imageListing"}
+              images={imgListingConf.images}
+              imagesPerRow={imgListingConf.imagesPerRow}
+              form={imgListingConf.form as any}
+              backgroundColor={imgListingConf.backgroundColor || globalSettings.backgroundColor}
+              isEditing={true}
+            />
+          </div>
+        );
+
+        return { previewNode: imgListingPreviewNode, contentNode: imgListingContentNode, designNode: imgListingDesignNode };
+
       default:
         return null;
     }
@@ -1461,7 +1652,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
   const renderSectionPreview = (sectionId: string) => {
     switch (sectionId) {
       case "hero":
-        if (!config.hero) return null;
+        if (!config.hero || config.hero.visible === false || String(config.hero.visible) === "false") return null;
         return (
           <Hero 
             id={config.hero.anchorId || "hero"}
@@ -1475,10 +1666,11 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             secondaryButton={config.hero.secondaryButton}
             backgroundColor={config.hero.backgroundColor || globalSettings.backgroundColor}
             isEditing={false}
+            priority={true}
           />
         );
       case "mainContent":
-        if (!config.mainContent || !config.mainContent.visible) return null;
+        if (!config.mainContent || config.mainContent.visible === false || String(config.mainContent.visible) === "false") return null;
         return (
           <CourseBanner 
             id={config.mainContent.anchorId || "mainContent"}
@@ -1493,7 +1685,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           />
         );
       case "services":
-        if (!config.services || !config.services.visible) return null;
+        if (!config.services || config.services.visible === false || String(config.services.visible) === "false") return null;
         return (
           <ServicesGrid 
             id={config.services.anchorId || "services"}
@@ -1507,7 +1699,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           />
         );
       case "community":
-        if (!config.community || !config.community.visible) return null;
+        if (!config.community || config.community.visible === false || String(config.community.visible) === "false") return null;
         const resolvedWhatsApp = !config.community.whatsappNumber || config.community.whatsappNumber === "972545947701"
           ? (globalSettings.contactWhatsApp || globalSettings.contactPhone || "972545947701")
           : config.community.whatsappNumber;
@@ -1530,10 +1722,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           />
         );
       case "livePosts":
-        if (!config.livePosts || !config.livePosts.visible) return null;
+        if (!config.livePosts || config.livePosts.visible === false || String(config.livePosts.visible) === "false") return null;
         return <LivePostsGrid id={config.livePosts.anchorId || "livePosts"} layout={config.livePosts.layout} customPages={config.livePosts.customPages} />;
       case "timer":
-        if (!config.timer || !config.timer.visible) return null;
+        if (!config.timer || config.timer.visible === false || String(config.timer.visible) === "false") return null;
         return (
           <TimerSection
             id={config.timer.anchorId || "timer"}
@@ -1545,7 +1737,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           />
         );
       case "pricing":
-        if (!config.pricing || !config.pricing.visible) return null;
+        if (!config.pricing || config.pricing.visible === false || String(config.pricing.visible) === "false") return null;
         return (
           <PricingSection
             id={config.pricing.anchorId || "pricing"}
@@ -1556,7 +1748,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           />
         );
       case "richContent":
-        if (!config.richContent || !config.richContent.visible) return null;
+        if (!config.richContent || config.richContent.visible === false || String(config.richContent.visible) === "false") return null;
         return (
           <RichContentSection 
             id={config.richContent.anchorId || "richContent"}
@@ -1567,7 +1759,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           />
         );
       case "landingSection":
-        if (!config.landingSection || !config.landingSection.visible) return null;
+        if (!config.landingSection || config.landingSection.visible === false || String(config.landingSection.visible) === "false") return null;
         return (
           <Suspense fallback={null}>
             <LandingSection
@@ -1584,6 +1776,39 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               isEditing={false}
             />
           </Suspense>
+        );
+      case "videoGallery":
+        const vGalleryPrevConf = config.videoGallery || {
+          visible: true,
+          images: [],
+          videoUrl: "",
+          videoType: "auto",
+          effect: "fade",
+          anchorId: "videoGallery",
+          backgroundColor: "#0f172a"
+        };
+        if (!vGalleryPrevConf.visible) return null;
+        return (
+          <VideoGallery
+            id={vGalleryPrevConf.anchorId || "videoGallery"}
+            images={vGalleryPrevConf.images}
+            videoUrl={vGalleryPrevConf.videoUrl}
+            videoType={vGalleryPrevConf.videoType}
+            effect={vGalleryPrevConf.effect}
+            backgroundColor={vGalleryPrevConf.backgroundColor || globalSettings.backgroundColor}
+          />
+        );
+      case "imageListing":
+        if (!config.imageListing || config.imageListing.visible === false || String(config.imageListing.visible) === "false") return null;
+        return (
+          <ImageListingSection
+            id={config.imageListing.anchorId || "imageListing"}
+            images={config.imageListing.images}
+            imagesPerRow={config.imageListing.imagesPerRow}
+            form={config.imageListing.form}
+            backgroundColor={config.imageListing.backgroundColor || globalSettings.backgroundColor}
+            isEditing={false}
+          />
         );
       default:
         return null;
@@ -2362,7 +2587,9 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               onReorder={(newOrder) => setConfig({ ...config, sectionOrder: newOrder })}
               className="space-y-4"
             >
-              {currentSectionOrder.map((sectionId) => {
+              {currentSectionOrder.map((sectionId, index) => {
+                const isFirst = index === 0;
+                const isLast = index === currentSectionOrder.length - 1;
                 const isMobileHidden = config.mobileHiddenSections?.includes(sectionId) || false;
                 const sectionLabels: Record<string, string> = {
                   hero: "אזור ראשי (Hero)",
@@ -2433,6 +2660,24 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                     onCancelLocal={() => {
                       setConfig(prev => ({ ...prev, activeEditSection: null }));
                     }}
+                    onMoveUp={() => {
+                      if (isFirst) return;
+                      const newOrder = [...currentSectionOrder];
+                      const temp = newOrder[index - 1];
+                      newOrder[index - 1] = newOrder[index];
+                      newOrder[index] = temp;
+                      setConfig({ ...config, sectionOrder: newOrder });
+                    }}
+                    onMoveDown={() => {
+                      if (isLast) return;
+                      const newOrder = [...currentSectionOrder];
+                      const temp = newOrder[index + 1];
+                      newOrder[index + 1] = newOrder[index];
+                      newOrder[index] = temp;
+                      setConfig({ ...config, sectionOrder: newOrder });
+                    }}
+                    isFirst={isFirst}
+                    isLast={isLast}
                     isSaving={saving}
                     previewNode={renderSection(sectionId)?.previewNode}
                     contentNode={renderSection(sectionId)?.contentNode}

@@ -119,6 +119,7 @@ export function CourseBanner({
                   alt={title || "Image"} 
                   fill 
                   className="object-cover"
+                  priority={true}
                 />
               ) : (
                 <div className="w-full h-full bg-slate-200 flex items-center justify-center">

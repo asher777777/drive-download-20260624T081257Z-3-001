@@ -132,6 +132,8 @@ export function LandingSection({
               src={imageSrc} 
               alt={title || "רקע"} 
               className="absolute inset-0 w-full h-full object-cover animate-fade-in"
+              loading="eager"
+              fetchPriority="high"
             />
             <div className={`absolute inset-0 ${activeTheme.bg}/85 mix-blend-multiply`} />
           </>

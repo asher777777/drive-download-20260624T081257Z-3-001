@@ -37,6 +37,7 @@ export interface PricingPackage {
 
 export interface HomePageConfig {
   hero: {
+    visible?: boolean;
     title: string;
     subtitle: string;
     description: string;
@@ -144,6 +145,24 @@ export interface HomePageConfig {
     heading: string;
     body: string;
     layout: "center" | "two-column" | "grid";
+    anchorId?: string;
+    backgroundColor?: string;
+    hoverColor?: string;
+  };
+  videoGallery?: {
+    visible: boolean;
+    images: string[];
+    videoUrl: string;
+    videoType: "drive-direct" | "iframe" | "auto";
+    effect: "fade" | "digital-squares";
+    anchorId?: string;
+    backgroundColor?: string;
+  };
+  imageListing?: {
+    visible: boolean;
+    images: string[];
+    imagesPerRow: number;
+    form: FormConfig;
     anchorId?: string;
     backgroundColor?: string;
     hoverColor?: string;
@@ -425,6 +444,15 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
     body: "כל ארגון הוא שונה, ולכן בנינו מערכת מודולרית שניתן להתאים בדיוק למידותיכם. העורך המתקדם שלנו מאפשר לכם לבחור אילו כלים להציג, לשנות את סדר האזורים ולהתאים את העיצוב למותג שלכם. בעזרת הפתרונות שלנו, הקהילה שלכם מקבלת את החוויה הדיגיטלית הטובה ביותר, בזמן שאתם מתפנים להתמקד במה שבאמת חשוב - העשייה עצמה.",
     layout: "center",
   },
+  imageListing: {
+    visible: false,
+    images: [],
+    imagesPerRow: 4,
+    form: DEFAULT_FORM_CONFIG,
+    anchorId: "imageListing",
+    backgroundColor: "#ffffff",
+    hoverColor: "rgba(59, 130, 246, 0.1)"
+  },
   timer: {
     visible: false,
     title: "הזמן אוזל!",
@@ -496,6 +524,7 @@ const DEFAULT_SERVICES_LANDING_CONFIG: HomePageConfig = {
   livePosts: { ...DEFAULT_HOME_CONFIG.livePosts, visible: false },
   timer: { ...DEFAULT_HOME_CONFIG.timer!, visible: false },
   richContent: { ...DEFAULT_HOME_CONFIG.richContent!, visible: false },
+  imageListing: { ...DEFAULT_HOME_CONFIG.imageListing!, visible: false },
   contact: { ...DEFAULT_HOME_CONFIG.contact, visible: false },
   landingSection: { 
     ...DEFAULT_HOME_CONFIG.landingSection!, 
@@ -553,6 +582,15 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
     contact: { ...DEFAULT_HOME_CONFIG.contact, ...data.contact },
     landingSection: { ...DEFAULT_HOME_CONFIG.landingSection, ...data.landingSection },
     richContent: { ...DEFAULT_HOME_CONFIG.richContent, ...data.richContent },
+    imageListing: {
+      visible: false,
+      images: [],
+      imagesPerRow: 4,
+      form: { ...DEFAULT_FORM_CONFIG },
+      anchorId: "imageListing",
+      backgroundColor: "#ffffff",
+      hoverColor: "rgba(59, 130, 246, 0.1)"
+    },
     timer: { ...DEFAULT_HOME_CONFIG.timer, ...data.timer },
     pricing: { ...DEFAULT_HOME_CONFIG.pricing, ...data.pricing },
     mobileHiddenSections: data.mobileHiddenSections || DEFAULT_HOME_CONFIG.mobileHiddenSections || [],

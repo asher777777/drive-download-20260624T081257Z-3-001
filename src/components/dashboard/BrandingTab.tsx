@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, Save, Wand2, Loader2, Copy, Building2, Check, Phone, Globe, Palette, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Save, Wand2, Loader2, Copy, Building2, Check, Phone, Globe, Palette, X, Trash2, Image as ImageIcon } from "lucide-react";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -10,7 +10,9 @@ import { rephraseTextWithAI } from "@/features/ai/actions";
 import { getCompanyServices } from "@/features/company-services/actions";
 import { generateMiniSiteWithAI } from "@/features/services/actions";
 import { CompanyMediaSection } from "./CompanyMediaSection";
+import { uploadMediaFile, fetchImageAsBase64 } from "@/features/media/actions";
 import { useRouter } from "next/navigation";
+import { extractColors } from "extract-colors";
 
 const scrollToTop = (e: React.MouseEvent<HTMLElement>) => {
   const target = e.currentTarget.parentElement;
@@ -21,16 +23,28 @@ const scrollToTop = (e: React.MouseEvent<HTMLElement>) => {
   }
 };
 
-export function BrandingTab() {
-  const [settings, setSettings] = useState<GlobalSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+export function BrandingTab({ 
+  onSave, 
+  activeStep = 8, 
+  settings: propSettings,
+  isOpen,
+  onToggle,
+  isCompleted
+}: { 
+  onSave?: () => void; 
+  activeStep?: number; 
+  settings?: GlobalSettings; 
+  isOpen: boolean;
+  onToggle: () => void;
+  isCompleted: boolean;
+}) {
+  const [settings, setSettings] = useState<GlobalSettings | null>(propSettings || null);
+  const [loading, setLoading] = useState(!propSettings);
   
-  const [isMainOpen, setIsMainOpen] = useState(true);
-  const [isNameOpen, setIsNameOpen] = useState(false);
-  const [isVisionOpen, setIsVisionOpen] = useState(false);
-  const [isContactOpen, setIsContactOpen] = useState(false);
-  const [isSocialOpen, setIsSocialOpen] = useState(false);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  
   const [isColorsOpen, setIsColorsOpen] = useState(false);
+  const [isLogoOpen, setIsLogoOpen] = useState(false);
   const [isBaseColorsOpen, setIsBaseColorsOpen] = useState(true);
   const [isTextColorsOpen, setIsTextColorsOpen] = useState(false);
   const [isButtonColorsOpen, setIsButtonColorsOpen] = useState(false);
@@ -41,10 +55,15 @@ export function BrandingTab() {
   const [slogan, setSlogan] = useState("");
   const [companyVision, setCompanyVision] = useState("");
   const [shortVision, setShortVision] = useState("");
-  
-  const [savingName, setSavingName] = useState(false);
   const [savingVision, setSavingVision] = useState(false);
+
+  // Logo upload state
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
+
   const [savingGeneral, setSavingGeneral] = useState(false);
+
+  const [savingName, setSavingName] = useState(false);
 
   const [servicesCount, setServicesCount] = useState(0);
   const [companyServices, setCompanyServices] = useState<any[]>([]);
@@ -64,6 +83,8 @@ export function BrandingTab() {
     setSavingGeneral(true);
     await saveGlobalSettings(settings);
     setSavingGeneral(false);
+    setEditingSection(null);
+    onSave?.();
   };
 
   // AI Modal states
@@ -73,23 +94,63 @@ export function BrandingTab() {
   const [aiResult, setAiResult] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // Sync state with props
+  useEffect(() => {
+    if (propSettings) {
+      setSettings(propSettings);
+      setCompanyName(propSettings.companyName || "");
+      if (propSettings.organizationType) setOrganizationType(propSettings.organizationType as any);
+      setOrganizationPurpose(propSettings.organizationPurpose || "");
+      setSlogan(propSettings.slogan || "");
+      setCompanyVision(propSettings.companyVision || "");
+      setShortVision(propSettings.shortVision || "");
+    }
+  }, [propSettings]);
+
+  const getFirstTwoWords = (text: string | undefined | null): string => {
+    if (!text) return "";
+    const cleanText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const words = cleanText.split(" ");
+    return words.slice(0, 2).join(" ");
+  };
+
+  const getActiveInnerSection = () => {
+    if (!organizationPurpose) return "purpose";
+    if (!companyName.trim()) return "name";
+    if (!settings?.memberCount) return "memberCount";
+    if (!slogan.trim()) return "slogan";
+    if (!companyVision.trim()) return "vision";
+    return "none";
+  };
+
+  const activeInnerSection = getActiveInnerSection();
+
+  const isPurposeOpen = editingSection === "purpose" || (editingSection === null && activeInnerSection === "purpose");
+  const isNameOpen = editingSection === "name" || (editingSection === null && activeInnerSection === "name");
+  const isMemberCountOpen = editingSection === "memberCount" || (editingSection === null && activeInnerSection === "memberCount");
+  const isSloganOpen = editingSection === "slogan" || (editingSection === null && activeInnerSection === "slogan");
+  const isVisionOpen = editingSection === "vision" || (editingSection === null && activeInnerSection === "vision");
+
   useEffect(() => {
     async function load() {
-      const data = await getGlobalSettings();
+      if (!propSettings) {
+        const data = await getGlobalSettings();
+        setSettings(data);
+        setCompanyName(data.companyName || "");
+        if (data.organizationType) setOrganizationType(data.organizationType as any);
+        setOrganizationPurpose(data.organizationPurpose || "");
+        setSlogan(data.slogan || "");
+        setCompanyVision(data.companyVision || "");
+        if (data.shortVision) setShortVision(data.shortVision);
+        if (data.logoUrl) setLogoUrl(data.logoUrl);
+      }
       const svcs = await getCompanyServices();
       setCompanyServices(svcs);
       setServicesCount(svcs.length);
-      setSettings(data);
-      setCompanyName(data.companyName || "");
-      if (data.organizationType) setOrganizationType(data.organizationType as any);
-      setOrganizationPurpose(data.organizationPurpose || "");
-      setSlogan(data.slogan || "");
-      setCompanyVision(data.companyVision || "");
-      setShortVision(data.shortVision || "");
       setLoading(false);
     }
     load();
-  }, []);
+  }, [propSettings]);
 
   const handleSaveName = async () => {
     setSavingName(true);
@@ -99,8 +160,9 @@ export function BrandingTab() {
       organizationPurpose,
       slogan
     });
-    if (companyName.trim()) setIsNameOpen(false);
+    setEditingSection(null);
     setSavingName(false);
+    onSave?.();
   };
 
   const getEntityNameLabel = () => {
@@ -117,8 +179,62 @@ export function BrandingTab() {
   const handleSaveVision = async () => {
     setSavingVision(true);
     await saveGlobalSettings({ companyVision, shortVision });
-    setIsVisionOpen(false);
     setSavingVision(false);
+    onSave?.();
+  };
+
+  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadMediaFile(formData);
+      if (res.success && res.url) {
+        setLogoUrl(res.url);
+        await saveGlobalSettings({ logoUrl: res.url });
+        onSave?.();
+      } else {
+        alert("שגיאה בהעלאת הלוגו: " + (res.error || ""));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("שגיאה בהעלאת הלוגו");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!confirm("האם למחוק את הלוגו?")) return;
+    setLogoUrl("");
+    await saveGlobalSettings({ logoUrl: "" });
+    onSave?.();
+  };
+
+  const handleApplyLogoColors = async () => {
+    if (!logoUrl) return;
+    try {
+      const imgRes = await fetchImageAsBase64(logoUrl);
+      if (imgRes.error || !imgRes.base64) {
+        alert("שגיאה בחילוץ התמונה (CORS/Network)");
+        return;
+      }
+      const dataUrl = `data:${imgRes.contentType};base64,${imgRes.base64}`;
+      const colors = await extractColors(dataUrl);
+      const topColors = colors.sort((a, b) => b.area - a.area).map(c => c.hex);
+      if (topColors.length >= 1) {
+        updateField("primaryColor", topColors[0]);
+        if (topColors.length >= 2) {
+          updateField("secondaryColor", topColors[1]);
+        }
+      }
+    } catch (e) {
+      console.error("Color extraction failed:", e);
+      alert("שגיאה בחילוץ צבעים מהלוגו");
+    }
   };
 
   const handleImproveWithAI = async () => {
@@ -128,10 +244,10 @@ export function BrandingTab() {
       if (result.success && result.text) {
         setCompanyVision(result.text);
       } else {
-        alert("שגיאה בשיפור הטקסט");
+        alert(result.error || "שגיאה בשיפור הטקסט");
       }
-    } catch (err) {
-      alert("שגיאה בשיפור הטקסט");
+    } catch (err: any) {
+      alert(err.message || "שגיאה בשיפור הטקסט");
     } finally {
       setAiLoading(false);
     }
@@ -149,10 +265,10 @@ export function BrandingTab() {
         const cleanText = result.text.replace(/<[^>]*>?/gm, '').trim();
         setShortVision(cleanText);
       } else {
-        alert("שגיאה בתמצות הטקסט");
+        alert(result.error || "שגיאה בתמצות הטקסט");
       }
-    } catch (err) {
-      alert("שגיאה בתמצות הטקסט");
+    } catch (err: any) {
+      alert(err.message || "שגיאה בתמצות הטקסט");
     } finally {
       setAiLoading(false);
     }
@@ -227,486 +343,642 @@ export function BrandingTab() {
   return (
     <div className="w-full space-y-0">
       {/* 1. Global Settings / Company Details Wrapper */}
-      <div className="w-full bg-[#181818] border-y border-white/5" dir="rtl">
+      <div className={`w-full bg-[#181818] border-y border-white/5 transition-all duration-300 ${isOpen ? 'sticky top-0 z-30 shadow-md' : ''}`} dir="rtl">
       {/* Outer Tab Header */}
       <button
         onClick={(e) => {
-          const next = !isMainOpen;
-          setIsMainOpen(next);
-          if (next) scrollToTop(e);
+          onToggle();
+          if (!isOpen) scrollToTop(e);
         }}
         className="w-full p-4 sm:p-5 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white cursor-pointer transition-colors"
       >
         <div className="flex items-center gap-4">
-          <div className="p-2 bg-white/5 text-indigo-400">
-            <Building2 className="w-5 h-5" />
+          <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${isCompleted ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-indigo-400'}`}>
+            {isCompleted ? <Check className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
           </div>
-          <span className="text-sm sm:text-base">מיתוג</span>
+          <div className="flex flex-col text-right">
+            <span className="text-sm sm:text-base">מיתוג</span>
+            {isCompleted && companyName && (
+              <span className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                הושלם: {companyName}
+              </span>
+            )}
+          </div>
         </div>
-        {isMainOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400 group-hover:text-white" />}
+        {isOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400 group-hover:text-white" />}
       </button>
 
       {/* Outer Tab Content */}
-      {isMainOpen && (
+      {isOpen && (
         <div className="w-full bg-[#111] border-t border-white/5 animate-in fade-in duration-200">
           <div className="w-full flex flex-col">
             
-            {/* Company Name Inner Accordion */}
-            <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isNameOpen ? 'ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative' : ''}`}>
-              <button
-                onClick={(e) => {
-                  const next = !isNameOpen;
-                  setIsNameOpen(next);
-                  if (next) scrollToTop(e);
-                }}
-                className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
+            {/* 1. המטרה */}
+            {!isPurposeOpen && organizationPurpose ? (
+              <div 
+                onClick={() => setEditingSection("purpose")}
+                className="w-full border-b border-white/5 bg-[#181818] p-4 flex items-center justify-between cursor-pointer hover:bg-[#202020] transition-colors"
               >
-                <span className="flex items-center gap-3">
-                  {getEntityNameLabel()}
-                </span>
-                <div className="flex items-center gap-3">
-                  {!isNameOpen && companyName && (
-                    <span className="text-emerald-400 font-bold text-xs bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
-                      {companyName}
-                    </span>
-                  )}
-                  {isNameOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-                </div>
-              </button>
-              
-              {isNameOpen && (
-                <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
-                  {/* Organization Type Selection */}
-                  <div className="space-y-2">
-                    <label className="text-white text-sm font-bold block">סוג התאגדות</label>
-                    <div className="flex flex-col gap-2">
-                      {["חברה", "עמותה", "שותפות", "עוסק מורשה", "עוסק פטור"].map((type) => (
-                        <label key={type} onClick={() => setOrganizationType(type as any)} className="flex items-center gap-2 cursor-pointer group">
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${organizationType === type ? 'border-indigo-500' : 'border-white/20 group-hover:border-white/40'}`}>
-                            {organizationType === type && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
-                          </div>
-                          <span className={`text-sm ${organizationType === type ? 'text-white font-medium' : 'text-gray-400 group-hover:text-gray-300'}`}>{type}</span>
-                        </label>
-                      ))}
-                    </div>
+                <div className="flex items-center gap-3 text-right">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 text-emerald-400" />
                   </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-slate-400">המטרה</span>
+                    <span className="text-xs font-bold text-white mt-0.5">{getFirstTwoWords(organizationPurpose)}</span>
+                  </div>
+                </div>
+                <span className="text-xs text-indigo-400 font-semibold">ערוך</span>
+              </div>
+            ) : (
+              <div className="w-full border-b border-white/5 bg-[#181818] p-4 text-white space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-slate-200 block">המטרה</label>
+                  {organizationPurpose && (
+                    <button 
+                      type="button"
+                      onClick={() => setEditingSection(null)}
+                      className="text-xs text-slate-400 hover:text-white"
+                    >
+                      סגור
+                    </button>
+                  )}
+                </div>
+                {organizationPurpose ? (
+                  <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/10 rounded-xl">
+                    <span className="text-slate-300 text-sm font-semibold">{organizationPurpose}</span>
+                    <button 
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setOrganizationPurpose("");
+                        await saveGlobalSettings({ organizationPurpose: "" });
+                        setEditingSection("purpose");
+                        onSave?.();
+                      }}
+                      className="text-red-400 hover:text-red-300 p-2 hover:bg-white/5 rounded-xl transition shrink-0"
+                      title="מחק מטרה"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {[
+                      "כספית - מכירה - נתינת שירותים",
+                      "ציבורית - מתן שירות תחת משרדי ממשלה או עיירה",
+                      "אידאולוגית/חברתית- קידום אגנדות או שירותי דת",
+                      "אחר - מטרה אישית, מקצועית או שונה"
+                    ].map((purpose) => (
+                      <button
+                        key={purpose}
+                        type="button"
+                        onClick={async () => {
+                          setOrganizationPurpose(purpose);
+                          await saveGlobalSettings({ organizationPurpose: purpose });
+                          setEditingSection(null);
+                          onSave?.();
+                        }}
+                        className="flex items-center gap-3 p-3.5 rounded-xl border border-white/5 bg-[#111] hover:bg-[#202020] text-right text-slate-300 hover:text-white transition w-full"
+                      >
+                        <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                        <span className="text-xs sm:text-sm font-bold">{purpose}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* 2. שם החברה (שדה טקסט בודד, שמירה בצידו) */}
+            {!isNameOpen && companyName.trim() ? (
+              <div 
+                onClick={() => setEditingSection("name")}
+                className="w-full border-b border-white/5 bg-[#181818] p-4 flex items-center justify-between cursor-pointer hover:bg-[#202020] transition-colors"
+              >
+                <div className="flex items-center gap-3 text-right">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-slate-400">שם החברה</span>
+                    <span className="text-xs font-bold text-white mt-0.5">{getFirstTwoWords(companyName)}</span>
+                  </div>
+                </div>
+                <span className="text-xs text-indigo-400 font-semibold">ערוך</span>
+              </div>
+            ) : (
+              (activeStep >= 2 || companyName.trim()) && (
+                <div className="w-full border-b border-white/5 bg-[#181818] p-4 text-white space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-200 block">שם החברה</label>
+                    {companyName.trim() && (
+                      <button 
+                        type="button"
+                        onClick={() => setEditingSection(null)}
+                        className="text-xs text-slate-400 hover:text-white"
+                      >
+                        סגור
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
                     <input
                       type="text"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
-                      className="flex-1 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
-                      placeholder={`הזן את ${getEntityNameLabel()}...`}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
+                      placeholder="הזן את שם החברה..."
                     />
-                  </div>
-                  
-                  {/* Organization Purpose & Slogan */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="flex-1 space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">מטרת התאגדות</label>
-                      <input
-                        type="text"
-                        value={organizationPurpose}
-                        onChange={(e) => setOrganizationPurpose(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
-                        placeholder="לדוגמה: מתן שירותים דיגיטליים..."
-                      />
-                    </div>
-                    <div className="flex-1 space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">סלוגן</label>
-                      <input
-                        type="text"
-                        value={slogan}
-                        onChange={(e) => setSlogan(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
-                        placeholder="המשפט שמלווה את העסק..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-2">
                     <button 
-                      onClick={handleSaveName} 
-                      disabled={savingName} 
-                      className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-bold transition-colors shrink-0 flex items-center justify-center disabled:opacity-50"
+                      type="button"
+                      onClick={handleSaveName}
+                      disabled={savingName}
+                      className="p-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition disabled:opacity-50 shrink-0 flex items-center justify-center"
+                      title="שמור שם"
                     >
                       {savingName ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                      <span className="mr-2">שמור הגדרות שם</span>
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
+              )
+            )}
 
-            {/* Company Vision Inner Accordion */}
-            <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isVisionOpen ? 'ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative' : ''}`}>
-              <button
-                onClick={(e) => {
-                  const next = !isVisionOpen;
-                  setIsVisionOpen(next);
-                  if (next) scrollToTop(e);
-                }}
-                className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
+            {/* 3. מספר עובדים/חברים/מתנדבים */}
+            {!isMemberCountOpen && settings?.memberCount ? (
+              <div 
+                onClick={() => setEditingSection("memberCount")}
+                className="w-full border-b border-white/5 bg-[#181818] p-4 flex items-center justify-between cursor-pointer hover:bg-[#202020] transition-colors"
               >
-                <span className="flex items-center gap-3">
-                  חזון החברה
-                </span>
-                {isVisionOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-              </button>
-              
-              {isVisionOpen && (
-                <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
-                  <div className="border border-white/10 overflow-hidden shadow-sm bg-[#181818]">
-                    <RichTextEditor
-                      value={companyVision}
-                      onChange={setCompanyVision}
-                      placeholder="הזן כאן את חזון החברה בפירוט..."
-                    />
+                <div className="flex items-center gap-3 text-right">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 text-emerald-400" />
                   </div>
-                  
-                  {/* Short Vision AI */}
-                  <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-white text-sm font-bold">תמצית החזון</label>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-slate-400">מספר עובדים/חברים/מתנדבים</span>
+                    <span className="text-xs font-bold text-white mt-0.5">{getFirstTwoWords(settings.memberCount)}</span>
+                  </div>
+                </div>
+                <span className="text-xs text-indigo-400 font-semibold">ערוך</span>
+              </div>
+            ) : (
+              (activeStep >= 3 || settings?.memberCount) && (
+                <div className="w-full border-b border-white/5 bg-[#181818] p-4 text-white space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-200 block">מספר עובדים/חברים/מתנדבים</label>
+                    {settings?.memberCount && (
                       <button 
-                        onClick={handleShortenVisionAI}
-                        disabled={aiLoading}
-                        className="text-xs flex items-center gap-1.5 text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                        type="button"
+                        onClick={() => setEditingSection(null)}
+                        className="text-xs text-slate-400 hover:text-white"
                       >
-                        {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                        ייצר תמצית בעזרת AI
+                        סגור
+                      </button>
+                    )}
+                  </div>
+                  {settings?.memberCount ? (
+                    <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/10 rounded-xl">
+                      <span className="text-slate-300 text-sm font-semibold">{settings.memberCount}</span>
+                      <button 
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await saveGlobalSettings({ memberCount: "" });
+                          setEditingSection("memberCount");
+                          onSave?.();
+                        }}
+                        className="text-red-400 hover:text-red-300 p-2 hover:bg-white/5 rounded-xl transition shrink-0"
+                        title="מחק בחירה"
+                      >
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
-                    <textarea
-                      value={shortVision}
-                      onChange={(e) => setShortVision(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600 min-h-[80px]"
-                      placeholder="כאן יופיע תקציר החזון, או שתוכל לכתוב אותו בעצמך..."
+                  ) : (
+                    <div className="flex flex-col gap-2.5">
+                      {["אני לבד לבנתיים", "עד 10", "עד 50", "יותר מ 50"].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={async () => {
+                            await saveGlobalSettings({ memberCount: count });
+                            setEditingSection(null);
+                            onSave?.();
+                          }}
+                          className="flex items-center gap-3 p-3.5 rounded-xl border border-white/5 bg-[#111] hover:bg-[#202020] text-right text-slate-300 hover:text-white transition w-full"
+                        >
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <span className="text-xs sm:text-sm font-bold">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
+            {/* 4. סלוגן */}
+            {!isSloganOpen && slogan.trim() ? (
+              <div 
+                onClick={() => setEditingSection("slogan")}
+                className="w-full border-b border-white/5 bg-[#181818] p-4 flex items-center justify-between cursor-pointer hover:bg-[#202020] transition-colors"
+              >
+                <div className="flex items-center gap-3 text-right">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-slate-400">סלוגן</span>
+                    <span className="text-xs font-bold text-white mt-0.5">{getFirstTwoWords(slogan)}</span>
+                  </div>
+                </div>
+                <span className="text-xs text-indigo-400 font-semibold">ערוך</span>
+              </div>
+            ) : (
+              (activeStep >= 4 || slogan.trim()) && (
+                <div className="w-full border-b border-white/5 bg-[#181818] p-4 text-white space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-200 block">סלוגן</label>
+                    {slogan.trim() && (
+                      <button 
+                        type="button"
+                        onClick={() => setEditingSection(null)}
+                        className="text-xs text-slate-400 hover:text-white"
+                      >
+                        סגור
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={slogan}
+                      onChange={(e) => setSlogan(e.target.value)}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600"
+                      placeholder="המשפט שמלווה את העסק..."
                     />
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-4 border-t border-white/5">
-                    <Button 
-                      onClick={handleSaveVision} 
-                      disabled={savingVision}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        setSavingGeneral(true);
+                        await saveGlobalSettings({ slogan });
+                        setSavingGeneral(false);
+                        setEditingSection(null);
+                        onSave?.();
+                      }}
+                      disabled={savingGeneral}
+                      className="p-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition disabled:opacity-50 shrink-0 flex items-center justify-center"
+                      title="שמור סלוגן"
                     >
-                      {savingVision ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                      שמור שינויים
-                    </Button>
-                    <Button 
-                      onClick={() => setIsAiModalOpen(true)}
-                      variant="outline"
-                      className="bg-white/5 hover:bg-white/10 border-white/10 text-purple-400"
-                    >
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      שפר עם AI
-                    </Button>
+                      {savingGeneral ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
+              )
+            )}
 
-            {/* Contact Accordion */}
-            <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isContactOpen ? 'ring-1 ring-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)] z-10 relative' : ''}`}>
-              <button
-                onClick={(e) => {
-                  const next = !isContactOpen;
-                  setIsContactOpen(next);
-                  if (next) scrollToTop(e);
-                }}
-                className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
+            {/* Company Vision Inner Accordion */}
+            {!isVisionOpen && companyVision.trim() ? (
+              <div 
+                onClick={() => setEditingSection("vision")}
+                className="w-full border-b border-white/5 bg-[#181818] p-4 flex items-center justify-between cursor-pointer hover:bg-[#202020] transition-colors"
               >
-                <span className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-emerald-400" />
-                  נתוני התקשרות גלובליים
-                </span>
-                {isContactOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-              </button>
-              
-              {isContactOpen && settings && (
-                <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
-                  <div className="grid grid-cols-1 gap-6">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">טלפון ליצירת קשר</label>
-                      <input
-                        type="tel"
-                        value={settings.contactPhone || ""}
-                        onChange={(e) => updateField("contactPhone", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors text-left"
-                        placeholder="054-0000000"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">אימייל ליצירת קשר</label>
-                      <input
-                        type="email"
-                        value={settings.contactEmail || ""}
-                        onChange={(e) => updateField("contactEmail", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors text-left"
-                        placeholder="info@yourdomain.com"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">כתובת פיזית (Waze)</label>
-                      <input
-                        type="text"
-                        value={settings.contactAddress || ""}
-                        onChange={(e) => updateField("contactAddress", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                        placeholder="רחוב החדשנות 1, תל אביב"
-                      />
-                    </div>
+                <div className="flex items-center gap-3 text-right">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 text-emerald-400" />
                   </div>
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleSaveGeneral} disabled={savingGeneral} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-6 py-2 rounded-xl">
-                      {savingGeneral ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                      שמור התקשרות
-                    </Button>
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs text-slate-400">חזון החברה</span>
+                    <span className="text-xs font-bold text-white mt-0.5">{getFirstTwoWords(companyVision)}</span>
                   </div>
                 </div>
-              )}
-            </div>
+                <span className="text-xs text-indigo-400 font-semibold">ערוך</span>
+              </div>
+            ) : (
+              (activeStep >= 5 || companyVision.trim()) && (
+                <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isVisionOpen ? 'ring-1 ring-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] z-10 relative' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (isVisionOpen) setEditingSection(null);
+                      else setEditingSection("vision");
+                      scrollToTop(e);
+                    }}
+                    className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      חזון החברה
+                    </span>
+                    {isVisionOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                  </button>
+                  
+                  {isVisionOpen && (
+                    <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
+                      <div className="border border-white/10 overflow-hidden shadow-sm bg-[#181818]">
+                        <RichTextEditor
+                          value={companyVision}
+                          onChange={setCompanyVision}
+                          placeholder="הזן כאן את חזון החברה בפירוט..."
+                        />
+                      </div>
+                      
+                      {/* Short Vision AI */}
+                      <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-white text-sm font-bold">תמצית החזון</label>
+                          <button 
+                            type="button"
+                            onClick={handleShortenVisionAI}
+                            disabled={aiLoading}
+                            className="text-xs flex items-center gap-1.5 text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                          >
+                            {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                            ייצר תמצית בעזרת AI
+                          </button>
+                        </div>
+                        <textarea
+                          value={shortVision}
+                          onChange={(e) => setShortVision(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-gray-600 min-h-[80px]"
+                          placeholder="כאן יופיע תקציר החזון, או שתוכל לכתוב אותו בעצמך..."
+                        />
+                      </div>
 
-            {/* Social Networks Accordion */}
-            <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isSocialOpen ? 'ring-1 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] z-10 relative' : ''}`}>
-              <button
-                onClick={(e) => {
-                  const next = !isSocialOpen;
-                  setIsSocialOpen(next);
-                  if (next) scrollToTop(e);
-                }}
-                className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
-              >
-                <span className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-blue-400" />
-                  רשתות חברתיות
-                </span>
-                {isSocialOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-              </button>
-              {isSocialOpen && settings && (
-                <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">קישור לפייסבוק</label>
-                      <input
-                        type="url"
-                        value={settings.contactFacebook || ""}
-                        onChange={(e) => updateField("contactFacebook", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors text-left"
-                      />
+                      <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 pt-4 border-t border-white/5">
+                        <Button 
+                          type="button"
+                          onClick={handleSaveVision} 
+                          disabled={savingVision}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
+                        >
+                          {savingVision ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          שמור שינויים
+                        </Button>
+                        <Button 
+                          type="button"
+                          onClick={() => setIsAiModalOpen(true)}
+                          variant="outline"
+                          className="bg-white/5 hover:bg-white/10 border-white/10 text-purple-400"
+                        >
+                          <Wand2 className="w-4 h-4 mr-2" />
+                          שפר עם AI
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">קישור לאינסטגרם</label>
-                      <input
-                        type="url"
-                        value={settings.contactInstagram || ""}
-                        onChange={(e) => updateField("contactInstagram", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500 transition-colors text-left"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">קישור ליוטיוב</label>
-                      <input
-                        type="url"
-                        value={settings.contactYouTube || ""}
-                        onChange={(e) => updateField("contactYouTube", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 transition-colors text-left"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-gray-400">מספר WhatsApp</label>
-                      <input
-                        type="tel"
-                        value={settings.contactWhatsApp || ""}
-                        onChange={(e) => updateField("contactWhatsApp", e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors text-left"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleSaveGeneral} disabled={savingGeneral} className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-6 py-2 rounded-xl">
-                      {savingGeneral ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                      שמור רשתות חברתיות
-                    </Button>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
+              )
+            )}
+
+
+
+            {/* Logo Accordion */}
+            {activeStep >= 8 && (
+              <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isLogoOpen ? 'ring-1 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] z-10 relative' : ''}`}>
+                <button
+                  onClick={(e) => {
+                    const next = !isLogoOpen;
+                    setIsLogoOpen(next);
+                    if (next) scrollToTop(e);
+                  }}
+                  className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <ImageIcon className="h-5 w-5 text-blue-400" />
+                    הלוגו שלך
+                  </span>
+                  {isLogoOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                </button>
+                {isLogoOpen && (
+                  <div className="p-4 sm:p-6 bg-[#111] border-t border-white/5 animate-in fade-in duration-200">
+                    <div className="flex flex-col items-center justify-center gap-4 bg-[#181818] p-6 sm:p-8 rounded-2xl border border-white/10 border-dashed">
+                      {logoUrl ? (
+                        <div className="flex flex-col items-center gap-4">
+                          <img src={logoUrl} alt="Company Logo" className="h-24 object-contain" />
+                          <div className="flex gap-3">
+                            <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2">
+                              {isUploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                              החלף לוגו
+                              <input type="file" accept="image/*" className="hidden" onChange={handleUploadLogo} disabled={isUploadingLogo} />
+                            </label>
+                            <button onClick={handleRemoveLogo} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-sm font-bold transition-colors">
+                              הסר
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center">
+                            <ImageIcon className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <p className="text-gray-400 text-sm text-center max-w-sm">
+                            העלה את לוגו החברה. הוא ישמש כברירת מחדל בכל הדפים והשירותים שלך.
+                          </p>
+                          <label className="cursor-pointer mt-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2">
+                            {isUploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                            {isUploadingLogo ? "מעלה לוגו..." : "העלה לוגו"}
+                            <input type="file" accept="image/*" className="hidden" onChange={handleUploadLogo} disabled={isUploadingLogo} />
+                          </label>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Colors Accordion */}
-            <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isColorsOpen ? 'ring-1 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.15)] z-10 relative' : ''}`}>
-              <button
-                onClick={(e) => {
-                  const next = !isColorsOpen;
-                  setIsColorsOpen(next);
-                  if (next) scrollToTop(e);
-                }}
-                className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
-              >
-                <span className="flex items-center gap-3">
-                  <Palette className="h-5 w-5 text-pink-400" />
-                  צבעים גלובליים
-                </span>
-                {isColorsOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-              </button>
-              {isColorsOpen && settings && (
-                <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
-                  
-                  {/* Base Colors Sub-accordion */}
-                  <div className="w-full border border-white/10 rounded-xl overflow-hidden bg-[#181818] scroll-mt-24">
-                    <button
-                      onClick={(e) => {
-                        const next = !isBaseColorsOpen;
-                        setIsBaseColorsOpen(next);
-                        if (next) scrollToTop(e);
-                      }}
-                      className="w-full p-3 bg-black/20 hover:bg-black/40 flex items-center justify-between font-bold text-white text-xs cursor-pointer transition-colors"
-                    >
-                      <span>צבעי בסיס</span>
-                      {isBaseColorsOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                    </button>
-                    {isBaseColorsOpen && (
-                      <div className="p-4 bg-black/10 border-t border-white/5 grid grid-cols-1 gap-4">
-                        {/* NOTE: Always row by row / 1 column (grid-cols-1) */}
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">צבע ראשי</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.primaryColor || "#d8435d"} onChange={(e) => updateField("primaryColor", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.primaryColor || "#d8435d"} onChange={(e) => updateField("primaryColor", e.target.value)} />
-                          </div>
+            {activeStep >= 8 && (
+              <div className={`w-full border-b border-white/5 bg-[#181818] transition-all scroll-mt-24 duration-500 ${isColorsOpen ? 'ring-1 ring-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.15)] z-10 relative' : ''}`}>
+                <button
+                  onClick={(e) => {
+                    const next = !isColorsOpen;
+                    setIsColorsOpen(next);
+                    if (next) scrollToTop(e);
+                  }}
+                  className="w-full p-4 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <Palette className="h-5 w-5 text-pink-400" />
+                    צבעים גלובליים
+                  </span>
+                  {isColorsOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                </button>
+                {isColorsOpen && settings && (
+                  <div className="p-4 bg-[#111] border-t border-white/5 animate-in fade-in duration-200 space-y-4">
+                    
+                    {logoUrl && (
+                      <div className="flex flex-col sm:flex-row items-center gap-4 bg-indigo-500/10 p-4 rounded-xl border border-indigo-500/20">
+                        <ImageIcon className="w-6 h-6 text-indigo-400" />
+                        <div className="flex-1 text-right">
+                          <p className="text-sm text-indigo-200 font-semibold">זיהינו שהעלית לוגו!</p>
+                          <p className="text-xs text-indigo-300">לחץ כדי לשלוף את הצבעים הראשיים של הלוגו ולהגדיר אותם כצבעים הגלובליים.</p>
                         </div>
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">צבע משני</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.secondaryColor || "#10354b"} onChange={(e) => updateField("secondaryColor", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.secondaryColor || "#10354b"} onChange={(e) => updateField("secondaryColor", e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">צבע רקע גלובלי</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.backgroundColor || "#f8f9fa"} onChange={(e) => updateField("backgroundColor", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.backgroundColor || "#f8f9fa"} onChange={(e) => updateField("backgroundColor", e.target.value)} />
-                          </div>
-                        </div>
+                        <button
+                          onClick={handleApplyLogoColors}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
+                        >
+                          קבע צבעי לוגו
+                        </button>
                       </div>
                     )}
-                  </div>
 
-                  {/* Text Colors Sub-accordion */}
-                  <div className="w-full border border-white/10 rounded-xl overflow-hidden bg-[#181818] scroll-mt-24">
-                    <button
-                      onClick={(e) => {
-                        const next = !isTextColorsOpen;
-                        setIsTextColorsOpen(next);
-                        if (next) scrollToTop(e);
-                      }}
-                      className="w-full p-3 bg-black/20 hover:bg-black/40 flex items-center justify-between font-bold text-white text-xs cursor-pointer transition-colors"
-                    >
-                      <span>צבעי טקסט</span>
-                      {isTextColorsOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                    </button>
-                    {isTextColorsOpen && (
-                      <div className="p-4 bg-black/10 border-t border-white/5 grid grid-cols-1 gap-4">
-                        {/* NOTE: Always row by row / 1 column (grid-cols-1) */}
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">כותרת ראשית (H1)</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColorH1 || "#000000"} onChange={(e) => updateField("textColorH1", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColorH1 || "#000000"} onChange={(e) => updateField("textColorH1", e.target.value)} />
+                    {/* Base Colors Sub-accordion */}
+                    <div className="w-full border border-white/10 rounded-xl overflow-hidden bg-[#181818] scroll-mt-24">
+                      <button
+                        onClick={(e) => {
+                          const next = !isBaseColorsOpen;
+                          setIsBaseColorsOpen(next);
+                          if (next) scrollToTop(e);
+                        }}
+                        className="w-full p-3 bg-black/20 hover:bg-black/40 flex items-center justify-between font-bold text-white text-xs cursor-pointer transition-colors"
+                      >
+                        <span>צבעי בסיס</span>
+                        {isBaseColorsOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                      </button>
+                      {isBaseColorsOpen && (
+                        <div className="p-4 bg-black/10 border-t border-white/5 grid grid-cols-1 gap-4">
+                          {/* NOTE: Always row by row / 1 column (grid-cols-1) */}
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">צבע ראשי</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.primaryColor || "#d8435d"} onChange={(e) => updateField("primaryColor", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.primaryColor || "#d8435d"} onChange={(e) => updateField("primaryColor", e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">צבע משני</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.secondaryColor || "#10354b"} onChange={(e) => updateField("secondaryColor", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.secondaryColor || "#10354b"} onChange={(e) => updateField("secondaryColor", e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">צבע רקע גלובלי</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.backgroundColor || "#f8f9fa"} onChange={(e) => updateField("backgroundColor", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.backgroundColor || "#f8f9fa"} onChange={(e) => updateField("backgroundColor", e.target.value)} />
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">כותרת משנית (H2)</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColorH2 || "#333333"} onChange={(e) => updateField("textColorH2", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColorH2 || "#333333"} onChange={(e) => updateField("textColorH2", e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">כותרת (H3)</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColorH3 || "#444444"} onChange={(e) => updateField("textColorH3", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColorH3 || "#444444"} onChange={(e) => updateField("textColorH3", e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">טקסט רגיל (p)</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColor || "#1a1a1a"} onChange={(e) => updateField("textColor", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColor || "#1a1a1a"} onChange={(e) => updateField("textColor", e.target.value)} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  {/* Button Colors Sub-accordion */}
-                  <div className="w-full border border-white/10 rounded-xl overflow-hidden bg-[#181818] scroll-mt-24">
-                    <button
-                      onClick={(e) => {
-                        const next = !isButtonColorsOpen;
-                        setIsButtonColorsOpen(next);
-                        if (next) scrollToTop(e);
-                      }}
-                      className="w-full p-3 bg-black/20 hover:bg-black/40 flex items-center justify-between font-bold text-white text-xs cursor-pointer transition-colors"
-                    >
-                      <span>צבעי כפתורים</span>
-                      {isButtonColorsOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                    </button>
-                    {isButtonColorsOpen && (
-                      <div className="p-4 bg-black/10 border-t border-white/5 grid grid-cols-1 gap-4">
-                        {/* NOTE: Always row by row / 1 column (grid-cols-1) */}
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">רקע כפתור</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.buttonBgColor || "#2563eb"} onChange={(e) => updateField("buttonBgColor", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.buttonBgColor || "#2563eb"} onChange={(e) => updateField("buttonBgColor", e.target.value)} />
+                    {/* Text Colors Sub-accordion */}
+                    <div className="w-full border border-white/10 rounded-xl overflow-hidden bg-[#181818] scroll-mt-24">
+                      <button
+                        onClick={(e) => {
+                          const next = !isTextColorsOpen;
+                          setIsTextColorsOpen(next);
+                          if (next) scrollToTop(e);
+                        }}
+                        className="w-full p-3 bg-black/20 hover:bg-black/40 flex items-center justify-between font-bold text-white text-xs cursor-pointer transition-colors"
+                      >
+                        <span>צבעי טקסט</span>
+                        {isTextColorsOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                      </button>
+                      {isTextColorsOpen && (
+                        <div className="p-4 bg-black/10 border-t border-white/5 grid grid-cols-1 gap-4">
+                          {/* NOTE: Always row by row / 1 column (grid-cols-1) */}
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">כותרת ראשית (H1)</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColorH1 || "#000000"} onChange={(e) => updateField("textColorH1", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColorH1 || "#000000"} onChange={(e) => updateField("textColorH1", e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">כותרת משנית (H2)</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColorH2 || "#333333"} onChange={(e) => updateField("textColorH2", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColorH2 || "#333333"} onChange={(e) => updateField("textColorH2", e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">כותרת (H3)</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColorH3 || "#444444"} onChange={(e) => updateField("textColorH3", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColorH3 || "#444444"} onChange={(e) => updateField("textColorH3", e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">טקסט רגיל (p)</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.textColor || "#1a1a1a"} onChange={(e) => updateField("textColor", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.textColor || "#1a1a1a"} onChange={(e) => updateField("textColor", e.target.value)} />
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                          <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">טקסט כפתור</span></div>
-                          <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
-                            <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.buttonTextColor || "#ffffff"} onChange={(e) => updateField("buttonTextColor", e.target.value)} />
-                            <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.buttonTextColor || "#ffffff"} onChange={(e) => updateField("buttonTextColor", e.target.value)} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleSaveGeneral} disabled={savingGeneral} className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-6 py-2 rounded-xl">
-                      {savingGeneral ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                      שמור צבעים
-                    </Button>
+                    {/* Button Colors Sub-accordion */}
+                    <div className="w-full border border-white/10 rounded-xl overflow-hidden bg-[#181818] scroll-mt-24">
+                      <button
+                        onClick={(e) => {
+                          const next = !isButtonColorsOpen;
+                          setIsButtonColorsOpen(next);
+                          if (next) scrollToTop(e);
+                        }}
+                        className="w-full p-3 bg-black/20 hover:bg-black/40 flex items-center justify-between font-bold text-white text-xs cursor-pointer transition-colors"
+                      >
+                        <span>צבעי כפתורים</span>
+                        {isButtonColorsOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                      </button>
+                      {isButtonColorsOpen && (
+                        <div className="p-4 bg-black/10 border-t border-white/5 grid grid-cols-1 gap-4">
+                          {/* NOTE: Always row by row / 1 column (grid-cols-1) */}
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">רקע כפתור</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.buttonBgColor || "#2563eb"} onChange={(e) => updateField("buttonBgColor", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.buttonBgColor || "#2563eb"} onChange={(e) => updateField("buttonBgColor", e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
+                            <div className="flex flex-col"><span className="text-sm font-semibold text-gray-200">טקסט כפתור</span></div>
+                            <div className="flex items-center gap-3 bg-black/60 p-1 pr-3 rounded-full border border-white/10">
+                              <input type="text" className="w-20 bg-transparent border-none text-xs font-mono text-gray-300 focus:outline-none focus:text-white uppercase text-left" dir="ltr" value={settings.buttonTextColor || "#ffffff"} onChange={(e) => updateField("buttonTextColor", e.target.value)} />
+                              <input type="color" className="w-7 h-7 rounded-full cursor-pointer" value={settings.buttonTextColor || "#ffffff"} onChange={(e) => updateField("buttonTextColor", e.target.value)} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <Button onClick={handleSaveGeneral} disabled={savingGeneral} className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-6 py-2 rounded-xl">
+                        {savingGeneral ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                        שמור צבעים
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Media Section */}
-            <CompanyMediaSection 
-              onApplyColors={async (colors) => {
-                if (colors.length >= 2) {
-                  const newSettings = { ...settings, primaryColor: colors[0], secondaryColor: colors[1] };
-                  updateField("primaryColor", colors[0]);
-                  updateField("secondaryColor", colors[1]);
-                  if (colors[2]) updateField("backgroundColor", colors[2]);
-                  
-                  setSavingGeneral(true);
-                  await saveGlobalSettings(newSettings);
-                  setSavingGeneral(false);
-                  
-                  setIsColorsOpen(true);
-                  setTimeout(() => {
-                    alert("הצבעים הוחלו בהצלחה!");
-                  }, 100);
-                }
-              }}
-            />
+            {activeStep >= 8 && (
+              <CompanyMediaSection 
+                onApplyColors={async (colors) => {
+                  if (colors.length >= 2) {
+                    const newSettings = { ...settings, primaryColor: colors[0], secondaryColor: colors[1] };
+                    updateField("primaryColor", colors[0]);
+                    updateField("secondaryColor", colors[1]);
+                    if (colors[2]) updateField("backgroundColor", colors[2]);
+                    
+                    setSavingGeneral(true);
+                    await saveGlobalSettings(newSettings);
+                    setSavingGeneral(false);
+                    onSave?.();
+                    
+                    setIsColorsOpen(true);
+                    setTimeout(() => {
+                      alert("הצבעים הוחלו בהצלחה!");
+                    }, 100);
+                  }
+                }}
+              />
+            )}
 
             {/* Generate Site Button Section */}
             {(canGenerateSite || hasMiniSiteSlug) && (

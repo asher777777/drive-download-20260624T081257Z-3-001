@@ -517,7 +517,7 @@ export const ContactSection = ({
                   <div><strong>עבור:</strong> <span className="text-white/80">{title}</span></div>
                   <div><strong>משלם:</strong> <span className="text-white/80">{checkoutData.clientName || "-- ללא שם --"}</span></div>
                   <div><strong>טלפון:</strong> <span className="text-white/80">{checkoutData.phone}</span></div>
-                  <div><strong>סכום לחיוב:</strong> <span className="font-black text-secondary">₪{checkoutData.amount}</span></div>
+                  <div><strong>סכום לחיוב:</strong> <span className="font-black text-secondary">₪{checkoutData.amount} {activeForm.payment_frequency === "recurring" && "(הוראת קבע לחודש)"}</span></div>
                 </div>
                 <KesherCheckout
                   amount={checkoutData.amount}

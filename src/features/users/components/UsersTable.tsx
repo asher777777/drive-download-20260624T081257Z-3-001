@@ -194,6 +194,156 @@ export function UsersTable({ initialUsers }: { initialUsers: UserDoc[] }) {
                 />
               </div>
             )}
+
+            {editingUser?.id && (
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">נתוני הגדרה ראשוניים (קהילה)</h4>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500">שם החברה / הקהילה</label>
+                  <div className="text-sm font-medium text-slate-800 bg-slate-50 p-2.5 rounded-xl border mt-1">
+                    {(editingUser as any).companyName || "לא הוגדר עדיין"}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500">מטרת התאגדות</label>
+                  <div className="text-sm font-medium text-slate-800 bg-slate-50 p-2.5 rounded-xl border mt-1">
+                    {(editingUser as any).organizationPurpose || "לא הוגדר עדיין"}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500">מספר עובדים/חברים/מתנדבים</label>
+                  <div className="text-sm font-medium text-slate-800 bg-slate-50 p-2.5 rounded-xl border mt-1">
+                    {(editingUser as any).memberCount || "לא הוגדר עדיין"}
+                  </div>
+                </div>
+
+                {/* Social Networks Links */}
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <label className="block text-xs font-bold text-slate-600">רשתות חברתיות של הקהילה</label>
+                  <div className="grid grid-cols-1 gap-2 text-xs">
+                    <div>
+                      <span className="font-semibold text-slate-500 text-right">פייסבוק: </span>
+                      <span className="text-slate-800">{(editingUser as any).contactFacebook || "לא הוגדר"}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 text-right">אינסטגרם: </span>
+                      <span className="text-slate-800">{(editingUser as any).contactInstagram || "לא הוגדר"}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 text-right">טיקטוק: </span>
+                      <span className="text-slate-800">{(editingUser as any).contactTikTok || "לא הוגדר"}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 text-right">יוטיוב: </span>
+                      <span className="text-slate-800">{(editingUser as any).contactYouTube || "לא הוגדר"}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 text-right">לינקידין: </span>
+                      <span className="text-slate-800">{(editingUser as any).contactLinkedIn || "לא הוגדר"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editingUser?.id && (
+              <div className="pt-4 border-t border-slate-100 space-y-4">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">עקיפת הגדרות API (API Overrides)</h4>
+                
+                {/* Google AI */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-bold text-slate-700">Google AI (Gemini)</label>
+                    <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={!!editingUser.useAdminGoogleAi}
+                        onChange={(e) => setEditingUser({ ...editingUser, useAdminGoogleAi: e.target.checked })}
+                        className="rounded border-slate-300"
+                      />
+                      השתמש במפתח מנהל ראשי
+                    </label>
+                  </div>
+                  {!editingUser.useAdminGoogleAi && (
+                    <Input
+                      type="text"
+                      placeholder="הזן מפתח אישי (Google AI Key)"
+                      value={editingUser.googleAiKey || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, googleAiKey: e.target.value })}
+                      className="rounded-lg text-sm"
+                    />
+                  )}
+                </div>
+
+                {/* Kesher */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-bold text-slate-700">מערכת סליקה (קשר)</label>
+                    <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={!!editingUser.useAdminKesher}
+                        onChange={(e) => setEditingUser({ ...editingUser, useAdminKesher: e.target.checked })}
+                        className="rounded border-slate-300"
+                      />
+                      השתמש במפתחות מנהל ראשי
+                    </label>
+                  </div>
+                  {!editingUser.useAdminKesher && (
+                    <div className="space-y-2">
+                      <Input
+                        type="text"
+                        placeholder="שם משתמש"
+                        value={editingUser.kesherSettings?.userName || ""}
+                        onChange={(e) => setEditingUser({ ...editingUser, kesherSettings: { ...editingUser.kesherSettings, userName: e.target.value } })}
+                        className="rounded-lg text-sm"
+                      />
+                      <Input
+                        type="text"
+                        placeholder="סיסמה (API Key)"
+                        value={editingUser.kesherSettings?.apiKey || ""}
+                        onChange={(e) => setEditingUser({ ...editingUser, kesherSettings: { ...editingUser.kesherSettings, apiKey: e.target.value } })}
+                        className="rounded-lg text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Green API */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-bold text-slate-700">Green API (WhatsApp)</label>
+                    <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={!!editingUser.useAdminGreenApi}
+                        onChange={(e) => setEditingUser({ ...editingUser, useAdminGreenApi: e.target.checked })}
+                        className="rounded border-slate-300"
+                      />
+                      השתמש במפתחות מנהל ראשי
+                    </label>
+                  </div>
+                  {!editingUser.useAdminGreenApi && (
+                    <div className="space-y-2">
+                      <Input
+                        type="text"
+                        placeholder="Instance ID"
+                        value={editingUser.greenApiSettings?.instanceId || ""}
+                        onChange={(e) => setEditingUser({ ...editingUser, greenApiSettings: { ...editingUser.greenApiSettings, instanceId: e.target.value } })}
+                        className="rounded-lg text-sm"
+                      />
+                      <Input
+                        type="text"
+                        placeholder="API Token Instance"
+                        value={editingUser.greenApiSettings?.apiTokenInstance || ""}
+                        onChange={(e) => setEditingUser({ ...editingUser, greenApiSettings: { ...editingUser.greenApiSettings, apiTokenInstance: e.target.value } })}
+                        className="rounded-lg text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <Modal.Footer>

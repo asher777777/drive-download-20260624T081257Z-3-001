@@ -4,22 +4,32 @@ import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export type UserRole = "ADMIN" | "PRO" | "DEVELOPING" | "TRIAL";
+export type UserRole = "SUPERADMIN" | "ADMIN" | "PRO" | "DEVELOPING" | "TRIAL";
 
 export interface UserDoc {
   id?: string;
   email: string;
   username: string;
   name?: string;
-  password?: string; // Stored securely/hashed in reality, but simple for now as requested
+  password?: string;
   role: UserRole;
   createdAt: string;
   trialExpiresAt?: string;
+  
+  // Admin API Overrides
+  useAdminGoogleAi?: boolean;
+  googleAiKey?: string;
+  
+  useAdminKesher?: boolean;
+  kesherSettings?: any;
+  
+  useAdminGreenApi?: boolean;
+  greenApiSettings?: any;
 }
 
 export async function getUsers() {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") throw new Error("Unauthorized");
+  if (session?.user?.role !== "SUPERADMIN") throw new Error("Unauthorized");
 
   const snapshot = await adminDb.collection("users").get();
   return snapshot.docs.map((doc: any) => ({
@@ -30,7 +40,7 @@ export async function getUsers() {
 
 export async function createUser(data: Partial<UserDoc>) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") throw new Error("Unauthorized");
+  if (session?.user?.role !== "SUPERADMIN") throw new Error("Unauthorized");
 
   if (!data.username || !data.password || !data.role) {
     throw new Error("Missing required fields");
@@ -62,7 +72,7 @@ export async function createUser(data: Partial<UserDoc>) {
 
 export async function updateUser(id: string, data: Partial<UserDoc>) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") throw new Error("Unauthorized");
+  if (session?.user?.role !== "SUPERADMIN") throw new Error("Unauthorized");
 
   if (data.role === "TRIAL" && !data.trialExpiresAt) {
     const expires = new Date();
@@ -79,7 +89,7 @@ export async function updateUser(id: string, data: Partial<UserDoc>) {
 
 export async function deleteUser(id: string) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") throw new Error("Unauthorized");
+  if (session?.user?.role !== "SUPERADMIN") throw new Error("Unauthorized");
 
   await adminDb.collection("users").doc(id).delete();
   revalidatePath("/dashboard/users");

@@ -9,7 +9,6 @@ import {
   getCompanyServices, addCompanyService, updateCompanyService, deleteCompanyService, 
   getAudiences, addAudience, CompanyCoreService, Audience 
 } from "@/features/company-services/actions";
-import { getCommunities } from "@/features/communities/actions";
 import { Community } from "@/features/communities/types";
 import { rephraseTextWithAI, suggestPainPointsWithAI } from "@/features/ai/actions";
 
@@ -24,9 +23,10 @@ const scrollToTop = (element: HTMLElement) => {
 
 interface CompanyServicesSectionProps {
   companyVision?: string;
+  onSave?: () => void;
 }
 
-export function CompanyServicesSection({ companyVision }: CompanyServicesSectionProps) {
+export function CompanyServicesSection({ companyVision, onSave }: CompanyServicesSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   
   const [services, setServices] = useState<CompanyCoreService[]>([]);
@@ -39,7 +39,7 @@ export function CompanyServicesSection({ companyVision }: CompanyServicesSection
   const [newName, setNewName] = useState("");
   const [savingNewService, setSavingNewService] = useState(false);
 
-  const DEFAULT_AUDIENCES = ["כולם", "מנהלים", "בעלי עסקים", "נשים"];
+  const DEFAULT_AUDIENCES = ["לקוחות", "תורמים", "עובדים", "חברים"];
   const allAudiencesOptions = [...new Set([...DEFAULT_AUDIENCES, ...audiences.map(a => a.name)])];
 
   // AI Generation State
@@ -47,14 +47,14 @@ export function CompanyServicesSection({ companyVision }: CompanyServicesSection
 
   useEffect(() => {
     async function loadData() {
-      const [srvs, auds, comms] = await Promise.all([
+      const [srvs, auds, globalSettings] = await Promise.all([
         getCompanyServices(),
         getAudiences(),
-        getCommunities()
+        import("@/features/settings/actions").then(m => m.getGlobalSettings())
       ]);
       setServices(srvs);
       setAudiences(auds);
-      setCommunities(comms);
+      setCommunities((globalSettings.communities as any) || []);
       setLoading(false);
     }
     loadData();
@@ -100,6 +100,7 @@ export function CompanyServicesSection({ companyVision }: CompanyServicesSection
         const createRes = await addCompanyService(newServiceData);
         if (createRes.success && createRes.id) {
           setServices([{ ...newServiceData, id: createRes.id, ownerId: "", createdAt: new Date().toISOString() }, ...services]);
+          onSave?.();
         } else {
           alert("שגיאה בשמירת השירות שנוצר.");
         }
@@ -126,6 +127,7 @@ export function CompanyServicesSection({ companyVision }: CompanyServicesSection
       setServices([{ ...data, id: res.id, ownerId: "", createdAt: new Date().toISOString() }, ...services]);
       setIsAddNameModalOpen(false);
       setNewName("");
+      onSave?.();
     } else {
       alert("שגיאה ביצירת שירות");
     }
@@ -137,6 +139,7 @@ export function CompanyServicesSection({ companyVision }: CompanyServicesSection
     const res = await deleteCompanyService(id);
     if (res.success) {
       setServices(services.filter(s => s.id !== id));
+      onSave?.();
     } else {
       alert("שגיאה במחיקת השירות");
     }
@@ -223,6 +226,7 @@ export function CompanyServicesSection({ companyVision }: CompanyServicesSection
                     const res = await updateCompanyService(id, data);
                     if (res.success) {
                       setServices(services.map(s => s.id === id ? { ...s, ...data } : s));
+                      onSave?.();
                       return true;
                     }
                     return false;

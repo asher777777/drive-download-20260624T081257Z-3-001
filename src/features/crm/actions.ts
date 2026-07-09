@@ -47,10 +47,24 @@ export async function getContacts(params: {
       .where("status", "==", status)
       .get();
 
+    // Fetch all system users to match with contacts
+    const usersRef = adminDb.collection("users");
+    const usersSnap = await usersRef.get();
+    const userEmails = new Map<string, string>();
+    const userPhones = new Map<string, string>();
+    usersSnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.email) userEmails.set(data.email, doc.id);
+      if (data.username) userPhones.set(data.username, doc.id);
+    });
+
     let contacts: Contact[] = snapshot.docs.map((doc: any) => {
       const data = doc.data();
+      const systemUserId = (data.email && userEmails.get(data.email)) || (data.conta_phone && userPhones.get(data.conta_phone));
       return {
         id: doc.id,
+        isUser: !!systemUserId,
+        systemUserId: systemUserId || undefined,
         ...data,
       } as Contact;
     });

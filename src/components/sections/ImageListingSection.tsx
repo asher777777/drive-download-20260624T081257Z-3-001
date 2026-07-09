@@ -1,0 +1,110 @@
+"use client";
+
+import React, { useState } from "react";
+import type { FormConfig } from "@/features/crm/components/CRMFormBuilder";
+import { CRMFormRenderer } from "@/features/crm/components/CRMFormRenderer";
+import { Modal } from "@/components/ui/Modal";
+
+interface ImageListingItem {
+  url: string;
+  form?: FormConfig;
+}
+
+interface ImageListingSectionProps {
+  id?: string;
+  images: any[]; // string or ImageListingItem
+  imagesPerRow: number;
+  imagesPerRowMobile?: number;
+  form?: FormConfig; // Global fallback form
+  backgroundColor?: string;
+  embeddingPostId?: string;
+  embeddingCollection?: string;
+  isEditing?: boolean;
+}
+
+export const ImageListingSection = ({
+  id = "imageListing",
+  images = [],
+  imagesPerRow = 4,
+  imagesPerRowMobile = 1,
+  form,
+  backgroundColor = "#ffffff",
+  embeddingPostId,
+  embeddingCollection,
+  isEditing = false,
+}: ImageListingSectionProps) => {
+  const [selectedImageForm, setSelectedImageForm] = useState<FormConfig | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleImageClick = (img: any) => {
+    if (isEditing) return; // Disable clicks in edit mode
+    
+    // Extract specific form or fallback to global
+    const imgForm = typeof img === "object" && img.form ? img.form : form;
+    
+    if (imgForm && imgForm.enabled) {
+      setSelectedImageForm(imgForm);
+      setIsModalOpen(true);
+    }
+  };
+
+  // Determine grid columns based on imagesPerRow and imagesPerRowMobile
+  const mobileCols = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" }[imagesPerRowMobile] || "grid-cols-1";
+  const desktopCols = { 1: "md:grid-cols-1", 2: "md:grid-cols-2", 3: "md:grid-cols-3", 4: "md:grid-cols-4", 5: "md:grid-cols-5", 6: "md:grid-cols-6" }[imagesPerRow] || "md:grid-cols-4";
+  const gridColsClass = `${mobileCols} ${desktopCols}`;
+
+  return (
+    <section id={id} className="py-16 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor }} dir="rtl">
+      <div className="max-w-7xl mx-auto">
+        {images.length === 0 ? (
+          <div className="text-center p-12 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 bg-slate-50/50">
+            לא נבחרו תמונות לאזור זה. בחר תמונות בעורך.
+          </div>
+        ) : (
+          <div className={`grid ${gridColsClass} gap-4`}>
+            {images.map((img, index) => {
+              if (!img) return null;
+              const url = typeof img === "string" ? img : img.url;
+              if (!url) return null;
+
+              return (
+                <div 
+                  key={`${url}-${index}`}
+                  className={`relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
+                  onClick={() => handleImageClick(img)}
+                >
+                  <img 
+                    src={url} 
+                    alt={`Listing image ${index + 1}`} 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                  />
+                  {!isEditing && (
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors duration-300" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Form Modal */}
+      {selectedImageForm && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <Modal.Content className="max-w-md w-[95vw] p-0 overflow-hidden bg-transparent border-0 shadow-2xl">
+            <Modal.Close />
+            
+            <Modal.Body className="max-h-[85vh] p-0 custom-scrollbar">
+              <CRMFormRenderer 
+                config={selectedImageForm}
+                formId={embeddingPostId || "home"}
+                formTitle="טופס פנייה"
+                embeddingCollection={embeddingCollection || "pages"}
+                />
+            </Modal.Body>
+          </Modal.Content>
+        </Modal>
+      )}
+    </section>
+  );
+};

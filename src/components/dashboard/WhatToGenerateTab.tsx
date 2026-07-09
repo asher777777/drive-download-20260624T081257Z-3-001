@@ -22,20 +22,46 @@ const OPTIONS = [
   { id: "product_pages", label: "עמודי מוצר", icon: ShoppingBag },
 ];
 
-export function WhatToGenerateTab() {
-  const [isOpen, setIsOpen] = useState(false);
+export function WhatToGenerateTab({
+  onSave,
+  activeStep = 8,
+  settings: propSettings,
+  isOpen,
+  onToggle,
+  isCompleted
+}: {
+  onSave?: () => void;
+  activeStep?: number;
+  settings?: GlobalSettings;
+  isOpen: boolean;
+  onToggle: () => void;
+  isCompleted: boolean;
+}) {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!propSettings);
   const [saving, setSaving] = useState(false);
 
+  // Sync state with props
   useEffect(() => {
-    async function load() {
-      const data = await getGlobalSettings();
-      setSelectedOptions(data.whatToGenerate || []);
-      setLoading(false);
+    if (propSettings?.whatToGenerate) {
+      setSelectedOptions(propSettings.whatToGenerate);
     }
-    load();
-  }, []);
+    setLoading(false);
+  }, [propSettings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await saveGlobalSettings({ whatToGenerate: selectedOptions });
+    setSaving(false);
+    onSave?.();
+  };
+
+  const getSelectedNames = () => {
+    return selectedOptions
+      .map(id => OPTIONS.find(opt => opt.id === id)?.label)
+      .filter(Boolean)
+      .join(", ");
+  };
 
   const toggleOption = (id: string) => {
     setSelectedOptions((prev) => 
@@ -43,36 +69,39 @@ export function WhatToGenerateTab() {
     );
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    await saveGlobalSettings({ whatToGenerate: selectedOptions });
-    setSaving(false);
-  };
-
   return (
-    <div className="w-full space-y-0">
-      {/* Outer Tab Header */}
-      <div className={`w-full bg-[#181818] border-y border-white/5 transition-all scroll-mt-24 duration-500 ${isOpen ? 'ring-1 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] z-10 relative' : ''}`} dir="rtl">
-        <button
-          onClick={(e) => {
-            const next = !isOpen;
-            setIsOpen(next);
-            if (next) scrollToTop(e);
-          }}
-          className="w-full p-4 sm:p-5 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white cursor-pointer transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-2 bg-white/5 text-blue-400">
-              <CheckSquare className="w-5 h-5" />
+    <div className="w-full border border-white/5 bg-[#181818] rounded-2xl">
+      <div className="relative">
+        {/* Sticky Header */}
+        <div className={`w-full bg-[#181818] transition-all duration-300 ${isOpen ? 'sticky top-0 z-30 shadow-md border-b border-white/5 rounded-t-2xl' : 'rounded-2xl'}`} dir="rtl">
+          <button
+            type="button"
+            onClick={(e) => {
+              onToggle();
+              if (!isOpen) scrollToTop(e);
+            }}
+            className={`w-full p-4 sm:p-5 bg-[#181818] hover:bg-[#202020] flex items-center justify-between font-bold text-white cursor-pointer transition-colors ${isOpen ? 'rounded-t-2xl' : 'rounded-2xl'}`}
+          >
+            <div className="flex items-center gap-4 text-right">
+              <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${isCompleted ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-blue-400'}`}>
+                {isCompleted ? <Check className="w-5 h-5" /> : <CheckSquare className="w-5 h-5" />}
+              </div>
+              <div className="flex flex-col text-right">
+                <span className="text-sm sm:text-base">מה נחולל</span>
+                {isCompleted && selectedOptions.length > 0 && (
+                  <span className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                    הושלם: {getSelectedNames().split(", ").slice(0, 2).join(", ")}
+                  </span>
+                )}
+              </div>
             </div>
-            <span className="text-sm sm:text-base">מה נחולל</span>
-          </div>
-          {isOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400 group-hover:text-white" />}
-        </button>
+            {isOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400 group-hover:text-white" />}
+          </button>
+        </div>
 
         {/* Outer Tab Content */}
         {isOpen && (
-          <div className="w-full bg-[#111] border-t border-white/5 p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="w-full bg-[#111] p-4 sm:p-6 animate-in fade-in duration-200 rounded-b-2xl">
             {loading ? (
               <div className="flex justify-center p-8">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />

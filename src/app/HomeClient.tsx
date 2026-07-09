@@ -9,6 +9,8 @@ const ServicesGrid = dynamic(() => import("@/components/sections/ServicesGrid").
 const CommunitySection = dynamic(() => import("@/components/sections/CommunitySection").then(m => m.CommunitySection), { ssr: true });
 const LivePostsGrid = dynamic(() => import("@/components/sections/LivePostsGrid").then(m => m.LivePostsGrid), { ssr: true });
 const LandingSection = dynamic(() => import("@/components/sections/LandingSection").then(m => m.LandingSection), { ssr: true });
+const VideoGallery = dynamic(() => import("@/components/sections/VideoGallery").then(m => m.VideoGallery), { ssr: true });
+const ImageListingSection = dynamic(() => import("@/components/sections/ImageListingSection").then(m => m.ImageListingSection), { ssr: true });
 const RichContentSection = dynamic(() => import("@/components/sections/RichContentSection").then(m => m.RichContentSection), { ssr: true });
 const TimerSection = dynamic(() => import("@/components/sections/TimerSection").then(m => m.TimerSection), { ssr: true });
 const PricingSection = dynamic(() => import("@/components/sections/PricingSection").then(m => m.PricingSection), { ssr: true });
@@ -46,6 +48,24 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   } as GlobalSettings);
 
   useEffect(() => {
+    if ((globalSettings as any)?.branding && (config as any).branding) {
+      if ((config as any).branding.logo !== (globalSettings as any).branding.logo ||
+          (config as any).branding.primaryColor !== (globalSettings as any).branding.primaryColor ||
+          (config as any).branding.fontFamily !== (globalSettings as any).branding.fontFamily) {
+        setConfig(prevConfig => ({
+          ...prevConfig,
+          branding: {
+            ...(prevConfig as any).branding,
+            logo: (globalSettings as any).branding.logo,
+            primaryColor: (globalSettings as any).branding.primaryColor,
+            fontFamily: (globalSettings as any).branding.fontFamily
+          }
+        }));
+      }
+    }
+  }, [(globalSettings as any)?.branding, (config as any).branding?.logo, (config as any).branding?.primaryColor, (config as any).branding?.fontFamily]);
+
+  useEffect(() => {
     const savedScroll = sessionStorage.getItem("home_editor_scroll");
     if (savedScroll) {
       window.scrollTo(0, parseInt(savedScroll));
@@ -77,7 +97,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
       case "hero":
-        if (!config.hero) return null;
+        if (!config.hero || config.hero.visible === false || String(config.hero.visible) === "false") return null;
         return (
           <Hero 
             id={config.hero.anchorId || "hero"}
@@ -94,10 +114,11 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             flexDirection={config.hero.flexDirection}
             formMode={config.hero.formMode}
             isEditing={false}
+            priority={true}
           />
         );
       case "mainContent":
-        if (!config.mainContent || !config.mainContent.visible) return null;
+        if (!config.mainContent || config.mainContent.visible === false || String(config.mainContent.visible) === "false") return null;
         return (
           <CourseBanner 
             id={config.mainContent.anchorId || "mainContent"}
@@ -112,7 +133,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           />
         );
       case "services":
-        if (!config.services || !config.services.visible) return null;
+        if (!config.services || config.services.visible === false || String(config.services.visible) === "false") return null;
         return (
           <ServicesGrid 
             id={config.services.anchorId || "services"}
@@ -126,7 +147,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           />
         );
       case "community":
-        if (!config.community || !config.community.visible) return null;
+        if (!config.community || config.community.visible === false || String(config.community.visible) === "false") return null;
         const resolvedWhatsApp = !config.community.whatsappNumber || config.community.whatsappNumber === "972545947701"
           ? (globalSettings.contactWhatsApp || globalSettings.contactPhone || "972545947701")
           : config.community.whatsappNumber;
@@ -149,10 +170,10 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           />
         );
       case "livePosts":
-        if (!config.livePosts || !config.livePosts.visible) return null;
+        if (!config.livePosts || config.livePosts.visible === false || String(config.livePosts.visible) === "false") return null;
         return <LivePostsGrid id={config.livePosts.anchorId || "livePosts"} layout={config.livePosts.layout} customPages={config.livePosts.customPages} />;
       case "timer":
-        if (!config.timer || !config.timer.visible) return null;
+        if (!config.timer || config.timer.visible === false || String(config.timer.visible) === "false") return null;
         return (
           <TimerSection
             id={config.timer.anchorId || "timer"}
@@ -164,7 +185,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           />
         );
       case "pricing":
-        if (!config.pricing || !config.pricing.visible) return null;
+        if (!config.pricing || config.pricing.visible === false || String(config.pricing.visible) === "false") return null;
         return (
           <PricingSection
             id={config.pricing.anchorId || "pricing"}
@@ -175,7 +196,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
           />
         );
       case "richContent":
-        if (!config.richContent || !config.richContent.visible) return null;
+        if (!config.richContent || config.richContent.visible === false || String(config.richContent.visible) === "false") return null;
         return (
           <RichContentSection 
             id={config.richContent.anchorId || "richContent"}
@@ -185,8 +206,33 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             isEditing={false}
           />
         );
+      case "videoGallery":
+        const vGalleryConf = config.videoGallery || { visible: false, images: [], videoUrl: "", videoType: "youtube" as const, effect: "none" as const };
+        if (!vGalleryConf.visible) return null;
+        return (
+          <VideoGallery
+            id={vGalleryConf.anchorId || "videoGallery"}
+            images={vGalleryConf.images}
+            videoUrl={vGalleryConf.videoUrl}
+            videoType={vGalleryConf.videoType}
+            effect={vGalleryConf.effect}
+            backgroundColor={vGalleryConf.backgroundColor || globalSettings.backgroundColor}
+          />
+        );
+      case "imageListing":
+        if (!config.imageListing || config.imageListing.visible === false || String(config.imageListing.visible) === "false") return null;
+        return (
+          <ImageListingSection
+            id={config.imageListing.anchorId || "imageListing"}
+            images={config.imageListing.images}
+            imagesPerRow={config.imageListing.imagesPerRow}
+            form={config.imageListing.form}
+            backgroundColor={config.imageListing.backgroundColor || globalSettings.backgroundColor}
+            isEditing={false}
+          />
+        );
       case "landingSection":
-        if (!config.landingSection || !config.landingSection.visible) return null;
+        if (!config.landingSection || config.landingSection.visible === false || String(config.landingSection.visible) === "false") return null;
         return (
           <Suspense fallback={null}>
             <LandingSection

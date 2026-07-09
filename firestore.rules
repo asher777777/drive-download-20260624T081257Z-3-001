@@ -2,25 +2,33 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Golden Model: Isolate all user-owned data in subcollections
+    // Golden Model: Isolate all user-owned data
+    // Regular users can only read/write documents where ownerId == their uid.
+    // SUPERADMIN can read/write everything.
+
+    // Allow user profile access
     match /users/{userId} {
-      allow read: if request.auth != null; // Optionally restrict to self or admins if user profiles are private
+      allow read: if request.auth != null;
       allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "SUPERADMIN" || request.auth.token.role == "ADMIN");
       
-      // Allow the user full access to their own subcollections
       match /{document=**} {
         allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.role == "SUPERADMIN" || request.auth.token.role == "ADMIN");
       }
     }
 
-    // Protect global collections from unauthorized reads/writes
-    match /contacts/{document=**} {
-      allow read, write: if request.auth != null && (request.auth.token.role == "SUPERADMIN" || request.auth.token.role == "ADMIN");
-    }
-    
-    // Default fallback - deny everything else
-    match /{document=**} {
-      allow read, write: if request.auth != null && (request.auth.token.role == "SUPERADMIN" || request.auth.token.role == "ADMIN");
+    // Apply ownerId filtering to all other collections
+    match /{collection}/{document=**} {
+      allow read, update, delete: if request.auth != null && (
+        request.auth.token.role == "SUPERADMIN" || 
+        request.auth.token.role == "ADMIN" || 
+        resource.data.ownerId == request.auth.uid
+      );
+      
+      allow create: if request.auth != null && (
+        request.auth.token.role == "SUPERADMIN" || 
+        request.auth.token.role == "ADMIN" || 
+        request.resource.data.ownerId == request.auth.uid
+      );
     }
   }
 }

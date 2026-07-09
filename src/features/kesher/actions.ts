@@ -8,6 +8,28 @@ export async function getKesherSettings() {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
+
+    // First check user doc overrides
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    const userData = userDoc.data();
+    
+    if (userData?.useAdminKesher) {
+      const globalDoc = await adminDb.collection("configs").doc("global").get();
+      const globalConfig = globalDoc.data() || {};
+      return { 
+        userName: globalConfig.kesherUserName || "", 
+        apiKey: globalConfig.kesherApiKey || "",
+        isActive: !!(globalConfig.kesherUserName && globalConfig.kesherApiKey)
+      };
+    }
+    
+    if (userData?.kesherSettings?.userName || userData?.kesherSettings?.apiKey) {
+      return { 
+        ...userData.kesherSettings,
+        isActive: !!(userData.kesherSettings.userName && userData.kesherSettings.apiKey)
+      };
+    }
+
     const { getUserDb } = await import("@/lib/firebase-admin");
     const docRef = getUserDb(userId).collection("settings").doc("kesher");
     const docSnap = await docRef.get();
@@ -58,24 +80,22 @@ export async function createManualInvoice(data: any) {
     const payload = {
       Json: {
         userName: settings.userName,
-        password: settings.ezCountToken, // User explicitly requested using EasyCount token here
+        password: settings.apiKey, 
         func: "SendCashTransaction", 
         format: "json",
         cashTran: {
-          ChargeOptionType: data.paymentType, // "Cash", "Check", "BankTransfer"
-          Total: Math.round(data.amount * 100), // in agorot
-          ProjectNumber: data.receiptType || "405", // Receipt type
-          FirstName: data.clientName.split(" ")[0] || "",
-          LastName: data.clientName.split(" ").slice(1).join(" ") || "",
-          Phone: data.phone || "",
-          Tz: data.zeout || "",
-          Details: data.details || "",
-          // Extra fields for check or bank transfer
-          CheckNumber: data.checkNumber || "",
           Bank: data.bankName || "",
+          Phone: data.phone || "",
+          Total: Number(data.amount),
           Branch: data.branchNumber || "",
           Account: data.accountNumber || "",
-          TransferRef: data.transferRef || ""
+          Currency: 1, // ILS
+          LastName: data.clientName.split(" ").slice(1).join(" ") || "",
+          FirstName: data.clientName.split(" ")[0] || "",
+          CheckNumber: data.checkNumber || null,
+          ProjectNumber: data.receiptType || "405", // Receipt type
+          TransactionType: "debit",
+          ChargeOptionType: data.paymentType
         }
       },
       format: "json"

@@ -85,7 +85,7 @@ export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slo
         isAuthenticated ? (
           <>
             <Link 
-              href="/dashboard"
+              href="/auth-redirect"
               className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-secondary/20"
               title="לוח בקרה"
             >
@@ -188,7 +188,7 @@ export const Navbar = ({ layout = "classic", logoUrl, navLinks, companyName, slo
               isAuthenticated ? (
                 <>
                   <Link
-                    href="/dashboard"
+                    href="/auth-redirect"
                     className="flex items-center gap-2 text-foreground/80 hover:text-primary py-1"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >

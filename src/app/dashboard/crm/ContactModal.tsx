@@ -8,6 +8,7 @@ import { Contact, ContactEvent } from "@/features/crm/types";
 import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField } from "@/features/crm/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
+import { impersonateUser } from "@/features/users/impersonate";
 import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud } from "lucide-react";
 
 const getInitials = (name: string, fm?: string) => {
@@ -377,36 +378,60 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <Modal.Content className="w-11/12 max-w-[450px] max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-6 sm:p-8 bg-[#0a0a0a] border border-white/10 [&::-webkit-scrollbar]:hidden">
-        <div dir="rtl" className="w-full">
-          <Modal.Close className="left-4 right-auto" />
+        <div dir="rtl" className="w-full relative">
+          <Modal.Close className="left-4 top-4 right-auto text-white bg-white/10 hover:bg-white/20 p-2 rounded-full z-50 w-8 h-8 flex items-center justify-center transition-all" />
           {isEdit ? (
-            <div className="flex flex-col items-center text-center space-y-4 border-b pb-6 mb-6">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-black text-white shadow-xl ring-4 ring-white" style={{ backgroundColor: getAvatarBg(contaName) }}>
+            <div className="flex flex-col items-center text-center space-y-6 border-b border-white/5 pb-8 mb-6 mt-4">
+              <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-black text-white ring-4 ring-white/10 bg-[#1a1a1a]">
                 {getInitials(contaName, fM)}
               </div>
-              <div>
-                <h3 className="text-2xl font-black text-slate-800">{contaName} {fM}</h3>
-              </div>
-              <div className="flex gap-3 w-full max-w-sm">
-                {contaPhone && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      className="flex-1 rounded-xl text-green-600 border-green-200 hover:bg-green-50"
-                      onClick={() => window.open(`https://wa.me/${contaPhone.replace(/\D/g, '')}`, '_blank')}
-                    >
-                      <MessageCircle className="w-4 h-4 ml-2" />
-                      וואטסאפ
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="flex-1 rounded-xl text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                      onClick={() => window.location.href = `tel:${contaPhone}`}
-                    >
-                      <Phone className="w-4 h-4 ml-2" />
-                      התקשר
-                    </Button>
-                  </>
+              
+              <div className="flex items-center justify-center gap-6 w-full max-w-sm">
+                {contaPhone ? (
+                  <button 
+                    type="button"
+                    className="w-14 h-14 rounded-full border-2 flex items-center justify-center hover:opacity-80 transition-opacity shrink-0"
+                    style={{ borderColor: "#2b2756", color: "#818cf8", backgroundColor: "transparent" }}
+                    onClick={() => window.location.href = `tel:${contaPhone}`}
+                  >
+                    <Phone className="w-6 h-6" />
+                  </button>
+                ) : <div className="w-14 h-14 shrink-0" />}
+                
+                <div 
+                  className="text-3xl font-black text-white truncate max-w-[200px] drop-shadow-md"
+                  style={{ color: "#ffffff" }}
+                >
+                  {contaName} {fM}
+                </div>
+                
+                {contaPhone ? (
+                  <button 
+                    type="button"
+                    className="w-14 h-14 rounded-full border-2 flex items-center justify-center hover:opacity-80 transition-opacity shrink-0"
+                    style={{ borderColor: "#123b24", color: "#25d366", backgroundColor: "transparent" }}
+                    onClick={() => window.open(`https://wa.me/${contaPhone.replace(/\D/g, '')}`, '_blank')}
+                  >
+                    <MessageCircle className="w-6 h-6" />
+                  </button>
+                ) : <div className="w-14 h-14 shrink-0" />}
+
+                {isSuperAdmin && contact?.isUser && contact?.systemUserId && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await impersonateUser(contact.systemUserId!);
+                        window.location.href = "/dashboard";
+                      } catch (err: any) {
+                        alert("שגיאה בהתחברות כמשתמש: " + (err.message || err));
+                      }
+                    }}
+                    className="w-14 h-14 rounded-full border-2 border-amber-500/30 text-amber-500 flex items-center justify-center hover:bg-amber-500/10 transition-colors shrink-0 tooltip-trigger"
+                    title="התחבר ולנהל משתמש זה"
+                  >
+                    <Settings className="w-6 h-6" />
+                  </button>
                 )}
               </div>
             </div>
@@ -630,67 +655,105 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                             {/* Google AI */}
                             <div className="space-y-2">
                               <h5 className="text-xs font-bold text-emerald-500">Google AI (Gemini)</h5>
-                              <Input
-                                value={userDetailsData.settings.ai?.googleAiKey || ""}
-                                onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, ai: {...userDetailsData.settings.ai, googleAiKey: e.target.value}}})}
-                                placeholder="מפתח API..."
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
-                                dir="ltr"
-                              />
+                              <div className="flex items-center gap-2 mb-2">
+                                <input 
+                                  type="checkbox" 
+                                  id="aiUseAdminKey"
+                                  checked={userDetailsData.settings.ai?.useAdminKey || false}
+                                  onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, ai: {...userDetailsData.settings.ai, useAdminKey: e.target.checked}}})}
+                                  className="w-4 h-4 rounded border-white/20 bg-black/40 text-emerald-500 cursor-pointer accent-emerald-500"
+                                />
+                                <label htmlFor="aiUseAdminKey" className="text-xs text-slate-300 cursor-pointer">השתמש במפתחות מנהל (Admin)</label>
+                              </div>
+                              {!userDetailsData.settings.ai?.useAdminKey && (
+                                <Input
+                                  value={userDetailsData.settings.ai?.googleAiKey || ""}
+                                  onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, ai: {...userDetailsData.settings.ai, googleAiKey: e.target.value}}})}
+                                  placeholder="מפתח API..."
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
+                                  dir="ltr"
+                                />
+                              )}
                             </div>
                             
                             {/* WhatsApp */}
                             <div className="space-y-2 border-t border-white/5 pt-4">
                               <h5 className="text-xs font-bold text-emerald-500">WhatsApp (Green API)</h5>
-                              <div className="flex gap-2">
-                                <Input
-                                  value={userDetailsData.settings.whatsapp?.idInstance || ""}
-                                  onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, whatsapp: {...userDetailsData.settings.whatsapp, idInstance: e.target.value}}})}
-                                  placeholder="ID Instance"
-                                  className="w-1/3 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
-                                  dir="ltr"
+                              <div className="flex items-center gap-2 mb-2">
+                                <input 
+                                  type="checkbox" 
+                                  id="waUseAdminKey"
+                                  checked={userDetailsData.settings.whatsapp?.useAdminKey || false}
+                                  onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, whatsapp: {...userDetailsData.settings.whatsapp, useAdminKey: e.target.checked}}})}
+                                  className="w-4 h-4 rounded border-white/20 bg-black/40 text-emerald-500 cursor-pointer accent-emerald-500"
                                 />
-                                <Input
-                                  value={userDetailsData.settings.whatsapp?.apiToken || ""}
-                                  onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, whatsapp: {...userDetailsData.settings.whatsapp, apiToken: e.target.value}}})}
-                                  placeholder="API Token"
-                                  className="w-2/3 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
-                                  dir="ltr"
-                                />
+                                <label htmlFor="waUseAdminKey" className="text-xs text-slate-300 cursor-pointer">השתמש במפתחות מנהל (Admin)</label>
                               </div>
+                              {!userDetailsData.settings.whatsapp?.useAdminKey && (
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={userDetailsData.settings.whatsapp?.idInstance || ""}
+                                    onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, whatsapp: {...userDetailsData.settings.whatsapp, idInstance: e.target.value}}})}
+                                    placeholder="ID Instance"
+                                    className="w-1/3 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
+                                    dir="ltr"
+                                  />
+                                  <Input
+                                    value={userDetailsData.settings.whatsapp?.apiToken || ""}
+                                    onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, whatsapp: {...userDetailsData.settings.whatsapp, apiToken: e.target.value}}})}
+                                    placeholder="API Token"
+                                    className="w-2/3 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
+                                    dir="ltr"
+                                  />
+                                </div>
+                              )}
                             </div>
 
                             {/* Kesher / EasyCount */}
                             <div className="space-y-2 border-t border-white/5 pt-4">
                               <h5 className="text-xs font-bold text-emerald-500">קשר ואיזיקאונט (סליקה וחשבוניות)</h5>
-                              <Input
-                                value={userDetailsData.settings.kesher?.userName || ""}
-                                onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, userName: e.target.value}}})}
-                                placeholder="Kesher Username"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white mb-2"
-                                dir="ltr"
-                              />
-                              <Input
-                                value={userDetailsData.settings.kesher?.apiKey || ""}
-                                onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, apiKey: e.target.value}}})}
-                                placeholder="Kesher API Key / Password"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white mb-2"
-                                dir="ltr"
-                              />
-                              <Input
-                                value={userDetailsData.settings.kesher?.paymentPageId || ""}
-                                onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, paymentPageId: e.target.value}}})}
-                                placeholder="Kesher Payment Page ID"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white mb-2"
-                                dir="ltr"
-                              />
-                              <Input
-                                value={userDetailsData.settings.kesher?.ezCountToken || ""}
-                                onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, ezCountToken: e.target.value}}})}
-                                placeholder="EasyCount Token"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
-                                dir="ltr"
-                              />
+                              <div className="flex items-center gap-2 mb-2">
+                                <input 
+                                  type="checkbox" 
+                                  id="ksUseAdminKey"
+                                  checked={userDetailsData.settings.kesher?.useAdminKey || false}
+                                  onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, useAdminKey: e.target.checked}}})}
+                                  className="w-4 h-4 rounded border-white/20 bg-black/40 text-emerald-500 cursor-pointer accent-emerald-500"
+                                />
+                                <label htmlFor="ksUseAdminKey" className="text-xs text-slate-300 cursor-pointer">השתמש במפתחות מנהל (Admin)</label>
+                              </div>
+                              {!userDetailsData.settings.kesher?.useAdminKey && (
+                                <>
+                                  <Input
+                                    value={userDetailsData.settings.kesher?.userName || ""}
+                                    onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, userName: e.target.value}}})}
+                                    placeholder="Kesher Username"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white mb-2"
+                                    dir="ltr"
+                                  />
+                                  <Input
+                                    value={userDetailsData.settings.kesher?.apiKey || ""}
+                                    onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, apiKey: e.target.value}}})}
+                                    placeholder="Kesher API Key / Password"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white mb-2"
+                                    dir="ltr"
+                                  />
+                                  <Input
+                                    value={userDetailsData.settings.kesher?.paymentPageId || ""}
+                                    onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, paymentPageId: e.target.value}}})}
+                                    placeholder="Kesher Payment Page ID"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white mb-2"
+                                    dir="ltr"
+                                  />
+                                  <Input
+                                    value={userDetailsData.settings.kesher?.ezCountToken || ""}
+                                    onChange={(e) => setUserDetailsData({...userDetailsData, settings: {...userDetailsData.settings, kesher: {...userDetailsData.settings.kesher, ezCountToken: e.target.value}}})}
+                                    placeholder="EasyCount Token"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
+                                    dir="ltr"
+                                  />
+                                </>
+                              )}
                             </div>
                           </div>
                         )}

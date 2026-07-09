@@ -9,6 +9,21 @@ export async function getAiSettings() {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
+
+    // First check user doc overrides
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    const userData = userDoc.data();
+    
+    if (userData?.useAdminGoogleAi) {
+      const globalDoc = await adminDb.collection("configs").doc("global").get();
+      const globalConfig = globalDoc.data() || {};
+      return { googleAiKey: globalConfig.googleAiKey || "" };
+    }
+    
+    if (userData?.googleAiKey) {
+      return { googleAiKey: userData.googleAiKey };
+    }
+
     const { getUserDb } = await import("@/lib/firebase-admin");
     const docRef = getUserDb(userId).collection("settings").doc("ai");
     const docSnap = await docRef.get();
