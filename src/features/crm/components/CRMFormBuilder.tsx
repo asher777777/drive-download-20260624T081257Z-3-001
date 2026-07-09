@@ -42,6 +42,12 @@ export interface FormField {
   fontSize?: number;
   communityId?: string;
   autocomplete?: string;
+  payment_doc_type?: string;
+  payment_methods?: string[];
+  payment_recurring_limit?: string;
+  payment_require_id?: boolean;
+  step_button_text?: string;
+  step_button_icon?: string;
 }
 
 export interface FormStepConfig {
@@ -172,7 +178,9 @@ const FIELD_TYPES = [
   { id: "calculated", label: "שדה חישוב (נוסחה)" },
   { id: "image_display", label: "תמונה לתצוגה (ללא קלט)" },
   { id: "rich_text_display", label: "טקסט מעוצב (WYSIWYG) לתצוגה" },
-  { id: "step", label: "--- חוצץ שלב חדש ---" }
+  { id: "step", label: "--- חוצץ שלב חדש ---" },
+  { id: "payment_summary", label: "שלב תשלום: סיכום ועריכת נתונים" },
+  { id: "payment_cc", label: "שלב תשלום: נתוני אשראי" }
 ];
 
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
@@ -503,7 +511,30 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                     id="form-payment-toggle"
                     type="checkbox"
                     checked={value.form_type === "payment"}
-                    onChange={(e) => updateConfig({ form_type: e.target.checked ? "payment" : "standard" })}
+                    onChange={(e) => {
+                      const isPayment = e.target.checked;
+                      if (isPayment) {
+                        const newFields = [...value.fields];
+                        let changed = false;
+                        if (!newFields.some(f => f.type === "payment_summary")) {
+                          newFields.push({ type: "step", label: "--- חוצץ שלב חדש ---", map_to: "", required: false, default_value: "", options: "", url_param_enable: false, url_param_name: "", cond_enable: false, cond_field_index: 0, cond_operator: "is", cond_value: "" });
+                          newFields.push({ type: "payment_summary", label: "תשלום מאובטח", payment_doc_type: "320", payment_methods: ["one-time", "installments", "recurring", "bit"], payment_recurring_limit: "user-choice", map_to: "", required: true, default_value: "", options: "", url_param_enable: false, url_param_name: "", cond_enable: false, cond_field_index: 0, cond_operator: "is", cond_value: "" });
+                          changed = true;
+                        }
+                        if (!newFields.some(f => f.type === "payment_cc")) {
+                          newFields.push({ type: "step", label: "--- חוצץ שלב חדש ---", map_to: "", required: false, default_value: "", options: "", url_param_enable: false, url_param_name: "", cond_enable: false, cond_field_index: 0, cond_operator: "is", cond_value: "" });
+                          newFields.push({ type: "payment_cc", label: "פרטי אשראי", payment_require_id: false, bgColor: "#09090b", textColor: "#ffffff", focusColor: "#f59e0b", map_to: "", required: true, default_value: "", options: "", url_param_enable: false, url_param_name: "", cond_enable: false, cond_field_index: 0, cond_operator: "is", cond_value: "" });
+                          changed = true;
+                        }
+                        if (changed) {
+                          updateConfig({ form_type: "payment", fields: newFields });
+                        } else {
+                          updateConfig({ form_type: "payment" });
+                        }
+                      } else {
+                        updateConfig({ form_type: "standard" });
+                      }
+                    }}
                     className="w-5 h-5 text-amber-500 border-slate-700 bg-slate-800 rounded focus:ring-amber-500 cursor-pointer"
                   />
                 </div>
@@ -662,17 +693,43 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                 </div>
                                 
                                 {field.type === "step" ? (
-                                  <div className="flex items-center gap-2 pt-2">
-                                    <input
-                                      id={`field-submit-next-${idx}`}
-                                      type="checkbox"
-                                      checked={field.submitOnNext || false}
-                                      onChange={(e) => handleFieldChange(idx, { submitOnNext: e.target.checked })}
-                                      className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
-                                    />
-                                    <label htmlFor={`field-submit-next-${idx}`} className="font-bold text-white cursor-pointer">
-                                      הכפתור גם מעביר לשלב הבא וגם שומר את הנתונים הנוכחיים לדאטה-בייס?
-                                    </label>
+                                  <div className="space-y-4 pt-4 border-t border-white/5">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        id={`field-submit-next-${idx}`}
+                                        type="checkbox"
+                                        checked={field.submitOnNext || false}
+                                        onChange={(e) => handleFieldChange(idx, { submitOnNext: e.target.checked })}
+                                        className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                      />
+                                      <label htmlFor={`field-submit-next-${idx}`} className="font-bold text-white cursor-pointer">
+                                        הכפתור גם מעביר לשלב הבא וגם שומר את הנתונים הנוכחיים לדאטה-בייס?
+                                      </label>
+                                    </div>
+                                    <h5 className="font-bold text-amber-500 mb-2 mt-4">הגדרות כפתור 'המשך' לשלב הבא</h5>
+                                    <div>
+                                      <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור 'המשך'</label>
+                                      <input
+                                        type="text"
+                                        value={field.step_button_text || ""}
+                                        onChange={(e) => handleFieldChange(idx, { step_button_text: e.target.value })}
+                                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                        placeholder="לדוגמה: הבא"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block font-semibold mb-1 text-slate-400">אייקון כפתור 'המשך'</label>
+                                      <select
+                                        value={field.step_button_icon || "chevron-left"}
+                                        onChange={(e) => handleFieldChange(idx, { step_button_icon: e.target.value })}
+                                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                      >
+                                        <option value="chevron-left">חץ שמאלה (רגיל)</option>
+                                        <option value="arrow-left">חץ שמאלה (ארוך)</option>
+                                        <option value="check">וי (V)</option>
+                                        <option value="">ללא אייקון</option>
+                                      </select>
+                                    </div>
                                   </div>
                                 ) : (
                                   <>
@@ -780,6 +837,78 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                           placeholder="e.g. [amount] * 0.17"
                                           dir="ltr"
                                         />
+                                      </div>
+                                    )}
+
+                                    {field.type === "payment_summary" && (
+                                      <div className="space-y-4">
+                                        <div>
+                                          <label className="block font-semibold mb-1 text-slate-400">סוג מסמך להפקה בקשר (Kesher)</label>
+                                          <select
+                                            value={field.payment_doc_type || "320"}
+                                            onChange={(e) => handleFieldChange(idx, { payment_doc_type: e.target.value })}
+                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                          >
+                                            <option value="320">חשבונית מס/קבלה (320)</option>
+                                            <option value="400">קבלה (400)</option>
+                                            <option value="405">קבלה על תרומה (405)</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label className="block font-semibold mb-1 text-slate-400">אפשרויות תשלום מותרות</label>
+                                          <div className="flex flex-wrap gap-4 mt-2">
+                                            {["one-time", "installments", "recurring", "bit"].map(method => {
+                                              const labels: any = { "one-time": "חד פעמי", "installments": "תשלומים", "recurring": "הוראת קבע", "bit": "אפליקציית Bit" };
+                                              const methods = field.payment_methods || ["one-time"];
+                                              return (
+                                                <label key={method} className="flex items-center gap-2 text-white font-bold cursor-pointer">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={methods.includes(method)}
+                                                    onChange={(e) => {
+                                                      const newMethods = e.target.checked ? [...methods, method] : methods.filter(m => m !== method);
+                                                      handleFieldChange(idx, { payment_methods: newMethods });
+                                                    }}
+                                                    className="w-4 h-4 text-amber-500 rounded bg-slate-800"
+                                                  />
+                                                  {labels[method]}
+                                                </label>
+                                              )
+                                            })}
+                                          </div>
+                                        </div>
+                                        {(field.payment_methods || []).includes("recurring") && (
+                                          <div>
+                                            <label className="block font-semibold mb-1 text-slate-400">כמות חיובים (הוראת קבע)</label>
+                                            <select
+                                              value={field.payment_recurring_limit || "user-choice"}
+                                              onChange={(e) => handleFieldChange(idx, { payment_recurring_limit: e.target.value })}
+                                              className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                            >
+                                              <option value="user-choice">תן ללקוח לבחור בטופס</option>
+                                              <option value="unlimited">ללא הגבלה בלבד (עד ביטול)</option>
+                                              <option value="12">קבוע ל-12 חודשים (שנה)</option>
+                                              <option value="24">קבוע ל-24 חודשים (שנתיים)</option>
+                                            </select>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {field.type === "payment_cc" && (
+                                      <div className="space-y-4">
+                                        <div className="flex items-center gap-2 pt-2">
+                                          <input
+                                            id={`field-req-id-${idx}`}
+                                            type="checkbox"
+                                            checked={field.payment_require_id || false}
+                                            onChange={(e) => handleFieldChange(idx, { payment_require_id: e.target.checked })}
+                                            className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                          />
+                                          <label htmlFor={`field-req-id-${idx}`} className="font-bold text-white cursor-pointer">
+                                            דרוש להזין תעודת זהות (ת.ז) בעת החיוב בקשר?
+                                          </label>
+                                        </div>
                                       </div>
                                     )}
                                   </>
@@ -1487,53 +1616,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 </div>
               </div>
 
-              {/* Step Configurations */}
-              <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs">
-                <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
-                  הגדרות שלבים (כותרות ואייקונים)
-                </h4>
-                <div className="space-y-4">
-                  {Array.from({ length: Math.max(1, ...(value.fields || []).map(f => f.step || 1)) }).map((_, i) => {
-                    const stepNum = i + 1;
-                    const config = (value.step_configs || []).find(c => c.step === stepNum) || { step: stepNum, title: `שלב ${stepNum}`, icon: "" };
-                    return (
-                      <div key={stepNum} className="flex gap-4 p-4 border border-white/5 bg-zinc-900 rounded-xl">
-                        <div className="flex-1">
-                          <label className="block font-semibold mb-1 text-slate-400">כותרת שלב {stepNum}</label>
-                          <input
-                            type="text"
-                            value={config.title}
-                            onChange={(e) => {
-                              const newConfigs = [...(value.step_configs || [])];
-                              const existingIndex = newConfigs.findIndex(c => c.step === stepNum);
-                              if (existingIndex >= 0) newConfigs[existingIndex].title = e.target.value;
-                              else newConfigs.push({ step: stepNum, title: e.target.value, icon: config.icon });
-                              updateConfig({ step_configs: newConfigs });
-                            }}
-                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
-                          />
-                        </div>
-                        <div className="w-1/3">
-                          <label className="block font-semibold mb-1 text-slate-400">אייקון</label>
-                          <select
-                            value={config.icon}
-                            onChange={(e) => {
-                              const newConfigs = [...(value.step_configs || [])];
-                              const existingIndex = newConfigs.findIndex(c => c.step === stepNum);
-                              if (existingIndex >= 0) newConfigs[existingIndex].icon = e.target.value;
-                              else newConfigs.push({ step: stepNum, title: config.title, icon: e.target.value });
-                              updateConfig({ step_configs: newConfigs });
-                            }}
-                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
-                          >
-                            {ICON_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+
 
               {/* Right Column: Submit Button Customizer & Preview */}
               <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs flex flex-col justify-between">

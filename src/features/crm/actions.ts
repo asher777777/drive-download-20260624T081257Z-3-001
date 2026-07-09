@@ -597,6 +597,7 @@ export async function submitCRMForm(params: {
   formConfig: any;
   status?: string;
   amountPaid?: number;
+  transactionId?: string;
 }) {
   try {
     const ownerId = await getUserId();
@@ -723,7 +724,7 @@ export async function submitCRMForm(params: {
     const newEvent = {
       time: new Date().toISOString(),
       title: `טופס: ${formTitle}`,
-      text: `${amountPaid ? `סכום: ${amountPaid} ש"ח. ` : ""}סטטוס: ${finalStatus}. ערכי שדות: ${JSON.stringify(formData)}`
+      text: `${amountPaid ? `סכום: ${amountPaid} ש"ח. ` : ""}${params.transactionId ? `מספר עסקה (קשר): ${params.transactionId}. ` : ""}סטטוס: ${finalStatus}. ערכי שדות: ${JSON.stringify(formData)}`
     };
 
     if (contactId) {

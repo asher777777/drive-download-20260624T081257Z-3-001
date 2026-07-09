@@ -28,6 +28,8 @@ export async function POST(request: Request) {
       transactionId, 
       installments,
       paymentFrequency, // "one-time" | "recurring" | "user-choice"
+      documentType,
+      id,
       userId: requestUserId 
     } = body;
 
@@ -112,7 +114,9 @@ export async function POST(request: Request) {
           FirstName: clientName ? clientName.split(" ")[0] : "",
           LastName: clientName && clientName.includes(" ") ? clientName.split(" ").slice(1).join(" ") : "NONAME",
           ProjectNumber: settings.paymentPageId || "",
-          Mail: email || ""
+          Mail: email || "",
+          DocumentType: documentType ? Number(documentType) : 320,
+          Id: id || ""
         }
       },
       format: "json"

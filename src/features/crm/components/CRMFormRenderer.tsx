@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Send, CheckCircle2, Loader2, Coins, CreditCard, ShieldAlert, RefreshCw, ChevronLeft, ChevronRight, User, Phone, Mail, MapPin, Building, Briefcase, Calendar, FileText, Heart, Smile, AlertCircle } from "lucide-react";
+import { Send, CheckCircle2, Loader2, Coins, CreditCard, ShieldAlert, RefreshCw, ChevronLeft, ChevronRight, User, Phone, Mail, MapPin, Building, Briefcase, Calendar, FileText, Heart, Smile, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FormConfig, FormField, LogicAction } from "./CRMFormBuilder";
@@ -85,6 +85,17 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     mail: string;
   } | null>(null);
 
+  const [ccData, setCcData] = useState({
+    creditNumber: "",
+    expiryMonth: "",
+    expiryYear: "",
+    cvv2: "",
+    id: "",
+    paymentMethod: "one-time",
+    installments: 1
+  });
+  const [isRecurringChecked, setIsRecurringChecked] = useState(config.payment_frequency === "recurring");
+
   // Initialize form field values from default values and URL params
   useEffect(() => {
     const initialData: Record<string, string> = {};
@@ -133,17 +144,47 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     }
   };
 
+  // Dynamically calculate steps based on field positions
+  const enrichedFields = useMemo(() => {
+    let currentStep = 1;
+    return config.fields.map((f, i) => {
+      if (f.type === "step") {
+        if (i !== 0) currentStep++;
+        return { ...f, _calculatedStep: currentStep, _isStepDivider: true };
+      }
+      return { ...f, _calculatedStep: currentStep, _isStepDivider: false };
+    });
+  }, [config.fields]);
+
+  const dynamicStepConfigs = useMemo(() => {
+    const stepConfigsMap = new Map();
+    enrichedFields.forEach((f) => {
+      if (f._isStepDivider) {
+        stepConfigsMap.set(f._calculatedStep, {
+          step: f._calculatedStep,
+          title: f.label,
+          icon: f.icon || "user",
+          submitOnNext: f.submitOnNext || false
+        });
+      }
+    });
+    if (!stepConfigsMap.has(1)) {
+      stepConfigsMap.set(1, { step: 1, title: "שלב 1", icon: "user", submitOnNext: false });
+    }
+    return stepConfigsMap;
+  }, [enrichedFields]);
+
   // Get active step counts
-  const visibleFields = config.fields.filter(isFieldVisible);
-  const stepsList = Array.from(new Set(visibleFields.map((f) => f.step || 1))).sort((a, b) => a - b);
+  const visibleFields = enrichedFields.filter((f) => !f._isStepDivider && isFieldVisible(f));
+  const stepsList = Array.from(new Set(visibleFields.map((f) => f._calculatedStep))).sort((a, b) => a - b);
   const totalSteps = stepsList.length > 0 ? Math.max(...stepsList) : 1;
 
   // Extract payment amount from fields or default config
   const getPaymentAmount = () => {
     let amt = config.payment_amount || 0;
     
-    config.fields.forEach((f) => {
-      if (isFieldVisible(f)) {
+    enrichedFields.forEach((f) => {
+      if (isFieldVisible(f) && !f._isStepDivider) {
         if (f.map_to === "payment_amount" || f.type === "fixed_amount") {
           let valStr = formData[f.label];
           if (f.type === "calculated") {
@@ -251,7 +292,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
       // Fallback to first step containing an error
       const firstErrorField = visibleFields.find((f) => newErrors[f.label]);
       if (firstErrorField) {
-        setCurrentStep(firstErrorField.step || 1);
+        setCurrentStep(firstErrorField._calculatedStep || 1);
       }
       return;
     }
@@ -328,7 +369,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           
           // Clear form
           const cleanData: Record<string, string> = {};
-          config.fields.forEach((f) => {
+          enrichedFields.forEach((f) => {
+            if (f._isStepDivider) return;
             cleanData[f.label] = f.default_value || "";
           });
           setFormData(cleanData);
@@ -403,20 +445,106 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           return;
         }
 
-        await submitCRMForm({
-          formId,
-          formTitle,
-          formType: effectiveFormType === "register" ? "register" : "payment",
-          formData: cleanFormData,
-          embeddingPostId: formId,
-          embeddingPostTitle: formTitle,
-          embeddingCollection,
-          formConfig: config,
-          status: "ממתין לתשלום (אשראי)"
-        });
+        const ccField = visibleFields.find(f => f.type === "payment_cc");
+        const summaryField = visibleFields.find(f => f.type === "payment_summary");
+        
+        if (ccField) {
+          // New inline checkout flow
+          if (!ccData.creditNumber || ccData.creditNumber.length < 8) {
+            setSubmissionError("אנא הזן מספר כרטיס תקין");
+            setSubmitting(false);
+            return;
+          }
+          if (!ccData.expiryMonth || !ccData.expiryYear) {
+            setSubmissionError("אנא הזן תוקף כרטיס אשראי");
+            setSubmitting(false);
+            return;
+          }
+          if (!ccData.cvv2 || ccData.cvv2.length < 3) {
+            setSubmissionError("אנא הזן ספרות ביקורת (CVV)");
+            setSubmitting(false);
+            return;
+          }
+          if ((ccField as any).payment_require_id && (!ccData.id || ccData.id.length < 5)) {
+            setSubmissionError("אנא הזן תעודת זהות תקינה");
+            setSubmitting(false);
+            return;
+          }
 
-        setCheckoutData({ amount, clientName, phone, mail });
-        setShowCheckout(true);
+          // Submit to CRM as waiting for payment
+          await submitCRMForm({
+            formId,
+            formTitle,
+            formType: effectiveFormType === "register" ? "register" : "payment",
+            formData: cleanFormData,
+            embeddingPostId: formId,
+            embeddingPostTitle: formTitle,
+            embeddingCollection,
+            formConfig: config,
+            status: "ממתין לתשלום (אשראי)"
+          });
+
+          const expiry = `${ccData.expiryYear.padStart(2, "0")}${ccData.expiryMonth.padStart(2, "0")}`;
+          const freq = ccData.paymentMethod === "recurring" ? "recurring" : "one-time";
+
+          const response = await fetch("/api/kesher/send-transaction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount,
+              creditNumber: ccData.creditNumber,
+              expiry,
+              cvv2: ccData.cvv2,
+              id: ccData.id,
+              clientName,
+              phone,
+              email: mail,
+              transactionId: formTitle,
+              installments: ccData.installments,
+              paymentFrequency: freq,
+              documentType: (summaryField as any)?.payment_doc_type || "320"
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            await submitCRMForm({
+              formId,
+              formTitle,
+              formType: "payment",
+              formData: cleanFormData,
+              embeddingPostId: formId,
+              embeddingPostTitle: formTitle,
+              embeddingCollection,
+              formConfig: config,
+              status: "תשלום בוצע",
+              amountPaid: amount,
+              transactionId: data.encryptedCC
+            });
+            setSuccessMsg(data.message || "התשלום בוצע בהצלחה!");
+            setIsSubmitted(true);
+          } else {
+            setSubmissionError(data.error || "שגיאה בביצוע התשלום");
+          }
+          setSubmitting(false);
+          return;
+        } else {
+          // Fallback to legacy checkout modal flow
+          await submitCRMForm({
+            formId,
+            formTitle,
+            formType: effectiveFormType === "register" ? "register" : "payment",
+            formData: cleanFormData,
+            embeddingPostId: formId,
+            embeddingPostTitle: formTitle,
+            embeddingCollection,
+            formConfig: config,
+            status: "ממתין לתשלום (אשראי)"
+          });
+
+          setCheckoutData({ amount, clientName, phone, mail });
+          setShowCheckout(true);
+        }
       }
     } catch (err: any) {
       setSubmissionError(err.message || "שגיאה לא צפויה בפנייה לשרת");
@@ -472,6 +600,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
   // Success UI is now a Modal rendered at the bottom
 
   const fieldBgStyle = config.field_bg_color && config.field_bg_color !== "#f8fafc" ? { backgroundColor: config.field_bg_color } : undefined;
+
+  const currentStepConf = dynamicStepConfigs.get(currentStep);
 
   return (
     <div 
@@ -543,26 +673,26 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           )}
 
           {/* Current Step Header */}
-          {(() => {
-            const stepConf = (config.step_configs || []).find(c => c.step === currentStep);
-            if (!stepConf) return null;
-            const StepIcon = stepConf.icon ? IconMap[stepConf.icon] : null;
-            return (
-              <div className="mb-6 pb-4 border-b border-white/10 flex items-center justify-center gap-3">
-                {StepIcon && <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30"><StepIcon className="w-5 h-5" /></div>}
-                <h3 className="text-xl font-bold text-white">{stepConf.title}</h3>
-              </div>
-            );
-          })()}
+          {currentStepConf ? (
+            <div className="mb-6 pb-4 border-b border-white/10 flex items-center justify-center gap-3">
+              {currentStepConf.icon && IconMap[currentStepConf.icon] && (
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30">
+                  {(() => { const StepIcon = IconMap[currentStepConf.icon]; return <StepIcon className="w-5 h-5" />; })()}
+                </div>
+              )}
+              <h3 className="text-xl font-bold text-white">{currentStepConf.title}</h3>
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap -mx-2 w-[calc(100%+1rem)]">
-          {config.fields.map((field, idx) => {
+          {enrichedFields.map((field, idx) => {
+            if (field._isStepDivider) return null;
             if (!isFieldVisible(field)) return null;
 
             // Step filter: only render the fields for the active step
             // Note: fixed_amount and hidden elements should be rendered at any step so their input elements are in DOM
             const isHiddenOrFixed = ["hidden", "fixed_amount", "calculated"].includes(field.type);
-            if (!isHiddenOrFixed && (field.step || 1) !== currentStep) return null;
+            if (!isHiddenOrFixed && field._calculatedStep !== currentStep) return null;
 
             const hasError = errors[field.label];
             const FieldIcon = field.icon ? IconMap[field.icon] : null;
@@ -596,6 +726,171 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                   </div>
                 ) : field.type === "rich_text_display" ? (
                   <div className="prose prose-invert prose-sm max-w-none text-slate-300 my-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 leading-relaxed" dangerouslySetInnerHTML={{ __html: field.default_value }} />
+                ) : field.type === "payment_summary" ? (
+                  <div className="bg-zinc-900/40 p-4 sm:p-6 rounded-2xl border mb-6" style={customFieldStyle}>
+                    <h3 className="text-xl font-bold mb-4 text-[var(--field-focus)]" style={customFieldStyle}>תשלום מאובטח</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-zinc-950/50 p-3 rounded-xl border border-white/5">
+                        <span className="text-slate-400">סכום לתשלום:</span>
+                        <span className="text-xl font-bold text-white">₪{getPaymentAmount().toLocaleString()}</span>
+                      </div>
+
+                      {/* Payment Settings Options */}
+                      <div className="pt-2 border-t border-white/5 space-y-3">
+                        <label className="text-sm font-bold text-slate-300">אופן תשלום</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {((field as any).payment_methods || ["one-time"]).includes("one-time") && (
+                            <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
+                              <input type="radio" name="paymentMethod" value="one-time" 
+                                checked={ccData.paymentMethod === "one-time"} 
+                                onChange={() => setCcData({...ccData, paymentMethod: "one-time", installments: 1})}
+                                className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
+                              />
+                              תשלום חד פעמי
+                            </label>
+                          )}
+                          {((field as any).payment_methods || ["one-time"]).includes("installments") && (
+                            <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
+                              <input type="radio" name="paymentMethod" value="installments" 
+                                checked={ccData.paymentMethod === "installments"} 
+                                onChange={() => setCcData({...ccData, paymentMethod: "installments"})}
+                                className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
+                              />
+                              תשלומים
+                            </label>
+                          )}
+                          {((field as any).payment_methods || ["one-time"]).includes("recurring") && (
+                            <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
+                              <input type="radio" name="paymentMethod" value="recurring" 
+                                checked={ccData.paymentMethod === "recurring"} 
+                                onChange={() => setCcData({...ccData, paymentMethod: "recurring", installments: 9999})}
+                                className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
+                              />
+                              הוראת קבע
+                            </label>
+                          )}
+                        </div>
+
+                        {ccData.paymentMethod === "installments" && (
+                          <div className="mt-3">
+                            <label className="text-xs font-bold text-slate-400 mb-2 block">מספר תשלומים</label>
+                            <select 
+                              className="w-full bg-zinc-950 text-white p-3 rounded-xl border border-white/10 outline-none focus:border-amber-500"
+                              value={ccData.installments}
+                              onChange={e => setCcData({...ccData, installments: Number(e.target.value)})}
+                            >
+                              {Array.from({length: 12}).map((_, i) => (
+                                <option key={i} value={i+2}>{i+2} תשלומים</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {ccData.paymentMethod === "recurring" && ((field as any).payment_recurring_limit === "user-choice") && (
+                          <div className="mt-3">
+                            <label className="text-xs font-bold text-slate-400 mb-2 block">מספר חיובים</label>
+                            <select 
+                              className="w-full bg-zinc-950 text-white p-3 rounded-xl border border-white/10 outline-none focus:border-amber-500"
+                              value={ccData.installments}
+                              onChange={e => setCcData({...ccData, installments: Number(e.target.value)})}
+                            >
+                              <option value="9999">ללא הגבלה (חיוב מתחדש קבוע)</option>
+                              {Array.from({length: 36}).map((_, i) => (
+                                <option key={i} value={i+1}>{i+1} חיובים</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : field.type === "payment_cc" ? (
+                  <div className="bg-[var(--field-bg)] border-[var(--field-border)] p-4 sm:p-6 rounded-2xl mb-6 shadow-xl" style={customFieldStyle}>
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
+                      <h3 className="text-lg font-bold" style={{color: customFieldStyle['--field-focus']}}>{field.label}</h3>
+                      <div className="flex gap-2">
+                        {/* Visa / Master Icons */}
+                        <div className="h-6 w-10 bg-white/10 rounded flex items-center justify-center text-[10px] font-bold text-white/50">VISA</div>
+                        <div className="h-6 w-10 bg-white/10 rounded flex items-center justify-center text-[10px] font-bold text-white/50">MASTER</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                          <CreditCard className="w-4 h-4" /> מספר כרטיס אשראי
+                        </label>
+                        <input
+                          type="text" dir="ltr" placeholder="0000 0000 0000 0000"
+                          value={ccData.creditNumber}
+                          onChange={(e) => setCcData({...ccData, creditNumber: e.target.value.replace(/\D/g, '')})}
+                          className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left transition-colors"
+                          style={{ borderColor: customFieldStyle['--field-border'] }}
+                          maxLength={16}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4" /> תוקף (חודש/שנה)
+                          </label>
+                          <div className="flex gap-2">
+                            <select
+                              dir="ltr" value={ccData.expiryMonth}
+                              onChange={(e) => setCcData({...ccData, expiryMonth: e.target.value})}
+                              className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono"
+                            >
+                              <option value="" disabled>MM</option>
+                              {Array.from({length: 12}).map((_, i) => {
+                                const m = String(i+1).padStart(2, '0');
+                                return <option key={m} value={m}>{m}</option>
+                              })}
+                            </select>
+                            <span className="text-slate-500 self-center">/</span>
+                            <select
+                              dir="ltr" value={ccData.expiryYear}
+                              onChange={(e) => setCcData({...ccData, expiryYear: e.target.value})}
+                              className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono"
+                            >
+                              <option value="" disabled>YY</option>
+                              {Array.from({length: 15}).map((_, i) => {
+                                const y = String(new Date().getFullYear() % 100 + i).padStart(2, '0');
+                                return <option key={y} value={y}>{y}</option>
+                              })}
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                            <Lock className="w-4 h-4" /> CVV (3 ספרות בגב)
+                          </label>
+                          <input
+                            type="text" dir="ltr" placeholder="123"
+                            value={ccData.cvv2}
+                            onChange={(e) => setCcData({...ccData, cvv2: e.target.value.replace(/\D/g, '')})}
+                            className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left"
+                            maxLength={4}
+                          />
+                        </div>
+                      </div>
+
+                      {(field as any).payment_require_id && (
+                        <div className="space-y-1.5 pt-2">
+                          <label className="text-xs font-bold text-slate-400">תעודת זהות של בעל הכרטיס (חובה)</label>
+                          <input
+                            type="text" dir="ltr" placeholder="123456789"
+                            value={ccData.id}
+                            onChange={(e) => setCcData({...ccData, id: e.target.value.replace(/\D/g, '')})}
+                            className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left"
+                            maxLength={9}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <>
                     {field.type === "textarea" ? (
@@ -809,11 +1104,11 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 style={btnStyle}
                 className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
               >
-                {config.continue_button_text || "המשך"}
-                {config.continue_button_icon === "arrow-left" && <ChevronLeft className="w-4 h-4" />}
-                {config.continue_button_icon === "chevron-left" && <ChevronLeft className="w-4 h-4" />}
-                {config.continue_button_icon === "check" && <CheckCircle2 className="w-4 h-4" />}
-                {!config.continue_button_icon && <ChevronLeft className="w-4 h-4" />}
+                {currentStepConf?.buttonText || config.continue_button_text || "המשך"}
+                {(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) === "arrow-left" && <ChevronLeft className="w-4 h-4" />}
+                {(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) === "chevron-left" && <ChevronLeft className="w-4 h-4" />}
+                {(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) === "check" && <CheckCircle2 className="w-4 h-4" />}
+                {!(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) && <ChevronLeft className="w-4 h-4" />}
               </Button>
             ) : (
               <Button
