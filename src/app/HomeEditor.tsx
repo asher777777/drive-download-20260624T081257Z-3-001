@@ -130,7 +130,7 @@ const SortableSectionItem = ({
   isFirst,
   isLast
 }: any) => {
-  const [openTab, setOpenTab] = useState<"preview" | "content" | "design">("preview");
+  const [openTab, setOpenTab] = useState<"preview" | "content" | "design" | null>("content");
   const [isMobilePreview, setIsMobilePreview] = useState(false);
 
   // Keep header sticky when open
@@ -234,7 +234,7 @@ const SortableSectionItem = ({
               <div className="w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm transition-colors">
                 <button
                   type="button"
-                  onClick={() => setOpenTab("preview")}
+                  onClick={() => setOpenTab(openTab === "preview" ? null : "preview")}
                   className="flex items-center gap-3 cursor-pointer flex-1 text-right"
                 >
                   <LayoutTemplate className="w-4 h-4 text-indigo-400" /> תצוגה מקדימה
@@ -253,12 +253,12 @@ const SortableSectionItem = ({
                   >
                     {isMobilePreview ? <Monitor className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
                   </button>
-                  <button type="button" onClick={() => setOpenTab("preview")}>
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", openTab === "preview" || openTab === "content" || openTab === "design" ? "rotate-180 text-white" : "text-gray-400")} />
+                  <button type="button" onClick={() => setOpenTab(openTab === "preview" ? null : "preview")}>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", openTab === "preview" ? "rotate-180 text-white" : "text-gray-400")} />
                   </button>
                 </div>
               </div>
-              {(true) && (
+              {openTab === "preview" && (
                 <div className="bg-[#0a0a0a] border-t border-white/5 relative w-full flex justify-center overflow-x-auto custom-scrollbar transition-all duration-300">
                   <IframePreview isMobile={isMobilePreview}>
                     {previewNode}
@@ -271,7 +271,7 @@ const SortableSectionItem = ({
             <div className="w-full border-b border-white/5 bg-[#181818] transition-all">
               <button
                 type="button"
-                onClick={() => setOpenTab(openTab === "content" ? "preview" : "content")}
+                onClick={() => setOpenTab(openTab === "content" ? null : "content")}
                 className="w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
               >
                 <span className="flex items-center gap-3">
@@ -291,7 +291,7 @@ const SortableSectionItem = ({
               <div className="w-full border-b border-white/5 bg-[#181818] transition-all">
                 <button
                   type="button"
-                  onClick={() => setOpenTab(openTab === "design" ? "preview" : "design")}
+                  onClick={() => setOpenTab(openTab === "design" ? null : "design")}
                   className="w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-xs sm:text-sm cursor-pointer transition-colors"
                 >
                   <span className="flex items-center gap-3">

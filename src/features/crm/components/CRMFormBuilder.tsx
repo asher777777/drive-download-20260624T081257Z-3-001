@@ -11,6 +11,8 @@ import { getFormTemplates, saveFormTemplate, FormTemplate } from "../formTemplat
 import { getCustomFields, addCustomField, getCustomTabs } from "../actions";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { getCommunities } from "@/features/communities/actions";
+import { IconPicker } from "@/components/ui/IconPicker";
 
 export interface FormField {
   label: string;
@@ -34,6 +36,11 @@ export interface FormField {
   bgColor?: string;
   borderColor?: string;
   focusColor?: string;
+  placeholder?: string;
+  height?: string | number;
+  textColor?: string;
+  fontSize?: number;
+  communityId?: string;
 }
 
 export interface FormStepConfig {
@@ -171,9 +178,11 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
   const value = { ...rawValue, fields: rawValue.fields || [] };
   const [activeTab, setActiveTab] = useState<"templates" | "type" | "fields" | "whatsapp" | "settings">("templates");
   const [expandedField, setExpandedField] = useState<number | null>(null);
+  const [activeFieldTab, setActiveFieldTab] = useState<"settings" | "design" | "mapping" | "advanced">("settings");
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [customFields, setCustomFields] = useState<any[]>([]);
   const [customTabs, setCustomTabs] = useState<any[]>([]);
+  const [communities, setCommunities] = useState<any[]>([]);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [showAddCustomFieldModal, setShowAddCustomFieldModal] = useState(false);
@@ -186,6 +195,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
     getFormTemplates().then(setTemplates);
     getCustomFields().then(setCustomFields);
     getCustomTabs().then(setCustomTabs);
+    getCommunities().then(setCommunities);
   }, []);
 
   const handleAddCustomField = async () => {
@@ -537,7 +547,10 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                           </button>
                           <button
                             type="button"
-                            onClick={() => setExpandedField(isExpanded ? null : idx)}
+                            onClick={() => {
+                              setExpandedField(isExpanded ? null : idx);
+                              setActiveFieldTab("settings");
+                            }}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
                           >
                             <Settings className="w-4 h-4" />
@@ -555,98 +568,249 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
 
                       {/* Expandable options details */}
                       {isExpanded && (
-                        <div className="p-4 border-t border-white/5 bg-black/20 rounded-b-2xl space-y-4 text-xs">
-                          <div className="flex flex-col gap-4">
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">סוג פריט</label>
-                              <select
-                                value={field.type}
-                                onChange={(e) => handleFieldChange(idx, { type: e.target.value })}
-                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                              >
-                                {FIELD_TYPES.map(t => (
-                                  <option key={t.id} value={t.id}>{t.label}</option>
-                                ))}
-                              </select>
-                            </div>
-                            
-                            {field.type === "step" ? (
-                              <>
-                                <div>
-                                  <label className="block font-semibold mb-1 text-slate-400">אייקון לשלב</label>
-                                  <select
-                                    value={field.icon || ""}
-                                    onChange={(e) => handleFieldChange(idx, { icon: e.target.value })}
-                                    className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                                  >
-                                    {ICON_OPTIONS.map(i => (
-                                      <option key={i.id} value={i.id}>{i.label}</option>
-                                    ))}
-                                  </select>
+                        <div className="border-t border-white/5 bg-black/20 rounded-b-2xl overflow-hidden text-xs">
+                          {/* Tabs */}
+                          <div className="flex bg-black/40 border-b border-white/5 overflow-x-auto custom-scrollbar">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setActiveFieldTab("settings"); }} className={`px-4 py-3 font-bold whitespace-nowrap transition-colors ${activeFieldTab === "settings" ? "text-amber-400 border-b-2 border-amber-400 bg-amber-500/5" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>הגדרות השדה</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setActiveFieldTab("design"); }} className={`px-4 py-3 font-bold whitespace-nowrap transition-colors ${activeFieldTab === "design" ? "text-amber-400 border-b-2 border-amber-400 bg-amber-500/5" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>עיצוב</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setActiveFieldTab("mapping"); }} className={`px-4 py-3 font-bold whitespace-nowrap transition-colors ${activeFieldTab === "mapping" ? "text-amber-400 border-b-2 border-amber-400 bg-amber-500/5" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>הגדרות מיפוי</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setActiveFieldTab("advanced"); }} className={`px-4 py-3 font-bold whitespace-nowrap transition-colors ${activeFieldTab === "advanced" ? "text-amber-400 border-b-2 border-amber-400 bg-amber-500/5" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>הגדרות מתקדמות</button>
+                          </div>
+
+                          <div className="p-4 space-y-4">
+                            {/* Tab: Settings */}
+                            {activeFieldTab === "settings" && (
+                              <div className="flex flex-col gap-4 animate-in fade-in">
+                                <div className="flex gap-4">
+                                  <div className="flex-1">
+                                    <label className="block font-semibold mb-1 text-slate-400">סוג פריט</label>
+                                    <select
+                                      value={field.type}
+                                      onChange={(e) => handleFieldChange(idx, { type: e.target.value })}
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                    >
+                                      {FIELD_TYPES.map(t => (
+                                        <option key={t.id} value={t.id}>{t.label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400">אייקון</label>
+                                    <IconPicker value={field.icon || ""} onChange={(icon) => handleFieldChange(idx, { icon })} />
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 pt-6">
-                                  <input
-                                    id={`field-submit-next-${idx}`}
-                                    type="checkbox"
-                                    checked={field.submitOnNext || false}
-                                    onChange={(e) => handleFieldChange(idx, { submitOnNext: e.target.checked })}
-                                    className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
-                                  />
-                                  <label htmlFor={`field-submit-next-${idx}`} className="font-bold text-white cursor-pointer">
-                                    הכפתור גם מעביר לשלב הבא וגם שומר את הנתונים הנוכחיים לדאטה-בייס?
-                                  </label>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">מיפוי לשדה CRM</label>
-                              <select
-                                value={field.map_to}
-                                onChange={(e) => {
-                                  if (e.target.value === "__other__") {
-                                    setShowAddCustomFieldModal(true);
-                                  } else {
-                                    handleFieldChange(idx, { map_to: e.target.value });
-                                  }
-                                }}
-                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                              >
-                                {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
-                                  <option key={k} value={k}>{v}</option>
-                                ))}
-                                {customFields.length > 0 && <optgroup label="שדות מותאמים אישית">
-                                  {customFields.map(cf => (
-                                    <option key={cf.id} value={cf.id}>{cf.label}</option>
-                                  ))}
-                                </optgroup>}
-                                <option value="__other__" className="font-bold text-amber-500">אחר (הוסף שדה חדש)...</option>
-                              </select>
-                            </div>
-                            
-                            <div className="col-span-full">
-                              <div className="flex items-center gap-2 mb-2">
-                                <input
-                                  id={`field-map-2-${idx}`}
-                                  type="checkbox"
-                                  checked={!!field.map_to_2}
-                                  onChange={(e) => handleFieldChange(idx, { map_to_2: e.target.checked ? "notes" : undefined })}
-                                  className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
-                                />
-                                <label htmlFor={`field-map-2-${idx}`} className="font-bold text-white cursor-pointer">
-                                  מפה לשדה נוסף ב-CRM (מיפוי כפול)
-                                </label>
+                                
+                                {field.type === "step" ? (
+                                  <div className="flex items-center gap-2 pt-2">
+                                    <input
+                                      id={`field-submit-next-${idx}`}
+                                      type="checkbox"
+                                      checked={field.submitOnNext || false}
+                                      onChange={(e) => handleFieldChange(idx, { submitOnNext: e.target.checked })}
+                                      className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                    />
+                                    <label htmlFor={`field-submit-next-${idx}`} className="font-bold text-white cursor-pointer">
+                                      הכפתור גם מעביר לשלב הבא וגם שומר את הנתונים הנוכחיים לדאטה-בייס?
+                                    </label>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {field.type === "select" && (
+                                      <div>
+                                        <label className="block font-semibold mb-1 text-slate-400">אפשרויות לבחירה (כל אפשרות בשורה חדשה)</label>
+                                        <textarea
+                                          value={field.options}
+                                          onChange={(e) => handleFieldChange(idx, { options: e.target.value })}
+                                          rows={3}
+                                          className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-3 outline-none resize-none font-mono"
+                                          placeholder="אפשרות א'&#10;אפשרות ב'&#10;אפשרות ג'"
+                                        />
+                                      </div>
+                                    )}
+
+                                    {["hidden", "fixed_amount", "rich_text_display"].includes(field.type) ? (
+                                      <div>
+                                        <label className="block font-semibold mb-1 text-slate-400">
+                                          {field.type === "rich_text_display" ? "תוכן טקסט עשיר (HTML)" : "ערך קבוע / ברירת מחדל"}
+                                        </label>
+                                        {field.type === "rich_text_display" ? (
+                                          <textarea
+                                            value={field.default_value || ""}
+                                            onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
+                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono text-left"
+                                            placeholder="<p>הכנס HTML כאן</p>"
+                                            rows={4}
+                                          />
+                                        ) : (
+                                          <input
+                                            type="text"
+                                            value={field.default_value || ""}
+                                            onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
+                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                            placeholder="הזן ערך מוגדר מראש"
+                                          />
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <label className="block font-semibold mb-1 text-slate-400">ערך ברירת מחדל</label>
+                                          <input
+                                            type="text"
+                                            value={field.default_value || ""}
+                                            onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
+                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                            placeholder="הזן ערך התחלתי..."
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block font-semibold mb-1 text-slate-400">טקסט שומר מקום (Placeholder)</label>
+                                          <input
+                                            type="text"
+                                            value={field.placeholder || ""}
+                                            onChange={(e) => handleFieldChange(idx, { placeholder: e.target.value })}
+                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                            placeholder="הזן טקסט שומר מקום..."
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {field.type === "image_display" && (
+                                      <div>
+                                        <label className="block font-semibold mb-1 text-slate-400">בחר תמונה להצגה בטופס</label>
+                                        <ImageUpload
+                                          currentImage={field.default_value || ""}
+                                          onSelect={(url) => handleFieldChange(idx, { default_value: url })}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {field.type === "calculated" && (
+                                      <div className="bg-amber-900/20 p-4 rounded-xl border border-amber-500/30">
+                                        <label className="block font-semibold mb-1 text-amber-300">נוסחת חישוב חשבונית</label>
+                                        <p className="text-amber-400 mb-2 text-xs">
+                                          כתוב נוסחה חשבונית (כפל <code>*</code>, חילוק <code>/</code>, חיבור <code>+</code>, חיסור <code>-</code>).<br/>
+                                          כדי להשתמש בערך של שדה אחר, הקלד את שם השדה בתוך סוגריים מרובעים. לדוגמה: <code>[כמות משתתפים] * 50 + 10</code>
+                                        </p>
+                                        <input
+                                          type="text"
+                                          value={field.calc_formula || ""}
+                                          onChange={(e) => handleFieldChange(idx, { calc_formula: e.target.value })}
+                                          className="w-full bg-zinc-950 text-white border border-amber-500/30 rounded-xl p-3 outline-none font-mono text-left"
+                                          placeholder="e.g. [amount] * 0.17"
+                                          dir="ltr"
+                                        />
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                               </div>
-                              {field.map_to_2 && (
+                            )}
+
+                            {/* Tab: Design */}
+                            {activeFieldTab === "design" && (
+                              <div className="flex flex-col gap-4 animate-in fade-in">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400">רוחב השדה בשורה</label>
+                                    <select
+                                      value={field.widthPercentage || 100}
+                                      onChange={(e) => handleFieldChange(idx, { widthPercentage: Number(e.target.value) })}
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                    >
+                                      {WIDTH_OPTIONS.map(w => (
+                                        <option key={w.id} value={w.id}>{w.label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400">גובה השדה</label>
+                                    <input
+                                      type="text"
+                                      value={field.height || ""}
+                                      onChange={(e) => handleFieldChange(idx, { height: e.target.value })}
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                      placeholder="לדוגמה: 40px או auto"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400">צבע גופן</label>
+                                    <div className="flex items-center gap-2 bg-zinc-950 border border-white/10 rounded-xl p-1">
+                                      <input
+                                        type="color"
+                                        value={field.textColor || "#ffffff"}
+                                        onChange={(e) => handleFieldChange(idx, { textColor: e.target.value })}
+                                        className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={field.textColor || "#ffffff"}
+                                        onChange={(e) => handleFieldChange(idx, { textColor: e.target.value })}
+                                        className="w-full bg-transparent text-white outline-none p-1 text-xs font-mono"
+                                        dir="ltr"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400">גודל גופן (px)</label>
+                                    <input
+                                      type="number"
+                                      value={field.fontSize || 14}
+                                      onChange={(e) => handleFieldChange(idx, { fontSize: parseInt(e.target.value) || 14 })}
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                      placeholder="14"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע רקע</label>
+                                    <input
+                                      type="color"
+                                      value={field.bgColor || "#09090b"}
+                                      onChange={(e) => handleFieldChange(idx, { bgColor: e.target.value })}
+                                      className="w-full h-8 rounded cursor-pointer border-0 p-0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע מסגרת</label>
+                                    <input
+                                      type="color"
+                                      value={field.borderColor || "#ffffff"}
+                                      onChange={(e) => handleFieldChange(idx, { borderColor: e.target.value })}
+                                      className="w-full h-8 rounded cursor-pointer border-0 p-0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע פוקוס (זהב)</label>
+                                    <input
+                                      type="color"
+                                      value={field.focusColor || "#f59e0b"}
+                                      onChange={(e) => handleFieldChange(idx, { focusColor: e.target.value })}
+                                      className="w-full h-8 rounded cursor-pointer border-0 p-0"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tab: Mapping */}
+                            {activeFieldTab === "mapping" && (
+                              <div className="flex flex-col gap-4 animate-in fade-in">
                                 <div>
-                                  <label className="block font-semibold mb-1 text-slate-400">מיפוי לשדה שני</label>
+                                  <label className="block font-semibold mb-1 text-slate-400">מיפוי לשדה CRM</label>
                                   <select
-                                    value={field.map_to_2}
+                                    value={field.map_to}
                                     onChange={(e) => {
                                       if (e.target.value === "__other__") {
                                         setShowAddCustomFieldModal(true);
                                       } else {
-                                        handleFieldChange(idx, { map_to_2: e.target.value });
+                                        handleFieldChange(idx, { map_to: e.target.value });
                                       }
                                     }}
                                     className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
@@ -659,233 +823,159 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                         <option key={cf.id} value={cf.id}>{cf.label}</option>
                                       ))}
                                     </optgroup>}
-                                    <option value="__other__" className="font-bold text-amber-400">אחר (הוסף שדה חדש)...</option>
+                                    <option value="__other__" className="font-bold text-amber-500">אחר (הוסף שדה חדש)...</option>
                                   </select>
                                 </div>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">רוחב השדה בשורה</label>
-                              <select
-                                value={field.widthPercentage || 100}
-                                onChange={(e) => handleFieldChange(idx, { widthPercentage: Number(e.target.value) })}
-                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                              >
-                                {WIDTH_OPTIONS.map(w => (
-                                  <option key={w.id} value={w.id}>{w.label}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">אייקון תצוגה</label>
-                              <select
-                                value={field.icon || ""}
-                                onChange={(e) => handleFieldChange(idx, { icon: e.target.value })}
-                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                              >
-                                {ICON_OPTIONS.map(i => (
-                                  <option key={i.id} value={i.id}>{i.label}</option>
-                                ))}
-                              </select>
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/5">
-                              <div>
-                                <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע רקע</label>
-                                <input
-                                  type="color"
-                                  value={field.bgColor || "#09090b"}
-                                  onChange={(e) => handleFieldChange(idx, { bgColor: e.target.value })}
-                                  className="w-full h-8 rounded cursor-pointer border-0 p-0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע מסגרת</label>
-                                <input
-                                  type="color"
-                                  value={field.borderColor || "#ffffff"}
-                                  onChange={(e) => handleFieldChange(idx, { borderColor: e.target.value })}
-                                  className="w-full h-8 rounded cursor-pointer border-0 p-0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע פוקוס (זהב)</label>
-                                <input
-                                  type="color"
-                                  value={field.focusColor || "#f59e0b"}
-                                  onChange={(e) => handleFieldChange(idx, { focusColor: e.target.value })}
-                                  className="w-full h-8 rounded cursor-pointer border-0 p-0"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 pt-6">
-                              <input
-                                id={`field-required-${idx}`}
-                                type="checkbox"
-                                checked={field.required}
-                                onChange={(e) => handleFieldChange(idx, { required: e.target.checked })}
-                                className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
-                              />
-                              <label htmlFor={`field-required-${idx}`} className="font-bold text-white cursor-pointer">
-                                שדה חובה למילוי?
-                              </label>
-                            </div>
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">שלב בטופס (עבור טופס רב-שלבי - נשמר אוטומטית לפי מיקום חוצץ השלב)</label>
-                              <input
-                                type="number"
-                                min="1"
-                                max="10"
-                                value={field.step || 1}
-                                onChange={(e) => handleFieldChange(idx, { step: parseInt(e.target.value) || 1 })}
-                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none opacity-50"
-                                disabled
-                              />
-                            </div>
-                            </>
-                            )}
-                          </div>
+                                
+                                <div className="border-t border-white/5 pt-3">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <input
+                                      id={`field-map-2-${idx}`}
+                                      type="checkbox"
+                                      checked={!!field.map_to_2}
+                                      onChange={(e) => handleFieldChange(idx, { map_to_2: e.target.checked ? "notes" : undefined })}
+                                      className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                    />
+                                    <label htmlFor={`field-map-2-${idx}`} className="font-bold text-white cursor-pointer">
+                                      מפה לשדה נוסף ב-CRM (מיפוי כפול)
+                                    </label>
+                                  </div>
+                                  {field.map_to_2 && (
+                                    <div>
+                                      <select
+                                        value={field.map_to_2}
+                                        onChange={(e) => {
+                                          if (e.target.value === "__other__") {
+                                            setShowAddCustomFieldModal(true);
+                                          } else {
+                                            handleFieldChange(idx, { map_to_2: e.target.value });
+                                          }
+                                        }}
+                                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none mt-1"
+                                      >
+                                        {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
+                                          <option key={k} value={k}>{v}</option>
+                                        ))}
+                                        {customFields.length > 0 && <optgroup label="שדות מותאמים אישית">
+                                          {customFields.map(cf => (
+                                            <option key={cf.id} value={cf.id}>{cf.label}</option>
+                                          ))}
+                                        </optgroup>}
+                                        <option value="__other__" className="font-bold text-amber-400">אחר (הוסף שדה חדש)...</option>
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
 
-                          {field.type === "select" && (
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">אפשרויות לבחירה (כל אפשרות בשורה חדשה)</label>
-                              <textarea
-                                value={field.options}
-                                onChange={(e) => handleFieldChange(idx, { options: e.target.value })}
-                                rows={3}
-                                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-3 outline-none resize-none font-mono"
-                                placeholder="אפשרות א'&#10;אפשרות ב'&#10;אפשרות ג'"
-                              />
-                            </div>
-                          )}
-
-                          {["hidden", "fixed_amount", "rich_text_display"].includes(field.type) && (
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">
-                                {field.type === "rich_text_display" ? "תוכן טקסט עשיר (HTML)" : "ערך קבוע / ברירת מחדל"}
-                              </label>
-                              {field.type === "rich_text_display" ? (
-                                <textarea
-                                  value={field.default_value || ""}
-                                  onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
-                                  className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono text-left"
-                                  placeholder="<p>הכנס HTML כאן</p>"
-                                  rows={4}
-                                />
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={field.default_value || ""}
-                                  onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
-                                  className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                                  placeholder="הזן ערך מוגדר מראש"
-                                />
-                              )}
-                            </div>
-                          )}
-
-                          {field.type === "image_display" && (
-                            <div>
-                              <label className="block font-semibold mb-1 text-slate-400">בחר תמונה להצגה בטופס</label>
-                              <ImageUpload
-                                currentImage={field.default_value || ""}
-                                onSelect={(url) => handleFieldChange(idx, { default_value: url })}
-                              />
-                            </div>
-                          )}
-
-                          {field.type === "calculated" && (
-                            <div className="bg-amber-900/20 p-4 rounded-xl border border-amber-500/30">
-                              <label className="block font-semibold mb-1 text-amber-300">נוסחת חישוב חשבונית</label>
-                              <p className="text-amber-400 mb-2 text-xs">
-                                כתוב נוסחה חשבונית (כפל <code>*</code>, חילוק <code>/</code>, חיבור <code>+</code>, חיסור <code>-</code>).<br/>
-                                כדי להשתמש בערך של שדה אחר, הקלד את שם השדה בתוך סוגריים מרובעים. לדוגמה: <code>[כמות משתתפים] * 50 + 10</code>
-                              </p>
-                              <input
-                                type="text"
-                                value={field.calc_formula || ""}
-                                onChange={(e) => handleFieldChange(idx, { calc_formula: e.target.value })}
-                                className="w-full bg-zinc-950 text-white border border-amber-500/30 rounded-xl p-3 outline-none font-mono text-left"
-                                placeholder="e.g. [amount] * 0.17"
-                                dir="ltr"
-                              />
-                            </div>
-                          )}
-
-                          {/* URL params */}
-                          <div className="border-t border-white/5 pt-3 flex flex-wrap gap-4 items-center">
-                            <div className="flex items-center gap-2">
-                              <input
-                                id={`field-url-${idx}`}
-                                type="checkbox"
-                                checked={field.url_param_enable}
-                                onChange={(e) => handleFieldChange(idx, { url_param_enable: e.target.checked })}
-                                className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
-                              />
-                              <label htmlFor={`field-url-${idx}`} className="font-bold text-white cursor-pointer">
-                                משיכת ערך מפרמטר בכתובת URL?
-                              </label>
-                            </div>
-                            {field.url_param_enable && (
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-400">שם הפרמטר ב-URL:</span>
-                                <input
-                                  type="text"
-                                  value={field.url_param_name}
-                                  onChange={(e) => handleFieldChange(idx, { url_param_name: e.target.value })}
-                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none w-32"
-                                  placeholder="e.g. promo"
-                                />
+                                <div className="border-t border-white/5 pt-3">
+                                  <label className="block font-semibold mb-1 text-slate-400">שיוך לקהילה</label>
+                                  <select
+                                    value={field.communityId || ""}
+                                    onChange={(e) => handleFieldChange(idx, { communityId: e.target.value })}
+                                    className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                  >
+                                    <option value="">-- ללא שיוך לקהילה מסוימת --</option>
+                                    {communities.map(c => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
                               </div>
                             )}
-                          </div>
 
-                          {/* Conditional Logic */}
-                          <div className="border-t border-white/5 pt-3 space-y-3">
-                            <div className="flex items-center gap-2">
-                              <input
-                                id={`field-cond-${idx}`}
-                                type="checkbox"
-                                checked={field.cond_enable}
-                                onChange={(e) => handleFieldChange(idx, { cond_enable: e.target.checked })}
-                                className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
-                              />
-                              <label htmlFor={`field-cond-${idx}`} className="font-bold text-white cursor-pointer">
-                                הפעל לוגיקה תנאית (Conditional Logic)?
-                              </label>
-                            </div>
-                            
-                            {field.cond_enable && (
-                              <div className="bg-amber-900/20 border border-amber-500/30 p-3.5 rounded-2xl flex flex-wrap gap-3 items-center">
-                                <span className="text-white">הצג שדה זה רק אם שדה:</span>
-                                <select
-                                  value={field.cond_field_index}
-                                  onChange={(e) => handleFieldChange(idx, { cond_field_index: parseInt(e.target.value) })}
-                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none min-w-[120px]"
-                                >
-                                  <option value="">בחר שדה...</option>
-                                  {selectFields
-                                    .filter(f => f.index !== idx)
-                                    .map(f => (
-                                      <option key={f.index} value={f.index}>{f.label}</option>
-                                    ))
-                                  }
-                                </select>
-                                <select
-                                  value={field.cond_operator}
-                                  onChange={(e) => handleFieldChange(idx, { cond_operator: e.target.value })}
-                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
-                                >
-                                  <option value="is">שווה ל-</option>
-                                  <option value="is_not">שונה מ-</option>
-                                </select>
-                                <input
-                                  type="text"
-                                  value={field.cond_value}
-                                  onChange={(e) => handleFieldChange(idx, { cond_value: e.target.value })}
-                                  placeholder="הזן ערך"
-                                  className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none w-32"
-                                />
+                            {/* Tab: Advanced */}
+                            {activeFieldTab === "advanced" && (
+                              <div className="flex flex-col gap-4 animate-in fade-in">
+                                <div className="flex items-center gap-2 pb-2">
+                                  <input
+                                    id={`field-required-${idx}`}
+                                    type="checkbox"
+                                    checked={field.required}
+                                    onChange={(e) => handleFieldChange(idx, { required: e.target.checked })}
+                                    className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                  />
+                                  <label htmlFor={`field-required-${idx}`} className="font-bold text-white cursor-pointer">
+                                    שדה חובה למילוי?
+                                  </label>
+                                </div>
+
+                                {/* URL params */}
+                                <div className="border-t border-white/5 pt-4 flex flex-col gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      id={`field-url-${idx}`}
+                                      type="checkbox"
+                                      checked={field.url_param_enable}
+                                      onChange={(e) => handleFieldChange(idx, { url_param_enable: e.target.checked })}
+                                      className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                    />
+                                    <label htmlFor={`field-url-${idx}`} className="font-bold text-white cursor-pointer">
+                                      משיכת ערך מפרמטר בכתובת URL?
+                                    </label>
+                                  </div>
+                                  {field.url_param_enable && (
+                                    <div className="flex items-center gap-1.5 pr-6">
+                                      <span className="text-slate-400">שם הפרמטר ב-URL:</span>
+                                      <input
+                                        type="text"
+                                        value={field.url_param_name}
+                                        onChange={(e) => handleFieldChange(idx, { url_param_name: e.target.value })}
+                                        className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none w-32"
+                                        placeholder="e.g. promo"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Conditional Logic */}
+                                <div className="border-t border-white/5 pt-4 flex flex-col gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      id={`field-cond-${idx}`}
+                                      type="checkbox"
+                                      checked={field.cond_enable}
+                                      onChange={(e) => handleFieldChange(idx, { cond_enable: e.target.checked })}
+                                      className="w-4 h-4 text-amber-500 rounded border-slate-700 bg-slate-800"
+                                    />
+                                    <label htmlFor={`field-cond-${idx}`} className="font-bold text-white cursor-pointer">
+                                      הפעל לוגיקה תנאית (Conditional Logic)?
+                                    </label>
+                                  </div>
+                                  
+                                  {field.cond_enable && (
+                                    <div className="bg-amber-900/20 border border-amber-500/30 p-3.5 rounded-2xl flex flex-wrap gap-3 items-center mt-2">
+                                      <span className="text-white">הצג שדה זה רק אם שדה:</span>
+                                      <select
+                                        value={field.cond_field_index}
+                                        onChange={(e) => handleFieldChange(idx, { cond_field_index: parseInt(e.target.value) })}
+                                        className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none min-w-[120px]"
+                                      >
+                                        <option value="">בחר שדה...</option>
+                                        {selectFields
+                                          .filter(f => f.index !== idx)
+                                          .map(f => (
+                                            <option key={f.index} value={f.index}>{f.label}</option>
+                                          ))
+                                        }
+                                      </select>
+                                      <select
+                                        value={field.cond_operator}
+                                        onChange={(e) => handleFieldChange(idx, { cond_operator: e.target.value })}
+                                        className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none"
+                                      >
+                                        <option value="is">שווה ל-</option>
+                                        <option value="is_not">שונה מ-</option>
+                                      </select>
+                                      <input
+                                        type="text"
+                                        value={field.cond_value}
+                                        onChange={(e) => handleFieldChange(idx, { cond_value: e.target.value })}
+                                        placeholder="הזן ערך"
+                                        className="bg-zinc-950 text-white border border-white/10 rounded-xl p-2 outline-none w-32"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
