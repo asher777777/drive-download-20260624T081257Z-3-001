@@ -677,7 +677,7 @@ export async function submitCRMForm(params: {
     }
     // -------------------------
 
-    const finalOwnerId = formConfig.crm_owner_id || ownerId;
+    const finalOwnerId = formConfig.crm_owner_id || ownerId || "1";
     const contactsRef = adminDb.collection("contacts");
     const querySnapshot = await contactsRef
       .where("ownerId", "==", finalOwnerId)

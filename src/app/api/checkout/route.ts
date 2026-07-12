@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { auth } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "לא נמצא משתמש מחובר" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { plan, amount, name, email, phone } = body;
 
@@ -32,7 +39,7 @@ export async function POST(request: Request) {
           CreditType: "1",
           Date: new Date().toISOString().split("T")[0],
           Comment: `תשלום עבור תוכנית ${plan} במחולל הקהילות`,
-          AddData: `SAAS_${Date.now()}`,
+          AddData: `SAAS_${userId}_${plan}_${Date.now()}`,
           NumPayment: 1,
           MaxPayments: 1,
           Moked: "CommunityGenerator"
