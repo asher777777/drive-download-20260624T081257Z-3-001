@@ -73,6 +73,9 @@ export interface FormConfig {
   submit_button_text_color: string;
   continue_button_text?: string;
   continue_button_icon?: string;
+  back_button_text?: string;
+  back_button_bg_color?: string;
+  back_button_text_color?: string;
   step_configs?: FormStepConfig[];
   form_bg_color?: string;
   field_bg_color?: string;
@@ -1680,6 +1683,46 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                           className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
                         />
                         <span className="font-mono text-white">{value.submit_button_text_color}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2 mt-4">
+                    עיצוב כפתור חזור (לשלב הקודם)
+                  </h4>
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור חזור</label>
+                    <input
+                      type="text"
+                      value={value.back_button_text || ""}
+                      onChange={(e) => updateConfig({ back_button_text: e.target.value })}
+                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      placeholder="חזור"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע כפתור חזור</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.back_button_bg_color || "#27272a"} // zinc-800
+                          onChange={(e) => updateConfig({ back_button_bg_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-white">{value.back_button_bg_color || "ברירת מחדל (שקוף/כהה)"}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע טקסט כפתור חזור</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.back_button_text_color || "#cbd5e1"} // slate-300
+                          onChange={(e) => updateConfig({ back_button_text_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-white">{value.back_button_text_color || "ברירת מחדל (אפור)"}</span>
                       </div>
                     </div>
                   </div>

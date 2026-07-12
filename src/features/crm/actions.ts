@@ -599,8 +599,14 @@ export async function submitCRMForm(params: {
   amountPaid?: number;
   transactionId?: string;
 }) {
+  let ownerId = "";
   try {
-    const ownerId = await getUserId();
+    ownerId = await getUserId();
+  } catch (e) {
+    // Anonymous user (not logged in)
+  }
+
+  try {
     const { formData, formConfig, formTitle, embeddingPostTitle, status, amountPaid, formType } = params;
 
     const contactData: Record<string, any> = {};

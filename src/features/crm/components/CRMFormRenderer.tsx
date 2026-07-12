@@ -630,7 +630,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 relative z-10">
           <div className="flex items-center gap-2 text-amber-500 border-b pb-3 mb-4">
             <Coins className="w-5 h-5 text-amber-400" />
-            <h4 className="font-bold text-base">תשלום מאובטח</h4>
+            <div className="font-bold text-base">תשלום מאובטח</div>
           </div>
           
           <div className="bg-slate-50 p-4 rounded-2xl border text-xs space-y-1.5 mb-2">
@@ -640,14 +640,34 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             <div><strong className="text-slate-400">סכום לחיוב:</strong> <span className="font-black text-amber-500">₪{checkoutData.amount}</span></div>
           </div>
 
-          <KesherCheckout
-            amount={checkoutData.amount}
-            description={formTitle}
-            onSuccess={handlePaymentSuccess}
-            paymentFrequency={ccData.paymentMethod === "recurring" ? "recurring" : "one-time"}
-            installments={ccData.installments}
-            isInstallmentsMapped={!!visibleFields.find(f => f.type === "payment_summary")}
-          />
+          {(() => {
+            const summaryField = visibleFields.find(f => f.type === "payment_summary");
+            const allowedMethods = summaryField?.payment_methods || ["one-time"];
+            const effectivePaymentMethod = allowedMethods.length === 1 ? allowedMethods[0] : ccData.paymentMethod;
+            let effectiveInstallments = ccData.installments;
+            
+            if (effectivePaymentMethod === "recurring") {
+              const limit = summaryField?.payment_recurring_limit || "user-choice";
+              if (limit !== "user-choice") {
+                effectiveInstallments = limit === "unlimited" ? 9999 : Number(limit);
+              } else if (effectiveInstallments === 1) {
+                effectiveInstallments = 9999;
+              }
+            } else if (effectivePaymentMethod === "one-time") {
+              effectiveInstallments = 1;
+            }
+
+            return (
+              <KesherCheckout
+                amount={checkoutData.amount}
+                description={formTitle}
+                onSuccess={handlePaymentSuccess}
+                paymentFrequency={effectivePaymentMethod === "recurring" ? "recurring" : "one-time"}
+                installments={effectiveInstallments}
+                isInstallmentsMapped={!!summaryField}
+              />
+            );
+          })()}
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
@@ -697,9 +717,9 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                   {(() => { const StepIcon = IconMap[currentStepConf.icon]; return <StepIcon className="w-5 h-5" />; })()}
                 </div>
               )}
-              <h3 className="text-xl font-bold" style={{ color: currentStepConf.textColor || '#ffffff' }}>
+              <div className="text-xl font-bold" style={{ color: currentStepConf.textColor || '#ffffff' }}>
                 {currentStepConf.title}
-              </h3>
+              </div>
             </div>
           ) : null}
 
@@ -748,7 +768,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                   <div className="prose prose-invert prose-sm max-w-none text-slate-300 my-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 leading-relaxed" dangerouslySetInnerHTML={{ __html: field.default_value }} />
                 ) : field.type === "payment_summary" ? (
                   <div className="bg-zinc-900/40 p-4 sm:p-6 rounded-2xl border mb-6" style={customFieldStyle}>
-                    <h3 className="text-xl font-bold mb-4 text-[var(--field-focus)]" style={customFieldStyle}>תשלום מאובטח</h3>
+                    <div className="text-xl font-bold mb-4 text-[var(--field-focus)]" style={customFieldStyle}>תשלום מאובטח</div>
                     
                     <div className="space-y-4">
                       <div className="flex justify-between items-center bg-zinc-950/50 p-3 rounded-xl border border-white/5">
@@ -757,72 +777,102 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                       </div>
 
                       {/* Payment Settings Options */}
-                      <div className="pt-2 border-t border-white/5 space-y-3">
-                        <label className="text-sm font-bold text-slate-300">אופן תשלום</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {((field as any).payment_methods || ["one-time"]).includes("one-time") && (
-                            <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
-                              <input type="radio" name="paymentMethod" value="one-time" 
-                                checked={ccData.paymentMethod === "one-time"} 
-                                onChange={() => setCcData({...ccData, paymentMethod: "one-time", installments: 1})}
-                                className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
-                              />
-                              תשלום חד פעמי
-                            </label>
-                          )}
-                          {((field as any).payment_methods || ["one-time"]).includes("installments") && (
-                            <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
-                              <input type="radio" name="paymentMethod" value="installments" 
-                                checked={ccData.paymentMethod === "installments"} 
-                                onChange={() => setCcData({...ccData, paymentMethod: "installments"})}
-                                className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
-                              />
-                              תשלומים
-                            </label>
-                          )}
-                          {((field as any).payment_methods || ["one-time"]).includes("recurring") && (
-                            <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
-                              <input type="radio" name="paymentMethod" value="recurring" 
-                                checked={ccData.paymentMethod === "recurring"} 
-                                onChange={() => setCcData({...ccData, paymentMethod: "recurring", installments: 9999})}
-                                className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
-                              />
-                              הוראת קבע
-                            </label>
-                          )}
-                        </div>
+                      {(() => {
+                        const allowedMethods = (field as any).payment_methods || ["one-time"];
+                        const isSingleMethod = allowedMethods.length === 1;
+                        const effectiveMethod = isSingleMethod ? allowedMethods[0] : ccData.paymentMethod;
+                        
+                        let effectiveInstallments = ccData.installments;
+                        if (effectiveMethod === "recurring") {
+                          const limit = (field as any).payment_recurring_limit || "user-choice";
+                          if (limit !== "user-choice") effectiveInstallments = limit === "unlimited" ? 9999 : Number(limit);
+                        }
 
-                        {ccData.paymentMethod === "installments" && (
-                          <div className="mt-3">
-                            <label className="text-xs font-bold text-slate-400 mb-2 block">מספר תשלומים</label>
-                            <select 
-                              className="w-full bg-zinc-950 text-white p-3 rounded-xl border border-white/10 outline-none focus:border-amber-500"
-                              value={ccData.installments}
-                              onChange={e => setCcData({...ccData, installments: Number(e.target.value)})}
-                            >
-                              {Array.from({length: 12}).map((_, i) => (
-                                <option key={i} value={i+2}>{i+2} תשלומים</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
+                        return (
+                          <div className="pt-4 border-t border-white/5 space-y-4">
+                            {!isSingleMethod && (
+                              <>
+                                <label className="text-sm font-bold text-[var(--field-focus)]" style={customFieldStyle}>אופן תשלום</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {allowedMethods.includes("one-time") && (
+                                    <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
+                                      <input type="radio" name="paymentMethod" value="one-time" 
+                                        checked={effectiveMethod === "one-time"} 
+                                        onChange={() => setCcData({...ccData, paymentMethod: "one-time", installments: 1})}
+                                        className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
+                                      />
+                                      תשלום חד פעמי
+                                    </label>
+                                  )}
+                                  {allowedMethods.includes("installments") && (
+                                    <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
+                                      <input type="radio" name="paymentMethod" value="installments" 
+                                        checked={effectiveMethod === "installments"} 
+                                        onChange={() => setCcData({...ccData, paymentMethod: "installments"})}
+                                        className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
+                                      />
+                                      תשלומים
+                                    </label>
+                                  )}
+                                  {allowedMethods.includes("recurring") && (
+                                    <label className="flex items-center gap-2 text-white text-sm cursor-pointer border border-white/5 bg-zinc-950 p-3 rounded-xl hover:bg-zinc-800 transition-colors">
+                                      <input type="radio" name="paymentMethod" value="recurring" 
+                                        checked={effectiveMethod === "recurring"} 
+                                        onChange={() => setCcData({...ccData, paymentMethod: "recurring", installments: 9999})}
+                                        className="text-amber-500 focus:ring-amber-500 bg-zinc-900 border-white/20"
+                                      />
+                                      הוראת קבע
+                                    </label>
+                                  )}
+                                </div>
+                              </>
+                            )}
 
-                        {ccData.paymentMethod === "recurring" && ((field as any).payment_recurring_limit === "user-choice") && (
-                          <div className="mt-3">
-                            <label className="text-xs font-bold text-slate-400 mb-2 block">מספר חיובים</label>
-                            <select 
-                              className="w-full bg-zinc-950 text-white p-3 rounded-xl border border-white/10 outline-none focus:border-amber-500"
-                              value={ccData.installments}
-                              onChange={e => setCcData({...ccData, installments: Number(e.target.value)})}
-                            >
-                              <option value="9999">ללא הגבלה (חיוב מתחדש קבוע)</option>
-                              {Array.from({length: 36}).map((_, i) => (
-                                <option key={i} value={i+1}>{i+1} חיובים</option>
-                              ))}
-                            </select>
+                            {effectiveMethod === "installments" && (
+                              <div className="mt-3">
+                                <label className="text-xs font-bold text-slate-400 mb-2 block">מספר תשלומים</label>
+                                <select 
+                                  className="w-full bg-zinc-950 text-white p-3 rounded-xl border border-white/10 outline-none focus:border-amber-500"
+                                  value={effectiveInstallments}
+                                  onChange={e => setCcData({...ccData, installments: Number(e.target.value)})}
+                                >
+                                  {Array.from({length: 12}).map((_, i) => (
+                                    <option key={i} value={i+2}>{i+2} תשלומים</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            {effectiveMethod === "recurring" && ((field as any).payment_recurring_limit === "user-choice") && (
+                              <div className="mt-3">
+                                <label className="text-xs font-bold text-slate-400 mb-2 block">מספר חיובים</label>
+                                <select 
+                                  className="w-full bg-zinc-950 text-white p-3 rounded-xl border border-white/10 outline-none focus:border-amber-500"
+                                  value={effectiveInstallments}
+                                  onChange={e => setCcData({...ccData, installments: Number(e.target.value)})}
+                                >
+                                  <option value="9999">ללא הגבלה (חיוב מתחדש קבוע)</option>
+                                  {Array.from({length: 36}).map((_, i) => (
+                                    <option key={i} value={i+1}>{i+1} חיובים</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            {effectiveMethod === "recurring" && (
+                              <div className="mt-4 p-3.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                                <p className="text-sm font-bold text-indigo-400 mb-1">פרטי העסקה (הוראת קבע)</p>
+                                <p className="text-sm text-indigo-200/80 leading-relaxed">
+                                  יבוצע חיוב חודשי על סך <strong className="text-white">₪{getPaymentAmount().toLocaleString()}</strong>
+                                  {effectiveInstallments === 9999 
+                                    ? " באופן קבוע (עד ביטול)." 
+                                    : ` למשך ${effectiveInstallments} חודשים (סך הכל ₪${(getPaymentAmount() * effectiveInstallments).toLocaleString()}).`}
+                                </p>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 ) : field.type === "payment_cc" ? (
@@ -1110,10 +1160,18 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 type="button"
                 onClick={handlePrevStep}
                 variant="outline"
-                className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border border-white/10 text-slate-300 hover:bg-white/5 cursor-pointer"
+                style={config.back_button_bg_color || config.back_button_text_color ? {
+                  backgroundColor: config.back_button_bg_color || 'transparent',
+                  color: config.back_button_text_color || '#cbd5e1',
+                  borderColor: config.back_button_text_color ? `${config.back_button_text_color}40` : 'rgba(255,255,255,0.1)'
+                } : undefined}
+                className={cn(
+                  "flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border cursor-pointer transition-all hover:opacity-80",
+                  !(config.back_button_bg_color || config.back_button_text_color) && "border-white/10 text-slate-300 bg-transparent hover:bg-white/5"
+                )}
               >
                 <ChevronRight className="w-4 h-4" />
-                חזור
+                {config.back_button_text || "חזור"}
               </Button>
             )}
             
