@@ -103,7 +103,7 @@ export async function POST(request: Request) {
           Token: null,
           Expiry: expiry, // YYMM
           Cvv2: cvv2,
-          Total: Number(amount) + "00", // Required format: adding "00"
+          Total: Math.round(Number(amount) * 100).toString(), // Required format: Agorot as string
           Currency: 1, // 1 = ILS
           CreditType: creditType,
           NumPayment: numPayments,

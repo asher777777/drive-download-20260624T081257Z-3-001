@@ -86,7 +86,7 @@ export async function createManualInvoice(data: any) {
         cashTran: {
           Bank: data.bankName || "",
           Phone: data.phone || "",
-          Total: Number(data.amount),
+          Total: Math.round(Number(data.amount) * 100).toString(),
           Branch: data.branchNumber || "",
           Account: data.accountNumber || "",
           Currency: 1, // ILS
