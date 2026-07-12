@@ -91,8 +91,8 @@ export const ImageListingSection = ({
       {/* Form Modal */}
       {selectedImageForm && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <Modal.Content className="max-w-md w-[95vw] p-0 overflow-hidden bg-transparent border-0 shadow-2xl">
-            <Modal.Close />
+          <Modal.Content className="max-w-md w-[95vw] p-0 overflow-hidden bg-transparent border-0 shadow-2xl relative">
+            <Modal.Close className="z-50 top-6 left-6 !right-auto text-slate-400 hover:text-white bg-black/50 p-2 rounded-full" />
             
             <Modal.Body className="max-h-[85vh] p-0 custom-scrollbar">
               <CRMFormRenderer 

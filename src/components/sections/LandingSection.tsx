@@ -249,7 +249,7 @@ export function LandingSection({
                   <Modal isOpen={isUserFormModalOpen} onClose={() => setIsUserFormModalOpen(false)}>
                     <Modal.Content className="max-w-[480px] p-0 bg-transparent border-0 shadow-none">
                       <div className="relative">
-                        <Modal.Close className="top-4 right-4 text-slate-400 hover:text-white" />
+                        <Modal.Close className="z-50 top-6 left-6 !right-auto text-slate-400 hover:text-white bg-black/50 p-2 rounded-full" />
                         {form?.enabled ? (
                           <CRMFormRenderer
                             config={form}

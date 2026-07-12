@@ -244,7 +244,12 @@ export const Hero = ({
                 <HeroActions />
                 {formMode === "modal" && form && (
                   <Modal isOpen={isRegisterModalOpen} onClose={() => setIsRegisterModalOpen(false)}>
-                    <CRMFormRenderer config={form} formId={id || "hero"} formTitle={title} />
+                    <Modal.Content className="max-w-xl p-0 bg-[#111111] overflow-hidden border border-white/10 rounded-[2rem] shadow-2xl">
+                      <Modal.Close className="text-white hover:text-amber-500 z-50 absolute top-4 left-4" />
+                      <div className="p-6 sm:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar relative">
+                        <CRMFormRenderer config={form} formId={id || "hero"} formTitle={title} />
+                      </div>
+                    </Modal.Content>
                   </Modal>
                 )}
               </div>

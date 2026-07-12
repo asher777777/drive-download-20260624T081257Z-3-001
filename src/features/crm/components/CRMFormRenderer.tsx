@@ -10,21 +10,7 @@ import { submitCRMForm } from "@/features/crm/actions";
 import { KesherCheckout } from "@/features/kesher/KesherCheckout";
 import { cn } from "@/lib/utils";
 
-const IconMap: Record<string, any> = {
-  "user": User,
-  "phone": Phone,
-  "mail": Mail,
-  "map-pin": MapPin,
-  "building": Building,
-  "briefcase": Briefcase,
-  "calendar": Calendar,
-  "file-text": FileText,
-  "heart": Heart,
-  "smile": Smile,
-  "alert-circle": AlertCircle,
-  "credit-card": CreditCard,
-  "coins": Coins,
-};
+import * as LucideIcons from "lucide-react";
 
 const evaluateFormula = (formula: string, data: Record<string, string>) => {
   if (!formula) return 0;
@@ -741,9 +727,9 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           {/* Current Step Header */}
           {currentStepConf ? (
             <div className="mb-6 pb-4 border-b border-white/10 flex items-center justify-center gap-3">
-              {currentStepConf.icon && IconMap[currentStepConf.icon] && (
+              {currentStepConf.icon && (LucideIcons as any)[currentStepConf.icon] && (
                 <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30">
-                  {(() => { const StepIcon = IconMap[currentStepConf.icon]; return <StepIcon className="w-5 h-5" />; })()}
+                  {(() => { const StepIcon = (LucideIcons as any)[currentStepConf.icon]; return <StepIcon className="w-5 h-5" />; })()}
                 </div>
               )}
               <div className="text-xl font-bold" style={{ color: currentStepConf.textColor || '#ffffff' }}>
@@ -763,7 +749,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             if (!isHiddenOrFixed && field._calculatedStep !== currentStep) return null;
 
             const hasError = errors[field.label];
-            const FieldIcon = field.icon ? IconMap[field.icon] : null;
+            const FieldIcon = field.icon ? (LucideIcons as any)[field.icon] : null;
 
             const customFieldStyle = {
               ...fieldBgStyle,

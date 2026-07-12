@@ -13,7 +13,9 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { getCommunities } from "@/features/communities/actions";
 import { IconPicker } from "@/components/ui/IconPicker";
+import dynamic from "next/dynamic";
 
+const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor").then(m => m.RichTextEditor), { ssr: false });
 export interface FormField {
   label: string;
   type: string; // text, tel, email, textarea, select, number, fixed_amount, hidden, step
@@ -823,13 +825,13 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                           {field.type === "rich_text_display" ? "תוכן טקסט עשיר (HTML)" : "ערך קבוע / ברירת מחדל"}
                                         </label>
                                         {field.type === "rich_text_display" ? (
-                                          <textarea
-                                            value={field.default_value || ""}
-                                            onChange={(e) => handleFieldChange(idx, { default_value: e.target.value })}
-                                            className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono text-left"
-                                            placeholder="<p>הכנס HTML כאן</p>"
-                                            rows={4}
-                                          />
+                                          <div className="w-full bg-zinc-950 text-slate-800 rounded-xl overflow-hidden mt-2">
+                                            <RichTextEditor
+                                              value={field.default_value || ""}
+                                              onChange={(val) => handleFieldChange(idx, { default_value: val })}
+                                              placeholder="הכנס תוכן מעוצב או HTML כאן..."
+                                            />
+                                          </div>
                                         ) : (
                                           <input
                                             type="text"
