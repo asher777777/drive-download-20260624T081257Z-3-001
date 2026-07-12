@@ -197,28 +197,33 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                         value={img} 
                         className="flex flex-col bg-[#111] rounded-xl border border-white/5 relative overflow-hidden"
                       >
-                        <div className="flex gap-4 p-4 items-center group relative">
-                          <div className="text-slate-500 cursor-grab active:cursor-grabbing hover:text-white transition-colors">
-                            <GripVertical className="w-5 h-5" />
+                        <div className="flex flex-col gap-4 p-4 group relative">
+                          <div className="flex items-center gap-4">
+                            <div className="text-slate-500 cursor-grab active:cursor-grabbing hover:text-white transition-colors shrink-0">
+                              <GripVertical className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 overflow-x-auto overflow-y-hidden">
+                              <ImageUpload
+                                currentImage={img.url}
+                                onSelect={(url) => handleUpdateImage(index, url)}
+                                size="sm"
+                              />
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <ImageUpload
-                              currentImage={img.url}
-                              onSelect={(url) => handleUpdateImage(index, url)}
-                            />
+                          <div>
+                            <button
+                              onClick={() => setEditingFormIndex(editingFormIndex === index ? null : index)}
+                              className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 w-fit ${
+                                editingFormIndex === index || (img.form && img.form.enabled)
+                                  ? "bg-amber-500 text-black hover:bg-amber-400 border border-amber-400"
+                                  : "bg-[#222] text-slate-300 hover:bg-[#333] hover:text-white border border-white/10"
+                              }`}
+                            >
+                              <FormInput className="w-4 h-4" /> 
+                              {img.form && img.form.enabled ? 'ערוך טופס ספציפי' : 'הוסף טופס'}
+                              {editingFormIndex === index ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
                           </div>
-                          <button
-                            onClick={() => setEditingFormIndex(editingFormIndex === index ? null : index)}
-                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${
-                              editingFormIndex === index || (img.form && img.form.enabled)
-                                ? "bg-amber-500 text-black hover:bg-amber-400 border border-amber-400"
-                                : "bg-[#222] text-slate-300 hover:bg-[#333] hover:text-white border border-white/10"
-                            }`}
-                          >
-                            <FormInput className="w-4 h-4" /> 
-                            {img.form && img.form.enabled ? 'ערוך טופס ספציפי' : 'הוסף טופס'}
-                            {editingFormIndex === index ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </button>
                           
                           <div className="absolute left-2 top-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all">
                             <button

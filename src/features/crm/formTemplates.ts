@@ -44,6 +44,24 @@ export async function saveFormTemplate(name: string, config: any): Promise<{ suc
   }
 }
 
+export async function updateFormTemplate(id: string, name: string, config: any): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) throw new Error("Unauthorized");
+
+    await adminDb.collection("form_templates").doc(id).update({
+      name,
+      config,
+      updatedAt: new Date().toISOString()
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating form template:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function deleteFormTemplate(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await auth();

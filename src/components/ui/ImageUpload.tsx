@@ -35,10 +35,11 @@ interface ImageUploadProps {
   preserveFormat?: boolean;
   compact?: boolean;
   multiple?: boolean;
+  size?: 'default' | 'sm';
   customTrigger?: (onClick: () => void) => React.ReactNode;
 }
 
-export function ImageUpload({ onSelect, currentImage, preserveFormat = false, compact = false, multiple = false, customTrigger }: ImageUploadProps) {
+export function ImageUpload({ onSelect, currentImage, preserveFormat = false, compact = false, multiple = false, size = 'default', customTrigger }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
@@ -421,7 +422,7 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
       ) : (
         <div className={`flex ${compact ? "flex-col" : "gap-2"}`}>
           <div className="flex gap-2">
-            <div className={`relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary transition-colors flex flex-col items-center justify-center bg-muted/30 ${compact ? "h-16 w-full max-w-xs" : "h-32 w-32"}`}>
+            <div className={`relative group cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-primary/20 hover:border-secondary transition-colors flex flex-col items-center justify-center bg-muted/30 ${compact ? "h-16 w-full max-w-xs" : size === 'sm' ? "h-20 w-20" : "h-32 w-32"}`}>
               <input
                 type="file"
                 accept="image/*,video/mp4,video/webm,video/quicktime"
@@ -437,25 +438,25 @@ export function ImageUpload({ onSelect, currentImage, preserveFormat = false, co
                 </div>
               ) : (
                 <>
-                  <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact ? "h-4 w-4" : ""}`} />
-                  <span className={`font-bold mt-1 uppercase ${compact ? "text-[8px]" : "text-[10px] mt-2"}`}>העלאה חדשה</span>
+                  <ImagePlus className={`text-primary/40 group-hover:text-secondary transition-colors ${compact || size === 'sm' ? "h-4 w-4" : ""}`} />
+                  <span className={`font-bold mt-1 uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[9px]" : "text-[10px] mt-2"}`}>העלאה<br className={size === 'sm' ? 'block' : 'hidden'}/>חדשה</span>
                 </>
               )}
             </div>
 
             <Button
               variant="outline"
-              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 ${compact ? "h-16 w-full max-w-xs gap-1" : "h-32 w-32 gap-2"}`}
+              className={`rounded-xl flex flex-col items-center justify-center border-primary/10 hover:border-primary/30 ${compact ? "h-16 w-full max-w-xs gap-1" : size === 'sm' ? "h-20 w-20 gap-1" : "h-32 w-32 gap-2"}`}
               onClick={() => setShowGallery(true)}
               disabled={isUploading}
             >
-              <Library className={`text-primary/40 ${compact ? "h-4 w-4" : "h-6 w-6"}`} />
-              <span className={`font-bold uppercase ${compact ? "text-[8px]" : "text-[10px]"}`}>גלריית מדיה</span>
+              <Library className={`text-primary/40 ${compact || size === 'sm' ? "h-4 w-4" : "h-6 w-6"}`} />
+              <span className={`font-bold uppercase text-center ${compact ? "text-[8px]" : size === 'sm' ? "text-[9px]" : "text-[10px]"}`}>גלריית<br className={size === 'sm' ? 'block' : 'hidden'}/>מדיה</span>
             </Button>
           </div>
 
           {currentImage && (
-            <div className={`rounded-xl overflow-hidden border relative group ${compact ? "h-32 w-full max-w-sm mt-3" : "h-32 w-32"}`}>
+            <div className={`rounded-xl overflow-hidden border relative group shrink-0 ${compact ? "h-32 w-full max-w-sm mt-3" : size === 'sm' ? "h-20 w-20" : "h-32 w-32"}`}>
               {isVideoUrl(currentImage) ? (
                 <video src={currentImage} className="absolute inset-0 w-full h-full object-cover" muted loop playsInline />
               ) : (

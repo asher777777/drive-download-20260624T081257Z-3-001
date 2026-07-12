@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { getFormTemplates, saveFormTemplate, FormTemplate } from "../formTemplates";
+import { getFormTemplates, saveFormTemplate, updateFormTemplate, FormTemplate } from "../formTemplates";
 import { getCustomFields, addCustomField, getCustomTabs } from "../actions";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
@@ -102,6 +102,8 @@ export interface FormConfig {
   custom_success_modal_image_url?: string;
   crm_save_step?: number;
   register_role?: "DEVELOPING" | "TRIAL";
+  templateId?: string;
+  templateName?: string;
 }
 
 interface CRMFormBuilderProps {
@@ -188,8 +190,8 @@ const FIELD_TYPES = [
 
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
   const value = { ...rawValue, fields: rawValue.fields || [] };
-  const [mainTab, setMainTab] = useState<"settings" | "fields">("settings");
-  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings">("templates");
+  const [mainTab, setMainTab] = useState<"settings" | "fields">("fields");
+  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings" | "">("");
   const [expandedField, setExpandedField] = useState<number | null>(null);
   const [activeFieldTab, setActiveFieldTab] = useState<"settings" | "design" | "mapping" | "advanced">("settings");
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
@@ -197,7 +199,8 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
   const [customTabs, setCustomTabs] = useState<any[]>([]);
   const [communities, setCommunities] = useState<any[]>([]);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-  const [templateName, setTemplateName] = useState("");
+  const [templateName, setTemplateName] = useState(rawValue.templateName || "");
+  const [loadedTemplateId, setLoadedTemplateId] = useState<string | null>(rawValue.templateId || null);
   const [showAddCustomFieldModal, setShowAddCustomFieldModal] = useState(false);
   const [newCustomFieldCategory, setNewCustomFieldCategory] = useState("details");
   const [newCustomFieldType, setNewCustomFieldType] = useState("text");
@@ -234,8 +237,11 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
     setIsSavingTemplate(true);
     const res = await saveFormTemplate(templateName, value);
     if (res.success) {
-      alert("התבנית נשמרה בהצלחה!");
-      setTemplateName("");
+      alert("התבנית נשמרה בהצלחה כחדשה!");
+      if (res.id) {
+        setLoadedTemplateId(res.id);
+        onChange({ ...value, templateId: res.id, templateName: templateName });
+      }
       getFormTemplates().then(setTemplates);
     } else {
       alert("שגיאה בשמירת התבנית: " + res.error);
@@ -243,9 +249,33 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
     setIsSavingTemplate(false);
   };
 
-  const handleLoadTemplate = (templateConfig: FormConfig) => {
+  const handleUpdateTemplate = async () => {
+    if (!loadedTemplateId) return;
+    if (!templateName.trim()) return alert("נא להזין שם לתבנית");
+    setIsSavingTemplate(true);
+    const res = await updateFormTemplate(loadedTemplateId, templateName, value);
+    if (res.success) {
+      alert("התבנית עודכנה בהצלחה!");
+      onChange({ ...value, templateName: templateName });
+      getFormTemplates().then(setTemplates);
+    } else {
+      alert("שגיאה בעדכון התבנית: " + res.error);
+    }
+    setIsSavingTemplate(false);
+  };
+
+  const handleLoadTemplate = (templateConfig: FormConfig, id?: string, name?: string) => {
     if (confirm("האם אתה בטוח? פעולה זו תדרוס את הטופס הנוכחי.")) {
-      onChange(templateConfig);
+      const mergedConfig = { ...templateConfig };
+      if (id) mergedConfig.templateId = id;
+      if (name) mergedConfig.templateName = name;
+      
+      onChange(mergedConfig);
+      
+      if (id && name) {
+        setLoadedTemplateId(id);
+        setTemplateName(name);
+      }
     }
   };
   
@@ -373,7 +403,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                 onChange={(e) => {
                   const t = templates.find(t => t.id === e.target.value);
                   if (t) {
-                    handleLoadTemplate(t.config);
+                    handleLoadTemplate(t.config, t.id, t.name);
                     setMainTab("fields");
                   }
                 }}
@@ -447,7 +477,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                     <select
                       onChange={(e) => {
                         const t = templates.find(t => t.id === e.target.value);
-                        if (t) handleLoadTemplate(t.config);
+                        if (t) handleLoadTemplate(t.config, t.id, t.name);
                         e.target.value = "";
                       }}
                       className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
@@ -459,18 +489,27 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                     </select>
                   </div>
                   <div className="border-t border-white/10 pt-3">
-                    <label className="block font-semibold mb-1 text-slate-400">שמור טופס זה כתבנית</label>
-                    <div className="flex gap-2">
+                    <label className="block font-semibold mb-2 text-slate-400">שמירת טופס זה כתבנית</label>
+                    <div className="flex flex-col gap-3">
                       <input
                         type="text"
                         value={templateName}
                         onChange={(e) => setTemplateName(e.target.value)}
                         placeholder="שם התבנית (למשל: טופס הרשמה לקייטנה)"
-                        className="flex-1 bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
+                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
                       />
-                      <Button type="button" onClick={handleSaveTemplate} disabled={isSavingTemplate} size="sm" className="rounded-xl h-auto flex gap-1 bg-transparent border border-white/10 hover:bg-white/5 text-white p-2.5">
-                        <Folder className={`w-5 h-5 ${isSavingTemplate ? 'text-white animate-pulse' : 'text-amber-500'}`} />
-                      </Button>
+                      <div className="flex gap-2">
+                        {loadedTemplateId && (
+                          <Button type="button" onClick={handleUpdateTemplate} disabled={isSavingTemplate} className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold py-2 h-auto gap-1">
+                            {isSavingTemplate ? <Sparkles className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            עדכן תבנית קיימת
+                          </Button>
+                        )}
+                        <Button type="button" onClick={handleSaveTemplate} disabled={isSavingTemplate} className={`rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold py-2 h-auto border border-white/10 gap-1 ${loadedTemplateId ? 'flex-1' : 'w-full'}`}>
+                          <Folder className="w-4 h-4" />
+                          שמור כתבנית חדשה
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
