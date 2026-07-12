@@ -163,12 +163,41 @@ const ICON_OPTIONS = [
 ];
 
 const WIDTH_OPTIONS = [
-  { id: 100, label: "100% (שורה מלאה)" },
-  { id: 75, label: "75% (שלושה רבעים)" },
-  { id: 66, label: "66% (שני שליש)" },
-  { id: 50, label: "50% (חצי שורה)" },
-  { id: 33, label: "33% (שליש שורה)" },
-  { id: 25, label: "25% (רבע שורה)" }
+  { id: 100, label: "100%" },
+  { id: 75, label: "75%" },
+  { id: 66, label: "66%" },
+  { id: 50, label: "50%" },
+  { id: 33, label: "33%" },
+  { id: 25, label: "25%" }
+];
+
+const HEIGHT_OPTIONS = [
+  { id: "", label: "רגיל (Auto)" },
+  { id: "30px", label: "30px (קטן מאוד)" },
+  { id: "40px", label: "40px (קטן)" },
+  { id: "50px", label: "50px (בינוני)" },
+  { id: "60px", label: "60px (גדול)" },
+  { id: "80px", label: "80px (ענק)" }
+];
+
+const FONT_SIZE_OPTIONS = [
+  { id: "", label: "רגיל" },
+  { id: 10, label: "10px" },
+  { id: 12, label: "12px" },
+  { id: 14, label: "14px" },
+  { id: 16, label: "16px" },
+  { id: 18, label: "18px" },
+  { id: 20, label: "20px" },
+  { id: 24, label: "24px" },
+  { id: 28, label: "28px" },
+  { id: 32, label: "32px" },
+  { id: 36, label: "36px" },
+  { id: 42, label: "42px" },
+  { id: 48, label: "48px" },
+  { id: 54, label: "54px" },
+  { id: 60, label: "60px" },
+  { id: 68, label: "68px" },
+  { id: 75, label: "75px" }
 ];
 
 const FIELD_TYPES = [
@@ -961,13 +990,13 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                             {/* Tab: Design */}
                             {activeFieldTab === "design" && (
                               <div className="flex flex-col gap-4 animate-in fade-in">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-3 gap-4">
                                   <div>
-                                    <label className="block font-semibold mb-1 text-slate-400">רוחב השדה בשורה</label>
+                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">רוחב השדה בשורה</label>
                                     <select
                                       value={field.widthPercentage || 100}
                                       onChange={(e) => handleFieldChange(idx, { widthPercentage: Number(e.target.value) })}
-                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
                                     >
                                       {WIDTH_OPTIONS.map(w => (
                                         <option key={w.id} value={w.id}>{w.label}</option>
@@ -975,74 +1004,67 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="block font-semibold mb-1 text-slate-400">גובה השדה</label>
-                                    <input
-                                      type="text"
+                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">גובה השדה</label>
+                                    <select
                                       value={field.height || ""}
                                       onChange={(e) => handleFieldChange(idx, { height: e.target.value })}
-                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                                      placeholder="לדוגמה: 40px או auto"
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
                                       dir="ltr"
-                                    />
+                                    >
+                                      {HEIGHT_OPTIONS.map(h => (
+                                        <option key={h.id} value={h.id}>{h.label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">גודל גופן</label>
+                                    <select
+                                      value={field.fontSize || ""}
+                                      onChange={(e) => handleFieldChange(idx, { fontSize: e.target.value ? parseInt(e.target.value) : undefined })}
+                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none text-xs"
+                                      dir="ltr"
+                                    >
+                                      {FONT_SIZE_OPTIONS.map(f => (
+                                        <option key={f.id} value={f.id}>{f.label}</option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-4 gap-3 text-center">
                                   <div>
-                                    <label className="block font-semibold mb-1 text-slate-400">צבע גופן</label>
-                                    <div className="flex items-center gap-2 bg-zinc-950 border border-white/10 rounded-xl p-1">
-                                      <input
-                                        type="color"
-                                        value={field.textColor || "#ffffff"}
-                                        onChange={(e) => handleFieldChange(idx, { textColor: e.target.value })}
-                                        className="w-8 h-8 rounded cursor-pointer border-0 p-0"
-                                      />
-                                      <input
-                                        type="text"
-                                        value={field.textColor || "#ffffff"}
-                                        onChange={(e) => handleFieldChange(idx, { textColor: e.target.value })}
-                                        className="w-full bg-transparent text-white outline-none p-1 text-xs font-mono"
-                                        dir="ltr"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label className="block font-semibold mb-1 text-slate-400">גודל גופן (px)</label>
+                                    <label className="block font-semibold mb-2 text-slate-400 text-[10px]">צבע גופן</label>
                                     <input
-                                      type="number"
-                                      value={field.fontSize || 14}
-                                      onChange={(e) => handleFieldChange(idx, { fontSize: parseInt(e.target.value) || 14 })}
-                                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                                      placeholder="14"
-                                      dir="ltr"
+                                      type="color"
+                                      value={field.textColor || "#ffffff"}
+                                      onChange={(e) => handleFieldChange(idx, { textColor: e.target.value })}
+                                      className="w-8 h-8 rounded cursor-pointer border-0 p-0 mx-auto block"
                                     />
                                   </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3">
                                   <div>
-                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע רקע</label>
+                                    <label className="block font-semibold mb-2 text-slate-400 text-[10px]">צבע רקע</label>
                                     <input
                                       type="color"
                                       value={field.bgColor || "#09090b"}
                                       onChange={(e) => handleFieldChange(idx, { bgColor: e.target.value })}
-                                      className="w-full h-8 rounded cursor-pointer border-0 p-0"
+                                      className="w-8 h-8 rounded cursor-pointer border-0 p-0 mx-auto block"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע מסגרת</label>
+                                    <label className="block font-semibold mb-2 text-slate-400 text-[10px]">צבע מסגרת</label>
                                     <input
                                       type="color"
                                       value={field.borderColor || "#ffffff"}
                                       onChange={(e) => handleFieldChange(idx, { borderColor: e.target.value })}
-                                      className="w-full h-8 rounded cursor-pointer border-0 p-0"
+                                      className="w-8 h-8 rounded cursor-pointer border-0 p-0 mx-auto block"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block font-semibold mb-1 text-slate-400 text-[10px]">צבע פוקוס (זהב)</label>
+                                    <label className="block font-semibold mb-2 text-slate-400 text-[10px]">צבע פוקוס</label>
                                     <input
                                       type="color"
                                       value={field.focusColor || "#f59e0b"}
                                       onChange={(e) => handleFieldChange(idx, { focusColor: e.target.value })}
-                                      className="w-full h-8 rounded cursor-pointer border-0 p-0"
+                                      className="w-8 h-8 rounded cursor-pointer border-0 p-0 mx-auto block"
                                     />
                                   </div>
                                 </div>

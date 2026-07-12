@@ -52,6 +52,35 @@ const evaluateFormula = (formula: string, data: Record<string, string>) => {
   }
 };
 
+const getAutoAutocomplete = (field: FormField) => {
+  if (field.autocomplete) return field.autocomplete;
+  
+  if (field.map_to === "conta_name") return "name";
+  if (field.map_to === "f_m") return "family-name";
+  if (field.map_to === "email") return "email";
+  if (field.map_to === "conta_phone") return "tel";
+  if (field.map_to === "work_phone") return "tel-local";
+  if (field.map_to === "mh_crm_city") return "address-level2";
+  if (field.map_to === "mh_crm_street") return "street-address";
+  if (field.map_to === "company_name") return "organization";
+  if (field.map_to === "job_title") return "organization-title";
+  if (field.map_to === "birth_date") return "bday";
+  
+  if (field.type === "email") return "email";
+  if (field.type === "tel") return "tel";
+  
+  const label = field.label || "";
+  if (label.includes('שם פרטי')) return "given-name";
+  if (label.includes('שם משפחה')) return "family-name";
+  if (label.includes('שם')) return "name";
+  if (label.includes('טלפון') || label.includes('נייד')) return "tel";
+  if (label.includes('אימייל') || label.includes('דוא"ל') || label.includes('מייל') || label.toLowerCase().includes('email')) return "email";
+  if (label.includes('עיר') || label.includes('ישוב')) return "address-level2";
+  if (label.includes('רחוב') || label.includes('כתובת')) return "street-address";
+  
+  return undefined;
+};
+
 interface CRMFormRendererProps {
   config: FormConfig;
   formId: string; // usually slug
@@ -744,19 +773,26 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
               '--field-text': (field as any).textColor || '#ffffff',
             } as any;
 
+            if (field.height && field.height !== "auto" && field.height !== "") {
+              customFieldStyle.height = field.height;
+            }
+            if (field.fontSize) {
+              customFieldStyle.fontSize = `${field.fontSize}px`;
+            }
+
             return (
               <div key={idx} className="space-y-1 px-2 mb-4" style={{ width: `${field.widthPercentage || 100}%` }}>
                 {field.type === "hidden" ? (
                   <input type="hidden" name={field.label} value={formData[field.label] || ""} />
                 ) : field.type === "fixed_amount" ? (
-                  <div className="bg-zinc-900 border border-white/5 text-white p-3 rounded-xl flex justify-between items-center text-xs" style={fieldBgStyle}>
-                    <span className="font-semibold text-slate-400">{field.label}:</span>
-                    <span className="font-mono font-bold text-white">₪{formData[field.label] || field.default_value}</span>
+                  <div className="border-[2px] border-[var(--field-border)] bg-[var(--field-bg)] p-3 rounded-xl flex justify-between items-center text-xs" style={customFieldStyle}>
+                    <span className="font-semibold text-[var(--field-focus)]">{field.label}:</span>
+                    <span className="font-mono font-bold text-[var(--field-text)]">₪{formData[field.label] || field.default_value}</span>
                   </div>
                 ) : field.type === "calculated" ? (
-                  <div className="bg-amber-900/20/50 border border-indigo-100 p-3 rounded-xl flex justify-between items-center text-xs" style={fieldBgStyle}>
-                    <span className="font-semibold text-amber-500">{field.label}:</span>
-                    <span className="font-mono font-bold text-amber-500 text-sm">
+                  <div className="border-[2px] border-[var(--field-border)] bg-[var(--field-bg)] p-3 rounded-xl flex justify-between items-center text-xs" style={customFieldStyle}>
+                    <span className="font-semibold text-[var(--field-focus)]">{field.label}:</span>
+                    <span className="font-mono font-bold text-[var(--field-text)] text-sm">
                       ₪{evaluateFormula(field.calc_formula || "", formData)}
                     </span>
                   </div>
@@ -893,6 +929,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                         </label>
                         <input
                           type="text" dir="ltr" placeholder="0000 0000 0000 0000"
+                          name="cc-number" id="cc-number" autoComplete="cc-number"
                           value={ccData.creditNumber}
                           onChange={(e) => setCcData({...ccData, creditNumber: e.target.value.replace(/\D/g, '')})}
                           className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left transition-colors"
@@ -908,6 +945,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           </label>
                           <div className="flex gap-2">
                             <select
+                              name="cc-exp-month" id="cc-exp-month" autoComplete="cc-exp-month"
                               dir="ltr" value={ccData.expiryMonth}
                               onChange={(e) => setCcData({...ccData, expiryMonth: e.target.value})}
                               className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono"
@@ -920,6 +958,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                             </select>
                             <span className="text-slate-500 self-center">/</span>
                             <select
+                              name="cc-exp-year" id="cc-exp-year" autoComplete="cc-exp-year"
                               dir="ltr" value={ccData.expiryYear}
                               onChange={(e) => setCcData({...ccData, expiryYear: e.target.value})}
                               className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono"
@@ -939,6 +978,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           </label>
                           <input
                             type="text" dir="ltr" placeholder="123"
+                            name="cc-csc" id="cc-csc" autoComplete="cc-csc"
                             value={ccData.cvv2}
                             onChange={(e) => setCcData({...ccData, cvv2: e.target.value.replace(/\D/g, '')})}
                             className="w-full bg-black/40 text-white border border-white/10 focus:border-[var(--field-focus)] rounded-xl p-3 text-sm outline-none font-mono tracking-widest text-left"
@@ -977,7 +1017,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           style={customFieldStyle}
                           required={field.required}
                           placeholder={field.label}
-                          autoComplete={field.autocomplete || undefined}
+                          name={field.label}
+                          autoComplete={getAutoAutocomplete(field)}
                         />
                         <label
                           htmlFor={`field-${idx}`}
@@ -1017,10 +1058,14 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                                   className={cn(
                                     "relative flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all",
                                     isSelected 
-                                      ? "border-amber-500 bg-amber-500/10 text-amber-500" 
-                                      : "border-white/20 bg-zinc-950 hover:border-amber-500/50 text-slate-300 hover:text-amber-500"
+                                      ? "border-[var(--field-focus)] text-[var(--field-focus)]" 
+                                      : "border-[var(--field-border)] bg-[var(--field-bg)] hover:border-[var(--field-focus)] text-[var(--field-text)] hover:text-[var(--field-focus)]"
                                   )}
-                                  style={fieldBgStyle}
+                                  style={{
+                                    ...customFieldStyle,
+                                    backgroundColor: isSelected ? 'var(--field-bg)' : undefined, // optional, maybe we want a tint
+                                    boxShadow: isSelected ? `inset 0 0 0 1px var(--field-focus)` : 'none'
+                                  }}
                                 >
                                   <input
                                     type="radio"
@@ -1028,7 +1073,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                                     value={clean}
                                     checked={isSelected}
                                     onChange={(e) => handleInputChange(field.label, e.target.value)}
-                                    className="w-5 h-5 text-amber-500 border-white/20 ml-3"
+                                    className="w-5 h-5 ml-3"
+                                    style={{ accentColor: 'var(--field-focus)' }}
                                     required={field.required && !formData[field.label]}
                                   />
                                   <span className="font-bold leading-tight">{clean}</span>
@@ -1047,9 +1093,10 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                               "peer w-full bg-[var(--field-bg)] text-[var(--field-text)] border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all appearance-none",
                               hasError ? "border-red-500 focus:border-red-500" : "border-[var(--field-border)] focus:border-[var(--field-focus)] focus:text-[var(--field-focus)]"
                             )}
-                            style={fieldBgStyle}
+                            style={customFieldStyle}
                             required={field.required}
-                            autoComplete={field.autocomplete || undefined}
+                            name={field.label}
+                            autoComplete={getAutoAutocomplete(field)}
                           >
                             <option value="" disabled hidden></option>
                             {(field.options || "").split("\n").map(opt => {
@@ -1061,16 +1108,17 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           <label
                             htmlFor={`field-${idx}`}
                             className={cn(
-                              "absolute right-4 transition-all pointer-events-none flex items-center gap-1 bg-zinc-950 px-1 rounded-sm",
+                              "absolute right-4 transition-all pointer-events-none flex items-center gap-1 bg-[var(--field-bg)] px-1 rounded-sm",
                               !!formData[field.label]
-                                ? (hasError ? "top-0 -translate-y-1/2 text-xs text-red-500" : "top-0 -translate-y-1/2 text-xs text-amber-500")
+                                ? (hasError ? "top-0 -translate-y-1/2 text-xs text-red-500" : "top-0 -translate-y-1/2 text-xs text-[var(--field-focus)]")
                                 : cn(
                                     "top-1/2 -translate-y-1/2 text-sm",
-                                    hasError ? "text-red-500" : "text-slate-400",
+                                    hasError ? "text-red-500" : "text-[var(--field-text)] opacity-70",
                                     "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:text-xs",
-                                    hasError ? "peer-focus:text-red-500" : "peer-focus:text-amber-500"
+                                    hasError ? "peer-focus:text-red-500" : "peer-focus:text-[var(--field-focus)]"
                                   )
                             )}
+                            style={customFieldStyle}
                           >
                             {FieldIcon && <FieldIcon className="w-3.5 h-3.5" />}
                             {field.label}
@@ -1093,7 +1141,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                           style={customFieldStyle}
                           required={field.required}
                           placeholder={field.label}
-                          autoComplete={field.autocomplete || undefined}
+                          name={field.label}
+                          autoComplete={getAutoAutocomplete(field)}
                         />
                         <label
                           htmlFor={`field-${idx}`}
