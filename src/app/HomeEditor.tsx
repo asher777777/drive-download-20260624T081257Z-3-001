@@ -50,7 +50,8 @@ import {
   Edit3,
   Eye,
   EyeOff,
-  Monitor
+  Monitor,
+  Folder
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -193,6 +194,17 @@ const SortableSectionItem = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {isSectionChanged && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (onSaveLocal) onSaveLocal(); }}
+              className="flex items-center justify-center w-8 h-8 rounded-xl transition-all border cursor-pointer bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20 hover:text-amber-400"
+              title="שמור שינויים באזור זה"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Folder className="w-4 h-4" />}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
@@ -2654,8 +2666,27 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                       }
                     }}
                     onSaveLocal={async () => {
-                      await handleSave();
-                      alert("נשמר בהצלחה בשרת!");
+                      await handleSave(false);
+                      // Update the lastSavedSectionData for this specific section immediately
+                      // so the "save" icon disappears and the orange dot disappears
+                      setConfig(prev => ({
+                        ...prev,
+                        lastSavedSectionData: {
+                          ...(prev as any).lastSavedSectionData,
+                          [sectionId]: JSON.stringify(prev[sectionId as keyof HomePageConfig])
+                        }
+                      } as any));
+                      // Optional visual feedback instead of an annoying alert
+                      const btn = document.activeElement as HTMLElement;
+                      if (btn) {
+                        const originalColor = btn.style.backgroundColor;
+                        btn.style.backgroundColor = 'rgba(34, 197, 94, 0.2)'; // green
+                        btn.style.color = '#4ade80';
+                        setTimeout(() => {
+                          btn.style.backgroundColor = originalColor;
+                          btn.style.color = '';
+                        }, 1000);
+                      }
                     }}
                     onCancelLocal={() => {
                       setConfig(prev => ({ ...prev, activeEditSection: null }));
