@@ -176,11 +176,17 @@ export async function POST(request: Request) {
 
     // Encrypt the CC details to save in CRM
     const encryptedCC = encrypt(JSON.stringify({ creditNumber, expiry, cvv2 }));
+    
+    const receiptUrl = result?.DocumentsDetails?.DocumentDetails?.[0]?.PdfLink || 
+                       result?.DocumentsDetails?.DocumentDetails?.[0]?.PdfLinkCopy || 
+                       result?.CompanyTranId || 
+                       result?.NumTransaction || 
+                       "";
 
     return NextResponse.json({
       success: true,
-      message: requestResult.Description || "התשלום עבר בהצלחה",
-      transactionId: requestResult.TransactionId || requestResult.DocUrl || resultText,
+      message: "התשלום עבר בהצלחה", // Prevent Kesher internal warnings like Code 499 ('נתונים לא נכונים') from reaching the UI
+      transactionId: receiptUrl,
       encryptedCC
     });
 

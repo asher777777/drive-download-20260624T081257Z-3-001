@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { 
   Plus, Trash2, Settings, Check, Sparkles, Copy,
-  Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette
+  Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette, Users
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -106,6 +106,7 @@ export interface FormConfig {
   register_role?: "DEVELOPING" | "TRIAL";
   templateId?: string;
   templateName?: string;
+  communityId?: string;
 }
 
 interface CRMFormBuilderProps {
@@ -222,7 +223,7 @@ const FIELD_TYPES = [
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
   const value = { ...rawValue, fields: rawValue.fields || [] };
   const [mainTab, setMainTab] = useState<"settings" | "fields">("fields");
-  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings" | "">("");
+  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings" | "communities" | "">("");
   const [expandedField, setExpandedField] = useState<number | null>(null);
   const [activeFieldTab, setActiveFieldTab] = useState<"settings" | "design" | "mapping" | "advanced">("settings");
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
@@ -1163,20 +1164,6 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                     </div>
                                   )}
                                 </div>
-
-                                <div className="border-t border-white/5 pt-3">
-                                  <label className="block font-semibold mb-1 text-slate-400">שיוך לקהילה</label>
-                                  <select
-                                    value={field.communityId || ""}
-                                    onChange={(e) => handleFieldChange(idx, { communityId: e.target.value })}
-                                    className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                                  >
-                                    <option value="">-- ללא שיוך לקהילה מסוימת --</option>
-                                    {communities.map(c => (
-                                      <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
                               </div>
                             )}
 
@@ -1431,6 +1418,42 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   </div>
                 </div>
               )}
+              </div>
+            )}
+          </div>
+
+          {/* TAB: COMMUNITIES */}
+          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab(activeTab === "communities" ? ("" as any) : "communities")}
+              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer sticky top-0 z-10 bg-zinc-950"
+            >
+              <span className="flex items-center gap-3">
+                <Users className="w-4 h-4 text-indigo-400" /> קהילות
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform text-gray-400 ${activeTab === "communities" ? "rotate-180 text-white" : ""}`} />
+            </button>
+            {activeTab === "communities" && (
+              <div className="p-4 bg-zinc-900 border-t border-white/5 space-y-6 max-w-3xl mx-auto">
+                <div>
+                  <h3 className="font-bold text-lg mb-2">שיוך לקהילה</h3>
+                  <p className="text-slate-400 text-xs mb-4">אנשי קשר שיירשמו דרך טופס זה ישויכו אוטומטית לקהילה הנבחרת.</p>
+                  
+                  <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+                    <label className="block font-semibold mb-2 text-slate-300">בחר קהילה</label>
+                    <select
+                      value={value.communityId || ""}
+                      onChange={(e) => onChange({ ...value, communityId: e.target.value })}
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-3 outline-none focus:border-amber-500/50 transition-colors"
+                    >
+                      <option value="">-- ללא שיוך לקהילה מסוימת --</option>
+                      {communities.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
             )}
           </div>

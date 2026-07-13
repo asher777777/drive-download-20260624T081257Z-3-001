@@ -627,6 +627,10 @@ export async function submitCRMForm(params: {
       contactData[formConfig.payment_amount_crm_map] = amountPaid;
     }
 
+    if (formConfig.communityId) {
+      contactData.communityIds = [formConfig.communityId];
+    }
+
     const rawPhone = contactData.conta_phone;
     if (!rawPhone) {
       throw new Error("מספר טלפון נייד הוא שדה חובה לשמירה ב-CRM");
