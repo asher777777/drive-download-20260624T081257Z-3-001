@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { 
-  Plus, Trash2, Settings, Check, Sparkles, 
+  Plus, Trash2, Settings, Check, Sparkles, Copy,
   Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -366,6 +366,18 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
     if (expandedField === index) setExpandedField(null);
   };
 
+  const duplicateField = (index: number) => {
+    const fieldToDuplicate = value.fields[index];
+    const newField = { 
+      ...fieldToDuplicate, 
+      id: `field_${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
+      label: `${fieldToDuplicate.label} (עותק)`
+    };
+    const newFields = [...value.fields];
+    newFields.splice(index + 1, 0, newField);
+    updateConfig({ fields: newFields });
+  };
+
   const moveField = (index: number, direction: "up" | "down") => {
     if (direction === "up" && index === 0) return;
     if (direction === "down" && index === value.fields.length - 1) return;
@@ -719,6 +731,17 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
                           >
                             <Settings className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              duplicateField(idx);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            title="שכפל שדה"
+                          >
+                            <Copy className="w-4 h-4" />
                           </button>
                           <button
                             type="button"

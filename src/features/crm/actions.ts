@@ -720,6 +720,27 @@ export async function submitCRMForm(params: {
       }
     });
 
+    if (amountPaid) {
+      const numericAmount = Number(amountPaid);
+      if (!isNaN(numericAmount) && numericAmount > 0) {
+        dbData.total_spent = (existingData?.total_spent || 0) + numericAmount;
+        dbData.order_count = (existingData?.order_count || 0) + 1;
+        dbData.last_order_date = new Date().toISOString();
+        
+        const paymentRecord = {
+          id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          date: new Date().toISOString(),
+          amount: numericAmount,
+          paymentType: "credit_card",
+          receiptType: "320",
+          kesherStatus: "Success",
+          receiptLink: params.transactionId || ""
+        };
+
+        dbData.payments = [...(existingData?.payments || []), paymentRecord];
+      }
+    }
+
     if (embeddingPostTitle) {
       dbData.lead_source = embeddingPostTitle;
     }

@@ -571,7 +571,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
               formConfig: config,
               status: "תשלום בוצע",
               amountPaid: amount,
-              transactionId: data.encryptedCC
+              transactionId: data.transactionId
             });
             setSuccessMsg(data.message || "התשלום בוצע בהצלחה!");
             setIsSubmitted(true);
@@ -605,7 +605,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     }
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (txId?: string) => {
     if (!checkoutData) return;
     setSubmitting(true);
     setShowCheckout(false);
@@ -627,7 +627,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
         embeddingCollection,
         formConfig: config,
         status: "תשלום בוצע",
-        amountPaid: checkoutData.amount
+        amountPaid: checkoutData.amount,
+        transactionId: typeof txId === 'string' ? txId : undefined
       });
 
       if (res.success) {
@@ -650,8 +651,6 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
   };
 
   // Success UI is now a Modal rendered at the bottom
-
-  const fieldBgStyle = config.field_bg_color && config.field_bg_color !== "#f8fafc" ? { backgroundColor: config.field_bg_color } : undefined;
 
   const currentStepConf = dynamicStepConfigs.get(currentStep);
 
@@ -775,8 +774,7 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             const FieldIcon = field.icon ? (LucideIcons as any)[field.icon] : null;
 
             const customFieldStyle = {
-              ...fieldBgStyle,
-              '--field-bg': (field as any).bgColor || '#09090b',
+              '--field-bg': (field as any).bgColor || config.field_bg_color || '#18181b',
               '--field-border': (field as any).borderColor || 'rgba(255,255,255,0.2)',
               '--field-focus': (field as any).focusColor || '#f59e0b',
               '--field-text': (field as any).textColor || '#ffffff',

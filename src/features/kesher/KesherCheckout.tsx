@@ -108,8 +108,8 @@ export function KesherCheckout({
       if (data.success) {
         setSuccessMsg(data.message || "התשלום בוצע בהצלחה!");
         if (onSuccess) {
-          // Pass encrypted CC to parent to save in CRM
-          setTimeout(() => onSuccess(data.encryptedCC), 1500);
+          // Pass transactionId to parent to save in CRM
+          setTimeout(() => onSuccess(data.transactionId), 1500);
         }
       } else {
         setError(data.error || "שגיאה בביצוע התשלום");

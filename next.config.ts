@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
     serverActions: {
+      bodySizeLimit: "10mb",
       allowedOrigins: [
         "hakel.club",
         "www.hakel.club",
