@@ -513,29 +513,52 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             status: "ממתין לתשלום (אשראי)"
           });
 
+          const allowedMethods = summaryField?.payment_methods || ["one-time"];
+          const effectiveMethod = allowedMethods.length === 1 ? allowedMethods[0] : ccData.paymentMethod;
+          
+          let effectiveInstallments = ccData.installments;
+          if (effectiveMethod === "recurring") {
+            const limit = (summaryField as any)?.payment_recurring_limit || "user-choice";
+            if (limit !== "user-choice") {
+              effectiveInstallments = limit === "unlimited" ? 9999 : Number(limit);
+            }
+          } else if (effectiveMethod === "one-time") {
+            effectiveInstallments = 1;
+          }
+
           const expiry = `${ccData.expiryYear.padStart(2, "0")}${ccData.expiryMonth.padStart(2, "0")}`;
-          const freq = ccData.paymentMethod === "recurring" ? "recurring" : "one-time";
+          const freq = effectiveMethod === "recurring" ? "recurring" : "one-time";
+
+          const payloadBody = {
+            amount,
+            creditNumber: ccData.creditNumber,
+            expiry,
+            cvv2: ccData.cvv2,
+            id: ccData.id,
+            clientName,
+            phone,
+            email: mail,
+            transactionId: formTitle,
+            installments: effectiveInstallments,
+            paymentFrequency: freq,
+            documentType: (summaryField as any)?.payment_doc_type || "320"
+          };
+
+          console.log("=== שליחת נתונים לקשר (בקשה) ===");
+          console.log("Headers:", { "Content-Type": "application/json" });
+          console.table(payloadBody);
+          console.log("Payload המלא:", payloadBody);
 
           const response = await fetch("/api/kesher/send-transaction", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              amount,
-              creditNumber: ccData.creditNumber,
-              expiry,
-              cvv2: ccData.cvv2,
-              id: ccData.id,
-              clientName,
-              phone,
-              email: mail,
-              transactionId: formTitle,
-              installments: ccData.installments,
-              paymentFrequency: freq,
-              documentType: (summaryField as any)?.payment_doc_type || "320"
-            })
+            body: JSON.stringify(payloadBody)
           });
           
           const data = await response.json();
+          
+          console.log("=== תשובה משרת קשר ===");
+          console.log("Response Data:", data);
           if (data.success) {
             await submitCRMForm({
               formId,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { CreditCard, Calendar, Lock, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { CreditCard, Calendar, Lock, AlertCircle, CheckCircle2, Loader2, User } from "lucide-react";
 
 interface KesherCheckoutProps {
   amount?: number;
@@ -46,6 +46,7 @@ export function KesherCheckout({
     expiryMonth: "",
     expiryYear: "",
     cvv2: "",
+    idNumber: "",
     userInstallments: installments
   });
 
@@ -74,7 +75,7 @@ export function KesherCheckout({
       return;
     }
 
-    const expiry = `${ccData.expiryYear.padStart(2, "0")}${ccData.expiryMonth.padStart(2, "0")}`; // Format YYMM
+    const expiry = `${ccData.expiryMonth.padStart(2, "0")}${ccData.expiryYear.padStart(2, "0")}`; // Format MMYY
 
     const freq = isRecurringChecked || paymentFrequency === "recurring" ? "recurring" : "one-time";
 
@@ -91,13 +92,19 @@ export function KesherCheckout({
           phone,
           email,
           transactionId: description || transactionId,
-          installments: ccData.userInstallments,
+          installments: isInstallmentsMapped ? installments : ccData.userInstallments,
           paymentFrequency: freq,
-          userId
+          userId,
+          id: ccData.idNumber
         })
       });
       const data = await response.json();
       
+      console.log("==== KESHER DEBUG ====");
+      if (data.payloadSent) console.log("Payload sent to Kesher:", JSON.stringify(data.payloadSent, null, 2));
+      if (data.rawResponse) console.log("Raw Response from Kesher:", data.rawResponse);
+      console.log("======================");
+
       if (data.success) {
         setSuccessMsg(data.message || "התשלום בוצע בהצלחה!");
         if (onSuccess) {
@@ -158,6 +165,22 @@ export function KesherCheckout({
           />
         </div>
 
+        <div className="space-y-1">
+          <label className={labelClass}>
+            <User className="w-3.5 h-3.5" />
+            תעודת זהות (בעל הכרטיס)
+          </label>
+          <input
+            type="text"
+            maxLength={9}
+            dir="ltr"
+            value={ccData.idNumber}
+            onChange={(e) => setCcData({...ccData, idNumber: e.target.value.replace(/\D/g, '')})}
+            className={inputClass}
+            placeholder="000000000"
+          />
+        </div>
+        
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className={labelClass}>

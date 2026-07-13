@@ -83,10 +83,21 @@ export async function POST(request: Request) {
     if (paymentFrequency === "recurring" || installments === 9999) {
       // If the user specified a specific number of months (e.g. 12), use it. Otherwise, unlimited (9999).
       numPayments = (installments && installments > 0) ? installments : 9999;
-      creditType = 1; // 1 usually works for standing order profile (monthly billing without holding credit frame)
+      creditType = 10; // 10 is required by Kesher for standing order (הוראת קבע)
     } else if (installments && installments > 1) {
-      numPayments = installments;
-      creditType = 8; // Sometimes 4 or 8 in Israel for installments (holds credit frame)
+      // In Kesher, for installments, NumPayment is the total number minus the first payment
+      numPayments = installments - 1;
+      creditType = 8; // 8 is required by Kesher for installments (תשלומים)
+    }
+
+    let finalExpiry = expiry;
+    if (finalExpiry && finalExpiry.length === 4) {
+      const p1 = finalExpiry.substring(0, 2);
+      const p2 = finalExpiry.substring(2, 4);
+      // If the first part is <= 12 and the second part is > 12, it was sent as MMYY. Swap to YYMM.
+      if (parseInt(p1) <= 12 && parseInt(p2) > 12) {
+        finalExpiry = p2 + p1;
+      }
     }
 
     const payload = {
@@ -97,13 +108,12 @@ export async function POST(request: Request) {
         format: "json",
         tran: {
           Address: "",
-          ApiKey: "XXX", // As in keser.html
           City: "",
           CreditNum: creditNumber,
           Token: null,
-          Expiry: expiry, // YYMM
+          Expiry: finalExpiry, // YYMM required by Kesher
           Cvv2: cvv2,
-          Total: Math.round(Number(amount) * 100).toString(), // Required format: Agorot as string
+          Total: Math.round(Number(amount) * 100), // Required format: Agorot (e.g. 1 ILS = 100)
           Currency: 1, // 1 = ILS
           CreditType: creditType,
           NumPayment: numPayments,
@@ -123,11 +133,7 @@ export async function POST(request: Request) {
     };
 
     console.log("================ KESHER API SEND_TRANSACTION REQUEST ================");
-    // Hide CC in logs
-    const safePayload = JSON.parse(JSON.stringify(payload));
-    safePayload.Json.tran.CreditNum = "***" + String(creditNumber).slice(-4);
-    safePayload.Json.tran.Cvv2 = "***";
-    console.log(JSON.stringify(safePayload, null, 2));
+    console.log(JSON.stringify(payload, null, 2));
 
     const response = await fetch("https://kesherhk.info/ConnectToKesher/ConnectToKesher", {
       method: "POST",
@@ -140,6 +146,14 @@ export async function POST(request: Request) {
     const resultText = await response.text();
     console.log("================ KESHER API RESPONSE ================");
     console.log(resultText);
+    
+    // DEBUG LOGGING
+    try {
+      require('fs').writeFileSync('kesher_debug_log.json', JSON.stringify({
+        sentPayload: payload,
+        response: resultText
+      }, null, 2));
+    } catch (e) {}
 
     let result;
     try {
@@ -152,7 +166,12 @@ export async function POST(request: Request) {
     const requestResult = result.RequestResult || result;
 
     if (requestResult.Status === false || requestResult.status === "error" || requestResult.error) {
-      return NextResponse.json({ success: false, error: requestResult.Description || requestResult.error || "שגיאה בשליחה למערכת קשר" }, { status: 400 });
+      return NextResponse.json({ 
+        success: false, 
+        error: requestResult.Description || requestResult.error || "שגיאה בשליחה למערכת קשר",
+        payloadSent: payload,
+        rawResponse: requestResult
+      }, { status: 400 });
     }
 
     // Encrypt the CC details to save in CRM
