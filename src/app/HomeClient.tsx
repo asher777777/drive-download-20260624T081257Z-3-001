@@ -226,6 +226,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             id={config.imageListing.anchorId || "imageListing"}
             images={config.imageListing.images}
             imagesPerRow={config.imageListing.imagesPerRow}
+            imagesPerRowMobile={config.imageListing.imagesPerRowMobile}
             form={config.imageListing.form}
             backgroundColor={config.imageListing.backgroundColor || globalSettings.backgroundColor}
             isEditing={false}

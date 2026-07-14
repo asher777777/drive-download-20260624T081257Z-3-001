@@ -1647,6 +1647,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               id={imgListingConf.anchorId || "imageListing"}
               images={imgListingConf.images}
               imagesPerRow={imgListingConf.imagesPerRow}
+              imagesPerRowMobile={imgListingConf.imagesPerRowMobile}
               form={imgListingConf.form as any}
               backgroundColor={imgListingConf.backgroundColor || globalSettings.backgroundColor}
               isEditing={true}

@@ -85,16 +85,36 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
               
               <div className="flex items-center gap-4">
                 {!isLayoutExpanded && (
-                  <div className="flex items-center gap-4 border border-white/10 bg-[#111] px-4 py-1.5 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Monitor className="w-4 h-4 text-amber-500" />
+                  <div className="flex items-center gap-1 border border-white/10 bg-[#111] px-2 py-1 rounded-lg">
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const current = config.imagesPerRow || 4;
+                        const next = current >= 6 ? 1 : current + 1;
+                        updateField("imagesPerRow", next);
+                      }}
+                      className="flex items-center gap-2 hover:bg-white/10 px-2 py-1 rounded-md transition-colors"
+                      title="לחץ לשינוי עמודות במסך רחב"
+                    >
                       <span className="text-white font-mono">{config.imagesPerRow || 4}</span>
-                    </div>
-                    <div className="w-px h-4 bg-white/10"></div>
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="w-4 h-4 text-amber-500" />
+                      <Monitor className="w-4 h-4 text-amber-500" />
+                    </button>
+                    <div className="w-px h-4 bg-white/10 mx-1"></div>
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const current = config.imagesPerRowMobile || 1;
+                        const next = current >= 3 ? 1 : current + 1;
+                        updateField("imagesPerRowMobile", next);
+                      }}
+                      className="flex items-center gap-2 hover:bg-white/10 px-2 py-1 rounded-md transition-colors"
+                      title="לחץ לשינוי עמודות בנייד"
+                    >
                       <span className="text-white font-mono">{config.imagesPerRowMobile || 1}</span>
-                    </div>
+                      <Smartphone className="w-4 h-4 text-amber-500" />
+                    </button>
                   </div>
                 )}
                 <div className="text-slate-400">
