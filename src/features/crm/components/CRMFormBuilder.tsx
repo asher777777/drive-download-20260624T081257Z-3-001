@@ -1476,64 +1476,6 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               {/* Left Column: Settings */}
               <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs">
 
-                {value.form_type === "payment" && (
-                  <div className="flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">סכום ברירת מחדל לתשלום (ש"ח)</label>
-                      <input
-                        type="number"
-                        value={value.payment_amount}
-                        onChange={(e) => updateConfig({ payment_amount: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-mono"
-                        placeholder="180"
-                        min="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">סוג קבלה להנפקה (TamalType)</label>
-                      <select
-                        value={value.payment_receipt_type || "405"}
-                        onChange={(e) => updateConfig({ payment_receipt_type: e.target.value })}
-                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
-                      >
-                        <option value="405">קבלת תרומה (למלכ"ר / עמותה)</option>
-                        <option value="400">קבלה רגילה (עוסק פטור / מורשה / בע"מ)</option>
-                        <option value="320">חשבונית מס קבלה (עוסק מורשה / בע"מ)</option>
-                        <option value="">-- ברירת מחדל של המסוף --</option>
-                      </select>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        * בחר את סוג המסמך שיופק לאחר סליקה מוצלחת בטופס זה.
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">תדירות התרומה (הוראת קבע)</label>
-                      <select
-                        value={value.payment_frequency || "one-time"}
-                        onChange={(e) => updateConfig({ payment_frequency: e.target.value as any })}
-                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
-                      >
-                        <option value="one-time">רק תרומה חד פעמית</option>
-                        <option value="user-choice">בחירת תורם (הצג מתג "תרומה חודשית קבועה")</option>
-                        <option value="recurring">רק הוראת קבע (תרומה חודשית קבועה תמיד)</option>
-                      </select>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        * ניתן לאפשר לתורם לבחור אם להפוך את התרומה להוראת קבע, או להכריח פעולה מסוימת.
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">שמור את סכום התרומה בשדה CRM</label>
-                      <select
-                        value={value.payment_amount_crm_map}
-                        onChange={(e) => updateConfig({ payment_amount_crm_map: e.target.value })}
-                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                      >
-                        {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
-                          <option key={k} value={k}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
 
                 {/* save_to_crm toggle removed per user request */}
 
