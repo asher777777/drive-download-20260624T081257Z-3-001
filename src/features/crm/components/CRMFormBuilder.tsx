@@ -473,17 +473,34 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               <div className="h-px bg-white/10 flex-1"></div>
             </div>
 
-            <Button
-              type="button"
-              onClick={() => {
-                addField();
-                setMainTab("fields");
-              }}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-amber-500/20 h-auto"
-            >
-              <Plus className="w-5 h-5 ml-2" />
-              ייצר טופס חדש (התחל מאפס)
-            </Button>
+            <div className="bg-zinc-900 border border-white/10 p-4 rounded-xl space-y-3">
+              <label className="block font-semibold text-sm">יצירת טופס חדש</label>
+              <input
+                type="text"
+                placeholder="הזן שם לטופס החדש..."
+                value={templateName}
+                onChange={(e) => {
+                  setTemplateName(e.target.value);
+                  onChange({ ...value, templateName: e.target.value });
+                }}
+                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold text-sm"
+              />
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!templateName.trim()) {
+                    alert("נא להזין שם לטופס החדש");
+                    return;
+                  }
+                  addField();
+                  setMainTab("fields");
+                }}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-amber-500/20 h-auto mt-2"
+              >
+                <Plus className="w-5 h-5 ml-2" />
+                ייצר טופס חדש (התחל מאפס)
+              </Button>
+            </div>
           </div>
         </div>
       )}
