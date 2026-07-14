@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "כל התוכן, המאמרים והפוסטים של הקהילה.",
 };
 
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export default async function ContentCategory() {
   const globalSettings = await getGlobalSettings("1");

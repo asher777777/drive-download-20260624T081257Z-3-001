@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "רשימת השירותים הקהילתיים שלנו.",
 };
 
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export default async function ServicesCategory() {
   const globalSettings = await getGlobalSettings("1");

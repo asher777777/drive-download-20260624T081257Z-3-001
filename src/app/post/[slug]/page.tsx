@@ -12,7 +12,7 @@ import { getGlobalSettings } from "@/features/settings/actions";
 import { Metadata } from "next";
 import { HomeClient } from "@/app/HomeClient";
 
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -21,13 +21,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     if (docSnap.exists) {
       const data = docSnap.data();
       return {
-        title: data?.seo?.title || data?.hero?.title || "פוסט",
-        description: data?.seo?.description || data?.hero?.subtitle || "",
+        title: data?.seo?.title || data?.hero?.title || "מאמר",
+        description: data?.seo?.description || data?.hero?.subtitle || "מאמר מעניין בקהילת מחולל הקהילות",
       };
     }
   } catch (e) {}
   
-  return { title: "פוסט" };
+  return { 
+    title: "מאמר",
+    description: "מאמר מעניין בקהילת מחולל הקהילות"
+  };
 }
 
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -173,6 +173,12 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
 
   const dynamicStepConfigs = useMemo(() => {
     const stepConfigsMap = new Map();
+    
+    // Extract default styling from the first field so Step 1 can be styled
+    const firstField = config.fields && config.fields[0];
+    const defaultTextColor = firstField?.textColor || "#ffffff";
+    const defaultTextAlign = (firstField as any)?.textAlign || "center";
+
     enrichedFields.forEach((f) => {
       if (f._isStepDivider) {
         stepConfigsMap.set(f._calculatedStep, {
@@ -180,12 +186,27 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
           title: f.label,
           icon: f.icon || "user",
           submitOnNext: f.submitOnNext || false,
-          textColor: f.textColor || "#ffffff"
+          textColor: f.textColor || defaultTextColor,
+          textAlign: (f as any).textAlign || defaultTextAlign,
+          buttonText: f.step_button_text,
+          buttonIcon: f.step_button_icon,
+          buttonBgColor: f.step_button_bg_color,
+          buttonTextColor: f.step_button_text_color,
+          backButtonText: f.step_back_button_text,
+          backButtonBgColor: f.step_back_button_bg_color,
+          backButtonTextColor: f.step_back_button_text_color
         });
       }
     });
     if (!stepConfigsMap.has(1)) {
-      stepConfigsMap.set(1, { step: 1, title: "שלב 1", icon: "user", submitOnNext: false });
+      stepConfigsMap.set(1, { 
+        step: 1, 
+        title: "שלב 1", 
+        icon: "user", 
+        submitOnNext: false,
+        textColor: defaultTextColor,
+        textAlign: defaultTextAlign
+      });
     }
     return stepConfigsMap;
   }, [enrichedFields]);
@@ -645,14 +666,15 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     }
   };
 
-  const btnStyle = {
-    backgroundColor: config.submit_button_bg_color || "#f59e0b",
-    color: config.submit_button_text_color || "#ffffff"
-  };
-
   // Success UI is now a Modal rendered at the bottom
 
   const currentStepConf = dynamicStepConfigs.get(currentStep);
+  const nextStepConf = dynamicStepConfigs.get(currentStep + 1);
+
+  const btnStyle = {
+    backgroundColor: nextStepConf?.buttonBgColor || config.submit_button_bg_color || "#f59e0b",
+    color: nextStepConf?.buttonTextColor || config.submit_button_text_color || "#ffffff"
+  };
 
   return (
     <div 
@@ -748,13 +770,16 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
 
           {/* Current Step Header */}
           {currentStepConf ? (
-            <div className="mb-6 pb-4 border-b border-white/10 flex items-center justify-center gap-3">
+            <div 
+              className="mb-6 pb-4 border-b border-white/10 flex items-center gap-3"
+              style={{ justifyContent: currentStepConf.textAlign === 'right' ? 'flex-start' : currentStepConf.textAlign === 'left' ? 'flex-end' : 'center' }}
+            >
               {currentStepConf.icon && (LucideIcons as any)[currentStepConf.icon] && (
                 <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30">
                   {(() => { const StepIcon = (LucideIcons as any)[currentStepConf.icon]; return <StepIcon className="w-5 h-5" />; })()}
                 </div>
               )}
-              <div className="text-xl font-bold" style={{ color: currentStepConf.textColor || '#ffffff' }}>
+              <div className="text-xl font-bold" style={{ color: currentStepConf.textColor || '#ffffff', textAlign: currentStepConf.textAlign || 'center' }}>
                 {currentStepConf.title}
               </div>
             </div>
@@ -785,6 +810,9 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
             }
             if (field.fontSize) {
               customFieldStyle.fontSize = `${field.fontSize}px`;
+            }
+            if ((field as any).textAlign) {
+              customFieldStyle.textAlign = (field as any).textAlign;
             }
 
             return (
@@ -1216,18 +1244,18 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 type="button"
                 onClick={handlePrevStep}
                 variant="outline"
-                style={config.back_button_bg_color || config.back_button_text_color ? {
-                  backgroundColor: config.back_button_bg_color || 'transparent',
-                  color: config.back_button_text_color || '#cbd5e1',
-                  borderColor: config.back_button_text_color ? `${config.back_button_text_color}40` : 'rgba(255,255,255,0.1)'
+                style={currentStepConf?.backButtonBgColor || currentStepConf?.backButtonTextColor || config.back_button_bg_color || config.back_button_text_color ? {
+                  backgroundColor: currentStepConf?.backButtonBgColor || config.back_button_bg_color || 'transparent',
+                  color: currentStepConf?.backButtonTextColor || config.back_button_text_color || '#cbd5e1',
+                  borderColor: currentStepConf?.backButtonTextColor || config.back_button_text_color ? `${currentStepConf?.backButtonTextColor || config.back_button_text_color}40` : 'rgba(255,255,255,0.1)'
                 } : undefined}
                 className={cn(
                   "flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border cursor-pointer transition-all hover:opacity-80",
-                  !(config.back_button_bg_color || config.back_button_text_color) && "border-white/10 text-slate-300 bg-transparent hover:bg-white/5"
+                  !(currentStepConf?.backButtonBgColor || currentStepConf?.backButtonTextColor || config.back_button_bg_color || config.back_button_text_color) && "border-white/10 text-slate-300 bg-transparent hover:bg-white/5"
                 )}
               >
                 <ChevronRight className="w-4 h-4" />
-                {config.back_button_text || "חזור"}
+                {currentStepConf?.backButtonText || config.back_button_text || "חזור"}
               </Button>
             )}
             
@@ -1238,11 +1266,11 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
                 style={btnStyle}
                 className="flex-1 py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
               >
-                {currentStepConf?.buttonText || config.continue_button_text || "המשך"}
-                {(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) === "arrow-left" && <ChevronLeft className="w-4 h-4" />}
-                {(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) === "chevron-left" && <ChevronLeft className="w-4 h-4" />}
-                {(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) === "check" && <CheckCircle2 className="w-4 h-4" />}
-                {!(currentStepConf?.buttonIcon !== undefined ? currentStepConf.buttonIcon : config.continue_button_icon) && <ChevronLeft className="w-4 h-4" />}
+                {nextStepConf?.buttonText || config.continue_button_text || "המשך"}
+                {(nextStepConf?.buttonIcon !== undefined ? nextStepConf.buttonIcon : config.continue_button_icon) === "arrow-left" && <ChevronLeft className="w-4 h-4" />}
+                {(nextStepConf?.buttonIcon !== undefined ? nextStepConf.buttonIcon : config.continue_button_icon) === "chevron-left" && <ChevronLeft className="w-4 h-4" />}
+                {(nextStepConf?.buttonIcon !== undefined ? nextStepConf.buttonIcon : config.continue_button_icon) === "check" && <CheckCircle2 className="w-4 h-4" />}
+                {!(nextStepConf?.buttonIcon !== undefined ? nextStepConf.buttonIcon : config.continue_button_icon) && <ChevronLeft className="w-4 h-4" />}
               </Button>
             ) : (
               <Button

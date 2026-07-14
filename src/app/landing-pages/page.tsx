@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "כל עמודי הנחיתה של קהילת מחולל הקהילות במקום אחד.",
 };
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const revalidate = 3600; // Revalidate every hour
 
 import { staticLandingPages } from "@/data/landing-pages";
 

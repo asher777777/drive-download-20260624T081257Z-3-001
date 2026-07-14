@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { 
   Plus, Trash2, Settings, Check, Sparkles, Copy,
-  Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette, Users
+  Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette, Users,
+  AlignLeft, AlignCenter, AlignRight
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -41,6 +42,7 @@ export interface FormField {
   placeholder?: string;
   height?: string | number;
   textColor?: string;
+  textAlign?: "left" | "center" | "right";
   fontSize?: number;
   communityId?: string;
   autocomplete?: string;
@@ -50,6 +52,11 @@ export interface FormField {
   payment_require_id?: boolean;
   step_button_text?: string;
   step_button_icon?: string;
+  step_button_bg_color?: string;
+  step_button_text_color?: string;
+  step_back_button_text?: string;
+  step_back_button_bg_color?: string;
+  step_back_button_text_color?: string;
 }
 
 export interface FormStepConfig {
@@ -815,6 +822,16 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                       />
                                     </div>
                                     <div>
+                                      <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור 'חזור' (לשלב הקודם)</label>
+                                      <input
+                                        type="text"
+                                        value={field.step_back_button_text || ""}
+                                        onChange={(e) => handleFieldChange(idx, { step_back_button_text: e.target.value })}
+                                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                                        placeholder="לדוגמה: חזור"
+                                      />
+                                    </div>
+                                    <div>
                                       <label className="block font-semibold mb-1 text-slate-400">אייקון כפתור 'המשך'</label>
                                       <select
                                         value={field.step_button_icon || "chevron-left"}
@@ -827,6 +844,64 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                         <option value="">ללא אייקון</option>
                                       </select>
                                     </div>
+                                    <details className="mt-4 bg-zinc-900 border border-white/5 rounded-xl group">
+                                      <summary className="p-3 font-bold text-slate-300 cursor-pointer list-none flex justify-between items-center outline-none">
+                                        עיצוב צבעי כפתורים
+                                        <ChevronDown className="w-4 h-4 text-slate-500 group-open:rotate-180 transition-transform" />
+                                      </summary>
+                                      <div className="p-4 pt-0 border-t border-white/5 mt-2">
+                                        <div className="grid grid-cols-4 gap-2">
+                                          <div>
+                                            <label className="block font-semibold mb-2 text-slate-400 text-[10px]">רקע 'המשך'</label>
+                                            <div className="flex flex-col gap-1 items-start">
+                                              <input
+                                                type="color"
+                                                value={field.step_button_bg_color || "#f59e0b"}
+                                                onChange={(e) => handleFieldChange(idx, { step_button_bg_color: e.target.value })}
+                                                className="w-full h-8 border border-white/10 rounded-lg cursor-pointer p-0.5 bg-transparent"
+                                              />
+                                              <span className="font-mono text-white text-[10px] w-full text-center truncate">{field.step_button_bg_color || "#f59e0b"}</span>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block font-semibold mb-2 text-slate-400 text-[10px]">טקסט 'המשך'</label>
+                                            <div className="flex flex-col gap-1 items-start">
+                                              <input
+                                                type="color"
+                                                value={field.step_button_text_color || "#ffffff"}
+                                                onChange={(e) => handleFieldChange(idx, { step_button_text_color: e.target.value })}
+                                                className="w-full h-8 border border-white/10 rounded-lg cursor-pointer p-0.5 bg-transparent"
+                                              />
+                                              <span className="font-mono text-white text-[10px] w-full text-center truncate">{field.step_button_text_color || "#ffffff"}</span>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block font-semibold mb-2 text-slate-400 text-[10px]">רקע 'חזור'</label>
+                                            <div className="flex flex-col gap-1 items-start">
+                                              <input
+                                                type="color"
+                                                value={field.step_back_button_bg_color || "transparent"}
+                                                onChange={(e) => handleFieldChange(idx, { step_back_button_bg_color: e.target.value })}
+                                                className="w-full h-8 border border-white/10 rounded-lg cursor-pointer p-0.5 bg-transparent"
+                                              />
+                                              <span className="font-mono text-white text-[10px] w-full text-center truncate">{field.step_back_button_bg_color || "transparent"}</span>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block font-semibold mb-2 text-slate-400 text-[10px]">טקסט 'חזור'</label>
+                                            <div className="flex flex-col gap-1 items-start">
+                                              <input
+                                                type="color"
+                                                value={field.step_back_button_text_color || "#cbd5e1"}
+                                                onChange={(e) => handleFieldChange(idx, { step_back_button_text_color: e.target.value })}
+                                                className="w-full h-8 border border-white/10 rounded-lg cursor-pointer p-0.5 bg-transparent"
+                                              />
+                                              <span className="font-mono text-white text-[10px] w-full text-center truncate">{field.step_back_button_text_color || "#cbd5e1"}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </details>
                                   </div>
                                 ) : (
                                   <>
@@ -1056,7 +1131,36 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                     </select>
                                   </div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-3 text-center">
+                                <div className="mt-4 border-t border-white/5 pt-4">
+                                  <label className="block font-semibold mb-2 text-slate-400 text-xs">יישור טקסט (לכותרות ושדות)</label>
+                                  <div className="flex bg-black/40 rounded-xl p-1 border border-white/10 w-fit">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleFieldChange(idx, { textAlign: "right" })}
+                                      className={`p-2 rounded-lg transition-colors ${(!field.textAlign || field.textAlign === "right") ? "bg-white/10 text-white" : "text-slate-500 hover:text-white"}`}
+                                      title="יישור לימין"
+                                    >
+                                      <AlignRight className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleFieldChange(idx, { textAlign: "center" })}
+                                      className={`p-2 rounded-lg transition-colors ${field.textAlign === "center" ? "bg-white/10 text-white" : "text-slate-500 hover:text-white"}`}
+                                      title="מרכוז"
+                                    >
+                                      <AlignCenter className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleFieldChange(idx, { textAlign: "left" })}
+                                      className={`p-2 rounded-lg transition-colors ${field.textAlign === "left" ? "bg-white/10 text-white" : "text-slate-500 hover:text-white"}`}
+                                      title="יישור לשמאל"
+                                    >
+                                      <AlignLeft className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-4 gap-3 text-center mt-4">
                                   <div>
                                     <label className="block font-semibold mb-2 text-slate-400 text-[10px]">צבע גופן</label>
                                     <input

@@ -6,7 +6,7 @@ import "./globals.css";
 const heebo = Heebo({
   variable: "--font-heebo",
   subsets: ["hebrew", "latin"],
-  preload: false,
+  preload: true,
 });
 
 export async function generateMetadata(): Promise<Metadata> {

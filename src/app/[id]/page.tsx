@@ -12,7 +12,7 @@ import { getGlobalSettings } from "@/features/settings/actions";
 import { Metadata } from "next";
 import { HomeClient } from "@/app/HomeClient";
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const revalidate = 3600; // Revalidate every hour
 
 import { staticLandingPages } from "@/data/landing-pages";
 
@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       const data = docSnap.data();
       return {
         title: data?.seo?.title || data?.hero?.title || "עמוד נחיתה",
-        description: data?.seo?.description || data?.hero?.subtitle || "",
+        description: data?.seo?.description || data?.hero?.subtitle || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
       };
     }
   } catch (e) {}
@@ -33,11 +33,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (fallback) {
     return {
       title: fallback.seo.title,
-      description: fallback.seo.description,
+      description: fallback.seo.description || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
     };
   }
   
-  return { title: "עמוד נחיתה" };
+  return { 
+    title: "עמוד נחיתה",
+    description: "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות"
+  };
 }
 
 export default async function LandingPage({ params }: { params: Promise<{ id: string }> }) {
