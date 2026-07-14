@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Image, X, Plus, GripVertical, FormInput, Grid3x3, ChevronDown, ChevronUp, Monitor, Smartphone, Layout, Copy } from "lucide-react";
-import { Reorder } from "framer-motion";
+import { Image, X, Plus, FormInput, Grid3x3, ChevronDown, ChevronUp, Monitor, Smartphone, Layout, Copy } from "lucide-react";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { CRMFormBuilder, type FormConfig } from "@/features/crm/components/CRMFormBuilder";
 
@@ -59,8 +58,16 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
     updateField("images", newImages);
   };
 
-  const handleReorder = (newOrder: ImageListingItem[]) => {
-    updateField("images", newOrder);
+  const handleMoveItem = (index: number, direction: "up" | "down") => {
+    if (direction === "up" && index === 0) return;
+    if (direction === "down" && index === images.length - 1) return;
+    
+    const newImages = [...images];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    const temp = newImages[index];
+    newImages[index] = newImages[targetIndex];
+    newImages[targetIndex] = temp;
+    updateField("images", newImages);
   };
 
   const handleAddMultiple = (urls: any) => {
@@ -205,22 +212,33 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                     לא נבחרו תמונות. לחץ על 'הוסף תמונות' למעלה.
                   </div>
                 ) : (
-                  <Reorder.Group 
-                    axis="y" 
-                    values={images} 
-                    onReorder={handleReorder}
-                    className="space-y-3"
-                  >
+                  <div className="space-y-3">
                     {images.map((img: ImageListingItem, index: number) => (
-                      <Reorder.Item 
+                      <div 
                         key={img.url + index} 
-                        value={img} 
                         className="flex flex-col bg-[#111] rounded-xl border border-white/5 relative overflow-hidden"
                       >
                         <div className="flex flex-col gap-4 p-4 group relative">
                           <div className="flex items-center gap-4">
-                            <div className="text-slate-500 cursor-grab active:cursor-grabbing hover:text-white transition-colors shrink-0">
-                              <GripVertical className="w-5 h-5" />
+                            <div className="flex flex-col gap-1 text-slate-500 shrink-0">
+                              <button
+                                type="button" 
+                                onClick={() => handleMoveItem(index, "up")}
+                                disabled={index === 0}
+                                title="הזז למעלה"
+                                className="hover:text-white disabled:opacity-30 disabled:hover:text-slate-500 transition-colors p-1 bg-white/5 rounded-md hover:bg-amber-500/20 hover:text-amber-500"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => handleMoveItem(index, "down")}
+                                disabled={index === images.length - 1}
+                                title="הזז למטה"
+                                className="hover:text-white disabled:opacity-30 disabled:hover:text-slate-500 transition-colors p-1 bg-white/5 rounded-md hover:bg-amber-500/20 hover:text-amber-500"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
                             </div>
                             <div className="flex-1 overflow-x-auto overflow-y-hidden">
                               <ImageUpload
@@ -271,9 +289,9 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                             />
                           </div>
                         )}
-                      </Reorder.Item>
+                      </div>
                     ))}
-                  </Reorder.Group>
+                  </div>
                 )}
               </div>
           </div>

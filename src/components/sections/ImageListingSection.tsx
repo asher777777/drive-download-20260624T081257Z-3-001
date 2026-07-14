@@ -48,10 +48,10 @@ export const ImageListingSection = ({
     }
   };
 
-  // Determine grid columns based on imagesPerRow and imagesPerRowMobile
-  const mobileCols = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" }[imagesPerRowMobile] || "grid-cols-1";
-  const desktopCols = { 1: "md:grid-cols-1", 2: "md:grid-cols-2", 3: "md:grid-cols-3", 4: "md:grid-cols-4", 5: "md:grid-cols-5", 6: "md:grid-cols-6" }[imagesPerRow] || "md:grid-cols-4";
-  const gridColsClass = `${mobileCols} ${desktopCols}`;
+  // Determine widths based on imagesPerRow and imagesPerRowMobile for Flexbox centering
+  const mobileWidth = { 1: "w-full", 2: "w-[calc(50%-0.5rem)]", 3: "w-[calc(33.333%-0.666rem)]" }[imagesPerRowMobile] || "w-full";
+  const desktopWidth = { 1: "md:w-full", 2: "md:w-[calc(50%-0.5rem)]", 3: "md:w-[calc(33.333%-0.666rem)]", 4: "md:w-[calc(25%-0.75rem)]", 5: "md:w-[calc(20%-0.8rem)]", 6: "md:w-[calc(16.666%-0.833rem)]" }[imagesPerRow] || "md:w-[calc(25%-0.75rem)]";
+  const itemWidthClass = `${mobileWidth} ${desktopWidth}`;
 
   return (
     <section id={id} className="py-16 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor }} dir="rtl">
@@ -61,7 +61,7 @@ export const ImageListingSection = ({
             לא נבחרו תמונות לאזור זה. בחר תמונות בעורך.
           </div>
         ) : (
-          <div className={`grid ${gridColsClass} gap-4`}>
+          <div className="flex flex-wrap justify-center gap-4 w-full">
             {images.map((img, index) => {
               if (!img) return null;
               const url = typeof img === "string" ? img : img.url;
@@ -70,7 +70,7 @@ export const ImageListingSection = ({
               return (
                 <div 
                   key={`${url}-${index}`}
-                  className={`relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
+                  className={`${itemWidthClass} relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
                   onClick={() => handleImageClick(img)}
                 >
                   <img 

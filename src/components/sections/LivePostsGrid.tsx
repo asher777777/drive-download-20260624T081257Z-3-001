@@ -94,10 +94,11 @@ export function LivePostsGrid({ id, layout = "grid", customPages }: LivePostsGri
 
         {/* Layout Render */}
         {layout === "grid" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="flex flex-wrap justify-center gap-8 w-full">
             {displayItems.map((item, index) => {
               const isGradient = item.imageSrc?.startsWith("linear-gradient");
               return (
+                <div key={index} className="w-full md:w-[calc(33.333%-1.333rem)]">
                 <motion.div
                   key={item.id || index}
                   initial={{ opacity: 0, y: 30 }}
@@ -161,6 +162,7 @@ export function LivePostsGrid({ id, layout = "grid", customPages }: LivePostsGri
                     </div>
                   </div>
                 </motion.div>
+                </div>
               );
             })}
           </div>

@@ -98,15 +98,23 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
 
   const renderLayout = () => {
     const getGridColsClass = (cols?: number) => {
-      switch(cols) {
-        case 1: return "lg:grid-cols-1";
-        case 2: return "lg:grid-cols-2";
-        case 3: return "lg:grid-cols-3";
-        case 4: return "lg:grid-cols-4";
-        case 5: return "lg:grid-cols-5";
-        case 6: return "lg:grid-cols-6";
-        default: return "lg:grid-cols-4";
-      }
+      // Not used anymore as we use flex, returning empty to avoid breaking things that might expect this function
+      return "";
+    };
+
+    const getWidthClass = (cols?: number, gapSize: number = 1.5) => { // gap-6 = 1.5rem, gap-8 = 2rem
+      const c = cols || 4;
+      if (c === 1) return "lg:w-full";
+      // Calc: (100% - total_gap_width) / columns
+      // total_gap_width for N columns is (N-1) * gapSize
+      // so width per item is calc( (100% - (N-1)*gapSize) / N )
+      // Simplified: calc(100%/N - ((N-1)/N)*gapSize)
+      if (c === 2) return `lg:w-[calc(50%-${gapSize / 2}rem)]`;
+      if (c === 3) return `lg:w-[calc(33.333%-${(2 * gapSize) / 3}rem)]`;
+      if (c === 4) return `lg:w-[calc(25%-${(3 * gapSize) / 4}rem)]`;
+      if (c === 5) return `lg:w-[calc(20%-${(4 * gapSize) / 5}rem)]`;
+      if (c === 6) return `lg:w-[calc(16.666%-${(5 * gapSize) / 6}rem)]`;
+      return `lg:w-[calc(25%-${(3 * gapSize) / 4}rem)]`;
     };
 
     const getEffectClass = () => {
@@ -123,7 +131,7 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
       return (
         <div className={cn(
           "w-full",
-          layout === "grid" && `grid grid-cols-1 sm:grid-cols-2 ${getGridColsClass(columns)} gap-6`,
+          layout === "grid" && "flex flex-wrap justify-center gap-6",
           layout === "carousel" && "flex overflow-x-auto pb-8 gap-6 no-scrollbar snap-x snap-mandatory"
         )}>
           {visibleItems.map((service, index) => (
@@ -132,7 +140,7 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
               href={service.url || "#"}
               className={cn(
                 "bg-card border rounded-3xl group cursor-pointer overflow-hidden",
-                layout === "grid" && "p-8 flex flex-col items-center text-center h-full min-w-0",
+                layout === "grid" && `p-8 flex flex-col items-center text-center w-full sm:w-[calc(50%-0.75rem)] ${getWidthClass(columns, 1.5)}`,
                 layout === "carousel" && "min-w-[280px] p-8 flex flex-col items-center text-center snap-center",
                 getEffectClass()
               )}
@@ -161,11 +169,11 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
     // ---- Layout: Image Card ----
     if (layout === "image-card") {
       return (
-        <div className={cn("w-full grid grid-cols-1 sm:grid-cols-2 gap-8", getGridColsClass(columns))}>
+        <div className="w-full flex flex-wrap justify-center gap-8">
           {visibleItems.map((service, index) => {
             const Icon = getIcon(service.icon);
             return (
-              <Link key={index} href={service.url || "#"} className={cn("group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100", getEffectClass())}>
+              <Link key={index} href={service.url || "#"} className={cn("group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 w-full sm:w-[calc(50%-1rem)]", getWidthClass(columns, 2), getEffectClass())}>
                 <div className="w-full aspect-[4/3] bg-slate-100 relative overflow-hidden flex items-center justify-center">
                   {service.imageSrc ? (
                     <Image src={service.imageSrc} alt={service.title} fill className="object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" />
@@ -192,11 +200,11 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
     // ---- Layout: Hover Card ----
     if (layout === "hover-card") {
       return (
-        <div className={cn("w-full grid grid-cols-1 sm:grid-cols-2 gap-6", getGridColsClass(columns))}>
+        <div className="w-full flex flex-wrap justify-center gap-6">
           {visibleItems.map((service, index) => {
             const Icon = getIcon(service.icon);
             return (
-              <Link key={index} href={service.url || "#"} className={cn("group relative bg-slate-900 rounded-[2rem] overflow-hidden aspect-square flex flex-col justify-end p-8", getEffectClass())}>
+              <Link key={index} href={service.url || "#"} className={cn("group relative bg-slate-900 rounded-[2rem] overflow-hidden aspect-square flex flex-col justify-end p-8 w-full sm:w-[calc(50%-0.75rem)]", getWidthClass(columns, 1.5), getEffectClass())}>
                 {/* Background Image */}
                 <div className="absolute inset-0 z-0">
                   {service.imageSrc ? (
