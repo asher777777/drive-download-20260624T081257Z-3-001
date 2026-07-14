@@ -174,10 +174,16 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
   const dynamicStepConfigs = useMemo(() => {
     const stepConfigsMap = new Map();
     
-    // Extract default styling from the first field so Step 1 can be styled
-    const firstField = config.fields && config.fields[0];
-    const defaultTextColor = firstField?.textColor || "#ffffff";
-    const defaultTextAlign = (firstField as any)?.textAlign || "center";
+    // Extract default styling from the first step field (or first field) so Step 1 can be styled
+    const firstStepField = config.fields && config.fields.find(f => f.type === "step");
+    const fallbackField = firstStepField || (config.fields && config.fields[0]);
+    const defaultTextColor = fallbackField?.textColor || "#ffffff";
+    const defaultTextAlign = (fallbackField as any)?.textAlign || "center";
+    
+    // If the user added a step field at the end of the form, it doesn't divide anything, but they probably meant it as the form's header
+    const hasEffectiveStepDivider = config.fields?.some((f, i) => f.type === "step" && i !== 0 && config.fields.slice(i + 1).some(nf => nf.type !== "step"));
+    const defaultTitle = (!hasEffectiveStepDivider && firstStepField) ? firstStepField.label : "שלב 1";
+    const defaultIcon = (!hasEffectiveStepDivider && firstStepField) ? firstStepField.icon : "user";
 
     enrichedFields.forEach((f) => {
       if (f._isStepDivider) {
@@ -201,8 +207,8 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     if (!stepConfigsMap.has(1)) {
       stepConfigsMap.set(1, { 
         step: 1, 
-        title: "שלב 1", 
-        icon: "user", 
+        title: defaultTitle, 
+        icon: defaultIcon || "user", 
         submitOnNext: false,
         textColor: defaultTextColor,
         textAlign: defaultTextAlign
