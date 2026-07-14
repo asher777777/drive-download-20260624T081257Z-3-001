@@ -230,7 +230,7 @@ const FIELD_TYPES = [
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
   const value = { ...rawValue, fields: rawValue.fields || [] };
   const [mainTab, setMainTab] = useState<"settings" | "fields">("fields");
-  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings" | "communities" | "">("");
+  const [activeTab, setActiveTab] = useState<"templates" | "type" | "whatsapp" | "settings" | "communities" | "submit_btn" | "">("");
   const [expandedField, setExpandedField] = useState<number | null>(null);
   const [activeFieldTab, setActiveFieldTab] = useState<"settings" | "design" | "mapping" | "advanced">("settings");
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
@@ -445,62 +445,85 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
             <LayoutTemplate className="w-8 h-8 text-amber-500" />
           </div>
           <h3 className="text-xl font-bold">ברוכים הבאים לעורך הטפסים!</h3>
-          <p className="text-slate-400">נראה שעדיין לא בחרת טופס. האם תרצה לפתוח תבנית קיימת או לייצר טופס חדש מאפס?</p>
+          <p className="text-slate-400">האם תרצה לפתוח תבנית קיימת או לייצר טופס חדש מאפס?</p>
           
-          <div className="flex flex-col gap-4 max-w-sm mx-auto mt-8">
-            <div className="bg-zinc-900 border border-white/10 p-4 rounded-xl space-y-3">
-              <label className="block font-semibold text-sm">טען מתבנית שמורה</label>
-              <select
-                onChange={(e) => {
-                  const t = templates.find(t => t.id === e.target.value);
-                  if (t) {
-                    handleLoadTemplate(t.config, t.id, t.name);
-                    setMainTab("fields");
-                  }
-                }}
-                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold text-sm"
+          <div className="max-w-md mx-auto mt-8 bg-zinc-900/50 p-2 rounded-2xl border border-white/5">
+            <div className="flex bg-black/40 border border-white/5 rounded-xl p-1 mb-6">
+              <button
+                type="button"
+                onClick={() => setTemplateName("new")}
+                className={`flex-1 py-3 px-4 font-bold text-sm rounded-lg transition-colors ${templateName === "new" || !templateName.startsWith("existing-") ? "bg-amber-500/10 text-amber-500" : "text-slate-400 hover:text-white"}`}
               >
-                <option value="">-- בחר תבנית לטעינה --</option>
-                {templates.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="flex items-center gap-4 py-2">
-              <div className="h-px bg-white/10 flex-1"></div>
-              <span className="text-xs text-slate-500 font-bold">או</span>
-              <div className="h-px bg-white/10 flex-1"></div>
+                יצירת טופס חדש
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplateName("existing-")}
+                className={`flex-1 py-3 px-4 font-bold text-sm rounded-lg transition-colors ${templateName.startsWith("existing-") ? "bg-amber-500/10 text-amber-500" : "text-slate-400 hover:text-white"}`}
+              >
+                טען תבנית שמורה
+              </button>
             </div>
 
-            <div className="bg-zinc-900 border border-white/10 p-4 rounded-xl space-y-3">
-              <label className="block font-semibold text-sm">יצירת טופס חדש</label>
-              <input
-                type="text"
-                placeholder="הזן שם לטופס החדש..."
-                value={templateName}
-                onChange={(e) => {
-                  setTemplateName(e.target.value);
-                  onChange({ ...value, templateName: e.target.value });
-                }}
-                className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold text-sm"
-              />
-              <Button
-                type="button"
-                onClick={() => {
-                  if (!templateName.trim()) {
-                    alert("נא להזין שם לטופס החדש");
-                    return;
-                  }
-                  addField();
-                  setMainTab("fields");
-                }}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-amber-500/20 h-auto mt-2"
-              >
-                <Plus className="w-5 h-5 ml-2" />
-                ייצר טופס חדש (התחל מאפס)
-              </Button>
-            </div>
+            {(!templateName || !templateName.startsWith("existing-")) ? (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-2 text-right">
+                  <label className="block font-semibold text-sm text-slate-300">שם לטופס החדש</label>
+                  <input
+                    type="text"
+                    placeholder="לדוגמה: טופס הרשמה 2026..."
+                    value={templateName === "new" ? "" : templateName}
+                    onChange={(e) => {
+                      setTemplateName(e.target.value);
+                    }}
+                    className="w-full bg-zinc-950 text-white border border-white/10 focus:border-amber-500/50 rounded-xl p-3 outline-none font-bold text-sm transition-colors"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const name = templateName === "new" ? "" : templateName;
+                    if (!name.trim()) {
+                      alert("נא להזין שם לטופס החדש");
+                      return;
+                    }
+                    onChange({ ...value, templateName: name } as any);
+                    addField();
+                    setMainTab("fields");
+                  }}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-500/20"
+                >
+                  <Plus className="w-5 h-5 ml-2" />
+                  צור טופס חדש והתחל לערוך
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 text-right">
+                <div className="space-y-2">
+                  <label className="block font-semibold text-sm text-slate-300">בחר תבנית מהרשימה</label>
+                  <select
+                    onChange={(e) => {
+                      const t = templates.find(t => t.id === e.target.value);
+                      if (t) {
+                        handleLoadTemplate(t.config, t.id, t.name);
+                        setMainTab("fields");
+                      }
+                    }}
+                    className="w-full bg-zinc-950 text-white border border-white/10 focus:border-amber-500/50 rounded-xl p-3 outline-none font-bold text-sm transition-colors"
+                  >
+                    <option value="">-- לחץ כאן לבחירת תבנית --</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {templates.length === 0 && (
+                  <p className="text-xs text-amber-500/80 text-center bg-amber-500/10 py-2 rounded-lg border border-amber-500/20">
+                    עדיין אין לך תבניות שמורות. ניתן לשמור תבנית לאחר יצירת טופס חדש.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -827,7 +850,53 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                         הכפתור גם מעביר לשלב הבא וגם שומר את הנתונים הנוכחיים לדאטה-בייס?
                                       </label>
                                     </div>
-                                    <h5 className="font-bold text-amber-500 mb-2 mt-4">הגדרות כפתור 'המשך' לשלב הבא</h5>
+
+                                    <h5 className="font-bold text-amber-500 mb-2 mt-4 border-t border-white/5 pt-4">עיצוב כותרת השלב</h5>
+                                    <div className="flex flex-col gap-4 bg-black/20 p-3 rounded-xl border border-white/5">
+                                      <div>
+                                        <label className="block font-semibold mb-2 text-slate-400 text-[10px]">יישור כותרת (Title Alignment)</label>
+                                        <div className="flex bg-zinc-950 rounded-xl p-1 border border-white/10 w-fit">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleFieldChange(idx, { textAlign: "right" })}
+                                            className={`p-2 rounded-lg transition-colors ${(!field.textAlign || field.textAlign === "right") ? "bg-white/10 text-white" : "text-slate-500 hover:text-white"}`}
+                                            title="יישור לימין"
+                                          >
+                                            <AlignRight className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleFieldChange(idx, { textAlign: "center" })}
+                                            className={`p-2 rounded-lg transition-colors ${field.textAlign === "center" ? "bg-white/10 text-white" : "text-slate-500 hover:text-white"}`}
+                                            title="מרכוז"
+                                          >
+                                            <AlignCenter className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleFieldChange(idx, { textAlign: "left" })}
+                                            className={`p-2 rounded-lg transition-colors ${field.textAlign === "left" ? "bg-white/10 text-white" : "text-slate-500 hover:text-white"}`}
+                                            title="יישור לשמאל"
+                                          >
+                                            <AlignLeft className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block font-semibold mb-2 text-slate-400 text-[10px]">צבע כותרת</label>
+                                        <div className="flex gap-2 items-center">
+                                          <input
+                                            type="color"
+                                            value={field.textColor || "#ffffff"}
+                                            onChange={(e) => handleFieldChange(idx, { textColor: e.target.value })}
+                                            className="w-8 h-8 rounded cursor-pointer border border-white/10 p-0.5 bg-transparent block"
+                                          />
+                                          <span className="font-mono text-white text-xs">{field.textColor || "#ffffff"}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <h5 className="font-bold text-amber-500 mb-2 mt-4 border-t border-white/5 pt-4">הגדרות כפתור 'המשך' לשלב הבא</h5>
                                     <div>
                                       <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור 'המשך'</label>
                                       <input
@@ -1392,6 +1461,155 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
               </div>
             </div>
           </div>
+          
+          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all mt-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab(activeTab === "submit_btn" ? ("" as any) : "submit_btn")}
+              className="w-full p-4 flex justify-between items-center hover:bg-[#202020] text-white font-bold text-sm cursor-pointer sticky top-0 z-10 bg-zinc-950"
+            >
+              <span className="flex items-center gap-3">
+                <Settings2 className="w-4 h-4 text-amber-400" /> הגדרות כפתור שליחה וצבעים (כללי)
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform text-gray-400 ${activeTab === "submit_btn" ? "rotate-180 text-white" : ""}`} />
+            </button>
+            {activeTab === "submit_btn" && (
+              <div className="p-4 bg-zinc-900 border-t border-white/5 space-y-4 max-w-3xl mx-auto text-xs">
+                <div className="space-y-4">
+                  <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
+                    עיצוב כפתור השליחה
+                  </h4>
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור שליחה (סיום טופס)</label>
+                    <input
+                      type="text"
+                      value={value.submit_button_text || ""}
+                      onChange={(e) => updateConfig({ submit_button_text: e.target.value })}
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      placeholder="המשך לתשלום מאובטח"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור המשך (מעבר שלב)</label>
+                    <input
+                      type="text"
+                      value={value.continue_button_text || ""}
+                      onChange={(e) => updateConfig({ continue_button_text: e.target.value })}
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      placeholder="המשך לשלב הבא"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">אייקון כפתור המשך</label>
+                    <select
+                      value={value.continue_button_icon || "arrow-left"}
+                      onChange={(e) => updateConfig({ continue_button_icon: e.target.value })}
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
+                    >
+                      <option value="">ללא אייקון</option>
+                      <option value="arrow-left">חץ שמאלה</option>
+                      <option value="chevron-left">חץ קטן שמאלה</option>
+                      <option value="check">וי (Check)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע כפתור</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.submit_button_bg_color || "#f59e0b"}
+                          onChange={(e) => updateConfig({ submit_button_bg_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-white">{value.submit_button_bg_color || "#f59e0b"}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע טקסט כפתור</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.submit_button_text_color || "#ffffff"}
+                          onChange={(e) => updateConfig({ submit_button_text_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-white">{value.submit_button_text_color || "#ffffff"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2 mt-4">
+                    עיצוב כפתור חזור (לשלב הקודם)
+                  </h4>
+                  <div>
+                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור חזור</label>
+                    <input
+                      type="text"
+                      value={value.back_button_text || ""}
+                      onChange={(e) => updateConfig({ back_button_text: e.target.value })}
+                      className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
+                      placeholder="חזור"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע כפתור חזור</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.back_button_bg_color || "#27272a"}
+                          onChange={(e) => updateConfig({ back_button_bg_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-white">{value.back_button_bg_color || "#27272a"}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע טקסט כפתור חזור</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.back_button_text_color || "#cbd5e1"}
+                          onChange={(e) => updateConfig({ back_button_text_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-white">{value.back_button_text_color || "#cbd5e1"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Form & Field background color settings */}
+                  <div className="flex flex-col gap-4 border-t border-white/10 pt-4">
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע הטופס</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.form_bg_color || "#09090b"}
+                          onChange={(e) => updateConfig({ form_bg_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-[10px] text-white">{value.form_bg_color || "#09090b"}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע השדות</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={value.field_bg_color || "#18181b"}
+                          onChange={(e) => updateConfig({ field_bg_color: e.target.value })}
+                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
+                        />
+                        <span className="font-mono text-[10px] text-white">{value.field_bg_color || "#18181b"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           </div>
 
           <div className={mainTab === "settings" ? "space-y-4 animate-in fade-in" : "hidden"}>
@@ -1793,140 +2011,8 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
 
 
 
-              {/* Right Column: Submit Button Customizer & Preview */}
+              {/* Right Column: Preview */}
               <div className="bg-zinc-950 p-6 rounded-2xl border border-white/5 space-y-4 text-xs flex flex-col justify-between">
-                <div className="space-y-4">
-                  <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2">
-                    עיצוב כפתור השליחה
-                  </h4>
-                  <div>
-                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור שליחה (סיום טופס)</label>
-                    <input
-                      type="text"
-                      value={value.submit_button_text}
-                      onChange={(e) => updateConfig({ submit_button_text: e.target.value })}
-                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
-                      placeholder="המשך לתשלום מאובטח"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור המשך (מעבר שלב)</label>
-                    <input
-                      type="text"
-                      value={value.continue_button_text || ""}
-                      onChange={(e) => updateConfig({ continue_button_text: e.target.value })}
-                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
-                      placeholder="המשך לשלב הבא"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1 text-slate-400">אייקון כפתור המשך</label>
-                    <select
-                      value={value.continue_button_icon || "arrow-left"}
-                      onChange={(e) => updateConfig({ continue_button_icon: e.target.value })}
-                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                    >
-                      <option value="">ללא אייקון</option>
-                      <option value="arrow-left">חץ שמאלה</option>
-                      <option value="chevron-left">חץ קטן שמאלה</option>
-                      <option value="check">וי (Check)</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע כפתור</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={value.submit_button_bg_color}
-                          onChange={(e) => updateConfig({ submit_button_bg_color: e.target.value })}
-                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <span className="font-mono text-white">{value.submit_button_bg_color}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">צבע טקסט כפתור</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={value.submit_button_text_color}
-                          onChange={(e) => updateConfig({ submit_button_text_color: e.target.value })}
-                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <span className="font-mono text-white">{value.submit_button_text_color}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <h4 className="font-bold text-white text-sm border-b border-white/10 pb-2 mt-4">
-                    עיצוב כפתור חזור (לשלב הקודם)
-                  </h4>
-                  <div>
-                    <label className="block font-semibold mb-1 text-slate-400">טקסט כפתור חזור</label>
-                    <input
-                      type="text"
-                      value={value.back_button_text || ""}
-                      onChange={(e) => updateConfig({ back_button_text: e.target.value })}
-                      className="w-full bg-zinc-900 text-white border border-white/10 rounded-xl p-2.5 outline-none font-bold"
-                      placeholder="חזור"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע כפתור חזור</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={value.back_button_bg_color || "#27272a"} // zinc-800
-                          onChange={(e) => updateConfig({ back_button_bg_color: e.target.value })}
-                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <span className="font-mono text-white">{value.back_button_bg_color || "ברירת מחדל (שקוף/כהה)"}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">צבע טקסט כפתור חזור</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={value.back_button_text_color || "#cbd5e1"} // slate-300
-                          onChange={(e) => updateConfig({ back_button_text_color: e.target.value })}
-                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <span className="font-mono text-white">{value.back_button_text_color || "ברירת מחדל (אפור)"}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Form & Field background color settings */}
-                  <div className="flex flex-col gap-4 border-t border-white/10 pt-4">
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע הטופס</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={value.form_bg_color || "#09090b"}
-                          onChange={(e) => updateConfig({ form_bg_color: e.target.value })}
-                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <span className="font-mono text-[10px] text-white">{value.form_bg_color || "#09090b"}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1 text-slate-400">צבע רקע השדות</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={value.field_bg_color || "#18181b"}
-                          onChange={(e) => updateConfig({ field_bg_color: e.target.value })}
-                          className="w-10 h-10 border border-white/10 rounded-xl cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <span className="font-mono text-[10px] text-white">{value.field_bg_color || "#18181b"}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 <div className="bg-black/20 p-6 rounded-2xl border border-white/5 text-center space-y-3">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">תצוגה מקדימה כפתור</span>

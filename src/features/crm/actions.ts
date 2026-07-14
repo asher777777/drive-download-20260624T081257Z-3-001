@@ -632,12 +632,10 @@ export async function submitCRMForm(params: {
     }
 
     const rawPhone = contactData.conta_phone;
-    if (!rawPhone) {
-      throw new Error("מספר טלפון נייד הוא שדה חובה לשמירה ב-CRM");
-    }
 
     // Normalize phone number
-    const normalizePhone = (phone: string) => {
+    const normalizePhone = (phone?: string) => {
+      if (!phone) return "";
       let clean = phone.replace(/\D/g, "");
       if (clean.startsWith("972") && clean.length > 9) {
         return "0" + clean.slice(3);
@@ -648,7 +646,9 @@ export async function submitCRMForm(params: {
       return clean;
     };
     const phone = normalizePhone(rawPhone);
-    contactData.conta_phone = phone;
+    if (phone) {
+      contactData.conta_phone = phone;
+    }
 
     // --- REGISTRATION LOGIC ---
     if (formType === "register") {
@@ -665,7 +665,7 @@ export async function submitCRMForm(params: {
           username: emailOrPhone.toLowerCase(),
           email: contactData.email || "",
           name: contactData.conta_name || "",
-          password: phone, // phone as password
+          password: phone || emailOrPhone.toLowerCase(), // phone as password, fallback to identifier
           role: role,
           createdAt: new Date().toISOString()
         };
@@ -683,11 +683,21 @@ export async function submitCRMForm(params: {
 
     const finalOwnerId = formConfig.crm_owner_id || ownerId || "1";
     const contactsRef = adminDb.collection("contacts");
-    const querySnapshot = await contactsRef
-      .where("ownerId", "==", finalOwnerId)
-      .where("conta_phone", "==", phone)
-      .limit(1)
-      .get();
+    
+    let querySnapshot: any = { empty: true };
+    if (phone) {
+      querySnapshot = await contactsRef
+        .where("ownerId", "==", finalOwnerId)
+        .where("conta_phone", "==", phone)
+        .limit(1)
+        .get();
+    } else if (contactData.email) {
+      querySnapshot = await contactsRef
+        .where("ownerId", "==", finalOwnerId)
+        .where("email", "==", contactData.email)
+        .limit(1)
+        .get();
+    }
 
     let contactId = "";
     let existingData: any = null;

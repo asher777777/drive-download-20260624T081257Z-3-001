@@ -1,0 +1,114 @@
+[debug] [2026-07-14T18:36:03.347Z] ----------------------------------------------------------------------
+[debug] [2026-07-14T18:36:03.355Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\ovt57\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting --project c-g-ltd --debug
+[debug] [2026-07-14T18:36:03.356Z] CLI Version:   15.22.2
+[debug] [2026-07-14T18:36:03.356Z] Platform:      win32
+[debug] [2026-07-14T18:36:03.357Z] Node Version:  v24.12.0
+[debug] [2026-07-14T18:36:03.357Z] Detected Agent: antigravity
+[debug] [2026-07-14T18:36:03.357Z] Time:          Tue Jul 14 2026 21:36:03 GMT+0300 (Israel Daylight Time)
+[debug] [2026-07-14T18:36:03.357Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-14T18:36:03.365Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-07-14T18:36:35.872Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-14T18:36:35.875Z] > authorizing via signed-in user (ovt5771@gmail.com)
+[debug] [2026-07-14T18:36:35.875Z] [iam] checking project c-g-ltd for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-07-14T18:36:35.883Z] Checked if tokens are valid: false, expires at: 1783949298178
+[debug] [2026-07-14T18:36:35.884Z] Checked if tokens are valid: false, expires at: 1783949298178
+[debug] [2026-07-14T18:36:35.885Z] > refreshing access token with scopes: []
+[debug] [2026-07-14T18:36:35.892Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-07-14T18:36:35.895Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-14T18:36:36.205Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-07-14T18:36:36.205Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-14T18:36:36.253Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions [none]
+[debug] [2026-07-14T18:36:36.254Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions  x-goog-user-project=c-g-ltd
+[debug] [2026-07-14T18:36:36.254Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-07-14T18:36:36.331Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-07-14T18:36:36.332Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-07-14T18:36:37.427Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions 200
+[debug] [2026-07-14T18:36:37.427Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-07-14T18:36:37.430Z] Checked if tokens are valid: true, expires at: 1784057795205
+[debug] [2026-07-14T18:36:37.431Z] Checked if tokens are valid: true, expires at: 1784057795205
+[debug] [2026-07-14T18:36:37.434Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd [none]
+[debug] [2026-07-14T18:36:37.907Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd 200
+[debug] [2026-07-14T18:36:37.907Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd {"projectId":"c-g-ltd","projectNumber":"155444280341","displayName":"c-g-LTD","name":"projects/c-g-ltd","resources":{"hostingSite":"c-g-ltd"},"state":"ACTIVE","labels":{"firebase":"enabled","firebaseworkflows/environment":"production","firebase/storage-default-bucket":"created"},"etag":"1_da4a5971-ca04-46f3-ac0d-a76d220aa45d"}
+[info] 
+   Thank you for trying our early preview of Next.js support on Firebase Hosting.
+   During the preview, support is best-effort and breaking changes can be expected. Proceed with caution.
+   The integration is known to work with Next.js version 12 - 16.0. You may encounter errors.
+
+   Documentation: https://firebase.google.com/docs/hosting/frameworks/nextjs
+   File a bug: https://github.com/firebase/firebase-tools/issues/new?template=bug_report.md
+   Submit a feature request: https://github.com/firebase/firebase-tools/issues/new?template=feature_request.md
+
+   We'd love to learn from you. Express your interest in helping us shape the future of Firebase Hosting: https://goo.gle/41enW5X
+
+[debug] [2026-07-14T18:37:35.435Z] Checked if tokens are valid: true, expires at: 1784057795205
+[debug] [2026-07-14T18:37:35.435Z] Checked if tokens are valid: true, expires at: 1784057795205
+[debug] [2026-07-14T18:37:35.435Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites/c-g-ltd [none]
+[debug] [2026-07-14T18:37:36.842Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites/c-g-ltd 200
+[debug] [2026-07-14T18:37:36.843Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites/c-g-ltd {"name":"projects/c-g-ltd/sites/c-g-ltd","defaultUrl":"https://c-g-ltd.web.app","type":"DEFAULT_SITE"}
+[info] ▲ Next.js 16.2.7 (Turbopack)
+
+[info] - Environments: .env.local, .env.production
+- Experiments (use with caution):
+  · serverActions
+
+
+[info]   Creating an optimized production build ...
+
+[info] 
+
+[info] [4.74ms] [@tailwindcss/postcss] node_modules\jodit\es2021\jodit.min.css
+[4.69ms]   ↳ Quick bail check
+
+
+[info] 
+
+[info] [2132.53ms] [@tailwindcss/postcss] src\app\globals.css
+[   0.07ms]   ↳ Quick bail check
+
+[info] [ 595.22ms]   ↳ Setup compiler
+[   1.35ms]     ↳ PostCSS AST -> Tailwind CSS AST
+[ 593.81ms]     ↳ Create compiler
+[   0.46ms]   ↳ Register full rebuild paths
+[  33.55ms]   ↳ Setup scanner
+
+[info] [ 348.75ms]   ↳ Scan for candidates
+
+[info] [ 124.81ms]   ↳ Register dependency messages
+[ 475.37ms]   ↳ Build utilities
+[ 507.43ms]   ↳ Optimization
+
+[info] [   8.97ms]     ↳ AST -> CSS
+
+[info] [ 402.09ms]     ↳ Lightning CSS
+
+[info] [  96.28ms]     ↳ CSS -> PostCSS AST
+
+[info] [  45.36ms]   ↳ Update PostCSS AST
+
+[info] 
+
+[info] ✓ Compiled successfully in 70s
+
+[info]   Running TypeScript ...
+
+[info] Failed to type check.
+
+
+[info] ./src/app/HomeEditor.tsx:1650:50
+Type error: Property 'imagesPerRowMobile' does not exist on type '{ visible: boolean; images: string[]; imagesPerRow: number; imagesPerRowMobile?: number; form: FormConfig; anchorId?: string; backgroundColor?: string; hoverColor?: string; } | { visible: true; ... 4 more ...; backgroundColor: string; }'. Did you mean 'imagesPerRow'?
+  Property 'imagesPerRowMobile' does not exist on type '{ visible: true; images: any[]; imagesPerRow: number; form: any; anchorId: string; backgroundColor: string; }'.
+
+  1648 | ...       images={imgListingConf.images}
+  1649 | ...       imagesPerRow={imgListingConf.imagesPerRow}
+> 1650 | ...       imagesPerRowMobile={imgListingConf.imagesPerRowMobile}
+       |                                              ^
+  1651 | ...       form={imgListingConf.form as any}
+  1652 | ...       backgroundColor={imgListingConf.backgroundColor || globalSettings.backgroundCo...
+  1653 | ...       isEditing={true}
+
+[info] Next.js build worker exited with code: 1 and signal: null
+
+[debug] [2026-07-14T18:40:06.780Z] Error: ENOENT: no such file or directory, open 'C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\.next\export-marker.json'
+[error] 
+[error] Error: An unexpected error has occurred.

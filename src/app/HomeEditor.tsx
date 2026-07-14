@@ -1609,6 +1609,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           visible: true,
           images: [],
           imagesPerRow: 4,
+          imagesPerRowMobile: 1,
           form: { enabled: false, fields: [], title: "" } as any,
           anchorId: "imageListing",
           backgroundColor: "#ffffff"

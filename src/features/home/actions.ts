@@ -162,6 +162,7 @@ export interface HomePageConfig {
     visible: boolean;
     images: string[];
     imagesPerRow: number;
+    imagesPerRowMobile?: number;
     form: FormConfig;
     anchorId?: string;
     backgroundColor?: string;

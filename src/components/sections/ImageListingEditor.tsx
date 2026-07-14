@@ -96,6 +96,7 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                     <button 
                       type="button"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         const current = config.imagesPerRow || 4;
                         const next = current >= 6 ? 1 : current + 1;
@@ -111,8 +112,9 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                     <button 
                       type="button"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
-                        const current = config.imagesPerRowMobile || 1;
+                        const current = Number(config.imagesPerRowMobile) || 1;
                         const next = current >= 3 ? 1 : current + 1;
                         updateField("imagesPerRowMobile", next);
                       }}

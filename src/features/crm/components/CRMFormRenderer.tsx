@@ -280,15 +280,21 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
     return true;
   };
 
-  const handleNextStep = async () => {
+  const handleNextStep = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     if (validateCurrentStep()) {
       const nextStepNum = Math.min(currentStep + 1, totalSteps);
       
       // Partial CRM Save Logic
       if (config.save_to_crm && config.crm_save_step && currentStep === config.crm_save_step) {
-        setSubmitting(true);
-        try {
-          const cleanFormData: Record<string, string> = {};
+        if (formId === "preview") {
+          console.log("Preview Mode: Mock partial CRM save for step", currentStep);
+        } else {
+          setSubmitting(true);
+          try {
+            const cleanFormData: Record<string, string> = {};
           visibleFields.forEach((f) => {
             if (f.type === "calculated") {
               cleanFormData[f.label] = String(evaluateFormula(f.calc_formula || "", formData));
@@ -313,12 +319,16 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
         }
         setSubmitting(false);
       }
+    }
 
       setCurrentStep(nextStepNum);
     }
   };
 
-  const handlePrevStep = () => {
+  const handlePrevStep = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
@@ -402,16 +412,23 @@ export function CRMFormRenderer({ config, formId, formTitle, embeddingCollection
       }
 
       if (effectiveFormType === "standard") {
-        const res = await submitCRMForm({
-          formId,
-          formTitle,
-          formType: "standard",
-          formData: cleanFormData,
-          embeddingPostId: formId,
-          embeddingPostTitle: formTitle,
-          embeddingCollection,
-          formConfig: config
-        });
+        let res: any = { success: true, error: "" };
+        if (formId === "preview") {
+          console.log("Preview Mode: Mock CRM full submission");
+          // Fake delay to show loading state
+          await new Promise(r => setTimeout(r, 800));
+        } else {
+          res = await submitCRMForm({
+            formId,
+            formTitle,
+            formType: "standard",
+            formData: cleanFormData,
+            embeddingPostId: formId,
+            embeddingPostTitle: formTitle,
+            embeddingCollection,
+            formConfig: config
+          });
+        }
 
         if (res.success) {
           if (matchedRule && matchedRule.action_type === "modal" && matchedRule.action_value) {

@@ -48,9 +48,18 @@ export const ImageListingSection = ({
     }
   };
 
-  // Determine widths based on imagesPerRow and imagesPerRowMobile for Flexbox centering
-  const mobileWidth = { 1: "w-full", 2: "w-[calc(50%-0.5rem)]", 3: "w-[calc(33.333%-0.666rem)]" }[imagesPerRowMobile] || "w-full";
-  const desktopWidth = { 1: "md:w-full", 2: "md:w-[calc(50%-0.5rem)]", 3: "md:w-[calc(33.333%-0.666rem)]", 4: "md:w-[calc(25%-0.75rem)]", 5: "md:w-[calc(20%-0.8rem)]", 6: "md:w-[calc(16.666%-0.833rem)]" }[imagesPerRow] || "md:w-[calc(25%-0.75rem)]";
+  const mobileCols = Number(imagesPerRowMobile) || 1;
+  const desktopCols = Number(imagesPerRow) || 4;
+  
+  const mobileWidth = { 1: "w-full", 2: "w-[calc(50%-0.5rem)]", 3: "w-[calc(33.333%-0.666rem)]" }[mobileCols] || "w-full";
+  const desktopWidth = { 
+    1: "sm:w-full", 
+    2: "sm:w-[calc(50%-0.5rem)]", 
+    3: "sm:w-[calc(33.333%-0.666rem)]", 
+    4: "sm:w-[calc(25%-0.75rem)]", 
+    5: "sm:w-[calc(20%-0.8rem)]", 
+    6: "sm:w-[calc(16.666%-0.833rem)]" 
+  }[desktopCols] || "sm:w-[calc(25%-0.75rem)]";
   const itemWidthClass = `${mobileWidth} ${desktopWidth}`;
 
   return (
