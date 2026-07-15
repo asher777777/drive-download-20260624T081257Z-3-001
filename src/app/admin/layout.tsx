@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Users, Database, LogOut, Settings, FileText, Receipt, Wand2 } from "lucide-react";
+import { LayoutDashboard, Users, Database, LogOut, Settings, FileText, Receipt, Wand2, Calendar } from "lucide-react";
 import { signOut } from "@/lib/auth";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -37,6 +37,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
             <Settings className="w-5 h-5" />
             הגדרות API גלובליות
+          </Link>
+          <Link href="/admin/calendar" className="flex items-center gap-3 px-4 py-3 rounded-xl text-amber-500 hover:bg-amber-500/10 transition-colors">
+            <Calendar className="w-5 h-5" />
+            יומן המחולל
           </Link>
           <div className="my-4 border-t border-slate-800"></div>
           <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">

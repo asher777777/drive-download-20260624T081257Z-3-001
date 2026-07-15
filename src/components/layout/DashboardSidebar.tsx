@@ -87,7 +87,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
       links: [
         { name: "לוח בקרה", href: "/dashboard", icon: LayoutDashboard },
         { name: "תצוגת פסיפס", href: "/dashboard/mosaic", icon: LayoutGrid },
-        { name: "יומן מסונכרן", href: "/dashboard/calendar", icon: Calendar },
+        { name: "יומן המחולל", href: "/dashboard/calendar", icon: Calendar },
         { name: "ניהול CRM", href: "/dashboard/crm", icon: Users },
         { name: "הוצאות", href: "/dashboard/expenses", icon: Receipt },
         { name: "קבלות ידניות", href: "/dashboard/receipts", icon: FileText },

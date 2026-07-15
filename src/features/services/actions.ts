@@ -88,9 +88,30 @@ export async function saveServicePage(slug: string, content: any) {
 export async function incrementPageView(slug: string, collectionName: string = "services") {
   try {
     const serviceRef = adminDb.collection(collectionName).doc(slug);
+    
+    // Increment the total views counter
     await serviceRef.set({
       views: FieldValue.increment(1)
     }, { merge: true });
+
+    // Fetch the document to get the ownerId and title
+    const docSnap = await serviceRef.get();
+    if (docSnap.exists) {
+      const data = docSnap.data();
+      const ownerId = data?.ownerId || "1";
+      const pageTitle = data?.title || slug;
+      
+      // Log the event to analytics_events for the timeline/graphs
+      await adminDb.collection("analytics_events").add({
+        ownerId,
+        slug,
+        collectionName,
+        title: pageTitle,
+        type: "landing_page_view",
+        timestamp: new Date().toISOString()
+      });
+    }
+
     return { success: true };
   } catch (error) {
     console.error(`Error incrementing views for ${slug}:`, error);

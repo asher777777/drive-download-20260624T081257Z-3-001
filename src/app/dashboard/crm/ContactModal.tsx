@@ -10,6 +10,7 @@ import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
 import { impersonateUser } from "@/features/users/impersonate";
 import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder } from "lucide-react";
+import { InteractionsList } from "@/components/ui/InteractionsList";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -57,7 +58,7 @@ const EditableLabel = ({ label, fieldId, isCustom, onSave, canEdit = true }: { l
   if (isEditing) {
     return (
       <div className="flex items-center gap-2 mb-1">
-        <Input autoFocus size="sm" value={val} onChange={e => setVal(e.target.value)} className="h-7 text-xs" />
+        <Input autoFocus value={val} onChange={e => setVal(e.target.value)} className="h-7 text-xs" />
         <Button size="sm" variant="ghost" className="h-7 px-2" disabled={saving} onClick={async () => {
           setSaving(true);
           await onSave(fieldId, val, isCustom);
@@ -1075,154 +1076,10 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
             </button>
             {activeTab === "events" && isEdit && (
               <div className="p-6 bg-[#111] animate-in fade-in duration-200">
-            <div className="space-y-4 animate-in fade-in">
-                {/* Sub-Tabs Navigation */}
-                <div className="flex border-b border-white/5 mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setEventSubTab("events")}
-                    className={`px-6 py-3 font-bold text-sm transition-colors ${
-                      eventSubTab === "events"
-                        ? "border-b-2 border-indigo-500 text-indigo-400"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    רשימת אירועים
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEventSubTab("timeline")}
-                    className={`px-6 py-3 font-bold text-sm transition-colors ${
-                      eventSubTab === "timeline"
-                        ? "border-b-2 border-indigo-500 text-indigo-400"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    ציר זמן
-                  </button>
-                </div>
-                
-                {eventSubTab === "events" && (
-                  <div className="animate-in fade-in space-y-4">
-                    <div className="flex items-center justify-between">
-                <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">היסטוריית אירועים ומפגשים</h4>
-                <Button
-                  type="button"
-                  onClick={handleAddEvent}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs py-1.5 px-3 flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  הוסף אירוע
-                </Button>
+                <InteractionsList contactId={contact?.id || ""} contactName={contact?.conta_name || ""} />
+                {renderCustomFields("events")}
               </div>
-
-              {events.length === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed rounded-2xl text-slate-400 text-sm">
-                  לא תועדו אירועים או מפגשים מול איש קשר זה. לחץ על "הוסף אירוע" כדי לתעד מפגש/שיחה.
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
-                  {events.map((event, index) => (
-                    <div key={index} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3 relative group">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveEvent(index)}
-                        className="absolute left-4 top-4 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="מחק אירוע"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">תאריך ושעה</label>
-                          <Input
-                            type="datetime-local"
-                            value={event.time}
-                            onChange={(e) => handleUpdateEvent(index, "time", e.target.value)}
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">כותרת המפגש</label>
-                          <Input
-                            value={event.title}
-                            onChange={(e) => handleUpdateEvent(index, "title", e.target.value)}
-                            placeholder="לדוגמה: שיחת טלפון, פגישת ייעוץ..."
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">סיכום המפגש / הערות</label>
-                        <textarea
-                          value={event.text}
-                          onChange={(e) => handleUpdateEvent(index, "text", e.target.value)}
-                          rows={2}
-                          placeholder="תקצר את מהלך המפגש או השיחה..."
-                          className="w-full text-xs p-2 border rounded-lg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-white"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {renderCustomFields("events")}
-                  </div>
-                )}
-                
-                {eventSubTab === "timeline" && (
-                  <div className="animate-in fade-in space-y-4">
-                    <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-2">ציר זמן אינטראקציות ופעולות</h4>
-              
-              <div className="relative border-r-2 border-slate-100 mr-3 pr-6 space-y-6 max-h-[350px] overflow-y-auto pl-1">
-                {/* Contact Creation Event */}
-                <div className="relative">
-                  <span className="absolute -right-[31px] top-1 bg-green-500 text-white rounded-full p-1 ring-4 ring-white">
-                    <User className="w-3.5 h-3.5" />
-                  </span>
-                  <div>
-                    <span className="text-[10px] font-mono text-slate-400 block">
-                      {contact?.createdAt ? new Date(contact.createdAt).toLocaleString("he-IL") : ""}
-                    </span>
-                    <h5 className="text-xs font-bold text-slate-800">הקמת איש קשר</h5>
-                    <p className="text-xs text-slate-500">איש הקשר נוצר במערכת.</p>
-                  </div>
-                </div>
-
-                {/* Form Submissions Timeline */}
-                {contact?.form_submissions && contact.form_submissions.length > 0 ? (
-                  contact.form_submissions.map((fs, idx) => (
-                    <div key={idx} className="relative">
-                      <span className="absolute -right-[31px] top-1 bg-indigo-500 text-white rounded-full p-1 ring-4 ring-white">
-                        <Clock className="w-3.5 h-3.5" />
-                      </span>
-                      <div>
-                        <span className="text-[10px] font-mono text-slate-400 block">
-                          {fs.date ? new Date(fs.date).toLocaleString("he-IL") : ""}
-                        </span>
-                        <h5 className="text-xs font-bold text-slate-800">הגשת טופס: {fs.name}</h5>
-                        <p className="text-xs text-slate-500">עמוד: {fs.page}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="relative">
-                    <span className="absolute -right-[31px] top-1 bg-slate-200 text-slate-500 rounded-full p-1 ring-4 ring-white">
-                      <Clock className="w-3.5 h-3.5" />
-                    </span>
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-400">אין פניות או הגשות טפסים</h5>
-                      <p className="text-xs text-slate-400">לא נרשמו הגשות טפסים אוטומטיות מהאתר.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-                  </div>
-                )}
-\n</div>
-              </div>
-          )}
+            )}
           </div>
 
           {/* Tab Content: Payments */}

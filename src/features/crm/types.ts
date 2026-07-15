@@ -17,6 +17,28 @@ export interface ContactEvent {
   text: string;
 }
 
+export interface CalendarEvent {
+  id?: string;
+  contactId: string;
+  userId: string;
+  title: string;
+  date: string;
+  time: string;
+  description?: string;
+  start: string; // ISO string
+  end: string;   // ISO string
+  type?: string;
+  status?: string;
+  followUpDate?: string;
+  linkedContacts?: { id: string, name: string }[];
+  sendToContact?: boolean;
+  metadata?: {
+    suggestions?: string[];
+    [key: string]: any;
+  };
+  createdAt?: string;
+}
+
 export interface FormSubmission {
   name: string;
   page: string;

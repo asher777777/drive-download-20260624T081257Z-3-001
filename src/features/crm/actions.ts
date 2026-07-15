@@ -1026,7 +1026,7 @@ export async function getCustomFields() {
 }
 
 // 15. Add custom CRM field
-export async function addCustomField(field: Omit<{id: string; category: string; type: string; label: string;}, "id">) {
+export async function addCustomField(field: Omit<{id: string; category: string; type: string; label: string; subFields?: any}, "id">) {
   try {
     const ownerId = await getUserId();
     const docRef = adminDb.collection("crm_settings").doc(`custom_fields_${ownerId}`);
@@ -1301,3 +1301,184 @@ export async function saveContactUserSettings(userId: string, newSettings: any, 
     return { success: false, error: err.message };
   }
 }
+
+// ---------------------------------------------------------
+// Calendar Events (Analytics Ready)
+// ---------------------------------------------------------
+
+export async function getCalendarEvents(contactId?: string) {
+  try {
+    const userId = await getUserId();
+    const allEvents: any[] = [];
+
+    // 1. Fetch Calendar Events (Tasks / Reminders)
+    let calQuery: FirebaseFirestore.Query = adminDb.collection("calendar_events").where("userId", "==", userId);
+    if (contactId) {
+      calQuery = calQuery.where("contactId", "==", contactId);
+    }
+    const calSnap = await calQuery.get();
+    calSnap.docs.forEach(doc => {
+      const data = doc.data();
+      allEvents.push({
+        id: doc.id,
+        ...data,
+        type: data.type || "task"
+      });
+    });
+
+    // 2. Fetch Contact Interactions (Forms, WhatsApp)
+    let contactsQuery: FirebaseFirestore.Query = adminDb.collection("contacts").where("ownerId", "==", userId);
+    if (contactId) {
+      // Not optimally querying by single ID if using ownerId, but it's fine for small scope or we just get doc.
+      // Actually if contactId is provided, we only need that contact.
+      const contactDoc = await adminDb.collection("contacts").doc(contactId).get();
+      if (contactDoc.exists && contactDoc.data()?.ownerId === userId) {
+        const cData = contactDoc.data();
+        if (cData?.events && Array.isArray(cData.events)) {
+          cData.events.forEach((ev: any, idx: number) => {
+            allEvents.push({
+              id: `contact_event_${contactId}_${idx}`,
+              contactId,
+              contactName: cData.conta_name || "",
+              title: ev.title || "אינטראקציה",
+              description: ev.text || "",
+              start: ev.time || new Date().toISOString(),
+              end: ev.time || new Date().toISOString(),
+              type: ev.title?.includes("WhatsApp") ? "whatsapp" : (ev.title?.includes("טופס") ? "registration" : "system"),
+              status: "בוצע"
+            });
+          });
+        }
+      }
+    } else {
+      const contactsSnap = await contactsQuery.get();
+      contactsSnap.docs.forEach(doc => {
+        const cData = doc.data();
+        if (cData.events && Array.isArray(cData.events)) {
+          cData.events.forEach((ev: any, idx: number) => {
+            allEvents.push({
+              id: `contact_event_${doc.id}_${idx}`,
+              contactId: doc.id,
+              contactName: cData.conta_name || "",
+              title: ev.title || "אינטראקציה",
+              description: ev.text || "",
+              start: ev.time || new Date().toISOString(),
+              end: ev.time || new Date().toISOString(),
+              type: ev.title?.includes("WhatsApp") ? "whatsapp" : (ev.title?.includes("טופס") ? "registration" : "system"),
+              status: "בוצע"
+            });
+          });
+        }
+      });
+    }
+
+    // 3. Fetch Analytics Events (Page Views)
+    // We only fetch page views if contactId is NOT provided (since page views are general, not per contact mostly)
+    if (!contactId) {
+      const analyticsSnap = await adminDb.collection("analytics_events").where("ownerId", "==", userId).get();
+      analyticsSnap.docs.forEach(doc => {
+        const data = doc.data();
+        allEvents.push({
+          id: doc.id,
+          title: `צפייה בעמוד: ${data.title}`,
+          description: `סוג: ${data.collectionName}`,
+          start: data.timestamp || new Date().toISOString(),
+          end: data.timestamp || new Date().toISOString(),
+          type: data.type || "landing_page_view",
+          status: "בוצע"
+        });
+      });
+    }
+
+    // Sort all events by start time descending
+    allEvents.sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
+
+    return { success: true, events: JSON.parse(JSON.stringify(allEvents)) };
+  } catch (error: any) {
+    console.error("Error fetching calendar events:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createCalendarEvent(data: any) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    // AI Suggestions Generation (Only for Superadmins)
+    let suggestions: string[] = [];
+    if (session.user.role === "SUPERADMIN" && data.title) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const prompt = `You are a CRM assistant. Given this interaction: "${data.title}" and description: "${data.description || ''}", suggest 2 short follow-up actions in Hebrew. Return ONLY a valid JSON array of strings, e.g. ["צור קשר מחר", "שלח הצעת מחיר"].`;
+        
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        });
+        
+        const rawText = response.text?.replace(/```json/g, '').replace(/```/g, '').trim();
+        if (rawText) {
+          suggestions = JSON.parse(rawText);
+        }
+      } catch (aiError) {
+        console.error("AI Generation failed:", aiError);
+      }
+    }
+
+    const eventData = {
+      ...data,
+      userId,
+      metadata: {
+        ...data.metadata,
+        ...(suggestions.length > 0 ? { suggestions } : {})
+      },
+      createdAt: new Date().toISOString()
+    };
+    const ref = await adminDb.collection("calendar_events").add(eventData);
+    
+    return { success: true, event: { id: ref.id, ...eventData } };
+  } catch (error: any) {
+    console.error("Error creating calendar event:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateCalendarEvent(eventId: string, data: any) {
+  try {
+    const userId = await getUserId();
+    const ref = adminDb.collection("calendar_events").doc(eventId);
+    const doc = await ref.get();
+    
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error("אירוע לא נמצא או שאין הרשאה");
+    }
+    
+    await ref.update(data);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating calendar event:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteCalendarEvent(eventId: string) {
+  try {
+    const userId = await getUserId();
+    const ref = adminDb.collection("calendar_events").doc(eventId);
+    const doc = await ref.get();
+    
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error("אירוע לא נמצא או שאין הרשאה");
+    }
+    
+    await ref.delete();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting calendar event:", error);
+    return { success: false, error: error.message };
+  }
+}
+
