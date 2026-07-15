@@ -141,16 +141,7 @@ const CRM_DB_FIELDS = {
   "tg2": "תג 2",
   "tg3": "תג 3",
   "payment_amount": "סכום לתשלום (עבור טופס תשלום)",
-  "child_first_name": "שם הילד (פרטי)",
-  "child_last_name": "שם הילד (משפחה)",
-  "child_grade": "כיתה / גן",
-  "child_id_number": "תעודת זהות ילד",
-  "allergies_has": "יש אלרגיות? (כן/לא)",
-  "allergies_details": "פירוט אלרגיות",
-  "father_name": "שם האב",
-  "father_phone": "טלפון האב",
-  "mother_name": "שם האם",
-  "mother_phone": "טלפון האם",
+
   "total_spent": "סך הכל תרומות/רכישות",
   "order_count": "מספר תרומות/רכישות"
 };

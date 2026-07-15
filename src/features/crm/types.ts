@@ -96,17 +96,7 @@ export interface Contact {
     transferRef?: string;
   };
 
-  // Camp / Family Fields
-  child_first_name?: string;
-  child_last_name?: string;
-  child_grade?: string;
-  child_id_number?: string;
-  allergies_has?: "כן" | "לא" | string;
-  allergies_details?: string;
-  father_name?: string;
-  mother_name?: string;
-  father_phone?: string;
-  mother_phone?: string;
+
 
   // Timestamps
   createdAt?: string;

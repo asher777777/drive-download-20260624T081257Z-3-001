@@ -96,17 +96,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   const [workPhone, setWorkPhone] = useState("");
   const [website, setWebsite] = useState("");
 
-  // Camp & Family States
-  const [childFirstName, setChildFirstName] = useState("");
-  const [childLastName, setChildLastName] = useState("");
-  const [childGrade, setChildGrade] = useState("");
-  const [childIdNumber, setChildIdNumber] = useState("");
-  const [allergiesHas, setAllergiesHas] = useState("");
-  const [allergiesDetails, setAllergiesDetails] = useState("");
-  const [fatherName, setFatherName] = useState("");
-  const [motherName, setMotherName] = useState("");
-  const [fatherPhone, setFatherPhone] = useState("");
-  const [motherPhone, setMotherPhone] = useState("");
+
 
   // Repeater states
   const [events, setEvents] = useState<ContactEvent[]>([]);
@@ -192,16 +182,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         setWorkPhone(contact.work_phone || "");
         setWebsite(contact.website || "");
         
-        setChildFirstName(contact.child_first_name || "");
-        setChildLastName(contact.child_last_name || "");
-        setChildGrade(contact.child_grade || "");
-        setChildIdNumber(contact.child_id_number || "");
-        setAllergiesHas(contact.allergies_has || "");
-        setAllergiesDetails(contact.allergies_details || "");
-        setFatherName(contact.father_name || "");
-        setMotherName(contact.mother_name || "");
-        setFatherPhone(contact.father_phone || "");
-        setMotherPhone(contact.mother_phone || "");
+
 
         setEvents(contact.events || []);
 
@@ -232,16 +213,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         setWorkPhone("");
         setWebsite("");
 
-        setChildFirstName("");
-        setChildLastName("");
-        setChildGrade("");
-        setChildIdNumber("");
-        setAllergiesHas("");
-        setAllergiesDetails("");
-        setFatherName("");
-        setMotherName("");
-        setFatherPhone("");
-        setMotherPhone("");
+
 
         setEvents([]);
         setCustomFieldsValues({});
@@ -278,16 +250,6 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
       last_form_name: lastFormName,
       work_phone: workPhone,
       website: website,
-      child_first_name: childFirstName,
-      child_last_name: childLastName,
-      child_grade: childGrade,
-      child_id_number: childIdNumber,
-      allergies_has: allergiesHas,
-      allergies_details: allergiesDetails,
-      father_name: fatherName,
-      mother_name: motherName,
-      father_phone: fatherPhone,
-      mother_phone: motherPhone,
       events,
       ...customFieldsValues,
     };

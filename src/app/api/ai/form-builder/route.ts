@@ -40,7 +40,7 @@ Your task is to generate a JSON configuration for a CRM form based on a detailed
 ## Core Design Rules (MUST FOLLOW)
 1. **SINGLE COLUMN ONLY**: Every field MUST have \`widthPercentage: 100\`. NEVER use 50% or smaller. All fields stack vertically, one below the other.
 2. **STRICTLY 1 FIELD PER STEP**: Every single field MUST be assigned to its own unique step (step: 1, step: 2, step: 3, etc.). NEVER put more than 1 field in the same step. Keep the form short, maximum 5 fields (and therefore 5 steps) total.
-3. **OPTIONAL SENSITIVE FIELDS**: Email address (\`email\`), ID number (\`child_id_number\`), and alternative receipt name must NEVER be mandatory required fields. They should have \`required: false\` and be presented as optional/nice-to-have. Use clear placeholder text like "אופציונלי".
+3. **OPTIONAL SENSITIVE FIELDS**: Email address (\`email\`) and alternative receipt name must NEVER be mandatory required fields. They should have \`required: false\` and be presented as optional/nice-to-have. Use clear placeholder text like "אופציונלי".
 4. **DYNAMIC MODERN COLORS**: Analyze the user's brief. If the form is for a summer camp, use vibrant summer colors (e.g. blue and yellow). If it's for luxury real estate, use elegant gold/black, etc. Choose a fitting \`form_bg_color\`, a complementary \`field_bg_color\` (like #f8f9ff or an off-white tint of the theme), and a bold \`submit_button_bg_color\`. NEVER use flat grays.
 5. **PERSUASIVE HEBREW COPY**: All labels, placeholders, success messages, and WhatsApp messages must be written in natural, emotionally engaging, conversion-optimized Hebrew. Match the tone from the user brief.
 6. **NO EMOJIS WHATSOEVER**: You are STRICTLY FORBIDDEN from using emojis anywhere in the JSON. No emojis in labels, no emojis in buttons, no emojis in messages. Use ONLY text.
@@ -121,16 +121,7 @@ interface FormConfig {
 - "tg2": תג 2
 - "tg3": תג 3
 - "payment_amount": סכום לתשלום
-- "child_first_name": שם הילד
-- "child_last_name": שם משפחה ילד
-- "child_grade": כיתה / גן
-- "child_id_number": תעודת זהות — OPTIONAL ONLY (required: false)
-- "allergies_has": יש אלרגיות?
-- "allergies_details": פירוט אלרגיות
-- "father_name": שם האב
-- "father_phone": טלפון האב
-- "mother_name": שם האם
-- "mother_phone": טלפון האם
+
 
 ## User Brief
 ${prompt}
