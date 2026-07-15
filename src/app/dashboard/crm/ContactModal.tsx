@@ -5,11 +5,11 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Contact, ContactEvent } from "@/features/crm/types";
-import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField } from "@/features/crm/actions";
+import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getContactUserSettings, saveContactUserSettings, getCustomTabs, addCustomTab, addCustomField, getSystemFieldLabels, updateCustomField } from "@/features/crm/actions";
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
 import { impersonateUser } from "@/features/users/impersonate";
-import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud } from "lucide-react";
+import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder } from "lucide-react";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -47,12 +47,60 @@ interface ContactModalProps {
 
 type TabType = "details" | "camp" | "tags" | "company" | "events" | "timeline" | "payments" | "userDetails";
 
+const EditableLabel = ({ label, fieldId, isCustom, onSave, canEdit = true }: { label: string, fieldId: string, isCustom: boolean, onSave: (id: string, newLabel: string, isCustom: boolean) => Promise<void>, canEdit?: boolean }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [val, setVal] = useState(label);
+  const [saving, setSaving] = useState(false);
+
+  if (!canEdit) return <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>;
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2 mb-1">
+        <Input autoFocus size="sm" value={val} onChange={e => setVal(e.target.value)} className="h-7 text-xs" />
+        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={saving} onClick={async () => {
+          setSaving(true);
+          await onSave(fieldId, val, isCustom);
+          setSaving(false);
+          setIsEditing(false);
+        }}>שמור</Button>
+        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={saving} onClick={() => { setVal(label); setIsEditing(false); }}>בטל</Button>
+      </div>
+    );
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1 group">
+      {label}
+      <button type="button" onClick={() => setIsEditing(true)} className="text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Edit className="w-3 h-3" />
+      </button>
+    </label>
+  );
+};
+
 export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactModalProps) {
   const isEdit = !!contact;
   const [activeTab, setActiveTab] = useState<TabType | "">("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
+
+  const [systemLabels, setSystemLabels] = useState<Record<string, string>>({});
+
+  const handleSaveLabel = async (fieldId: string, newLabel: string, isCustom: boolean) => {
+    if (isCustom) {
+      const res = await updateCustomField(fieldId, { label: newLabel });
+      if (res.success) {
+        setCustomFieldsConfig(prev => prev.map(f => f.id === fieldId ? { ...f, label: newLabel } : f));
+      } else {
+        alert("שגיאה בשמירת שם השדה: " + res.error);
+      }
+    } else {
+      alert("שגיאה: עריכת שדות מערכת מותרת רק ממסך ההגדרות למנהל העל.");
+    }
+  };
+
 
   const handleSyncWhatsApp = async () => {
     if (!contact?.id || !contaPhone) return;
@@ -126,6 +174,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
   useEffect(() => {
     getCustomFields().then(setCustomFieldsConfig);
     checkIsSuperAdmin().then(setIsSuperAdmin).catch(() => setIsSuperAdmin(false));
+    getSystemFieldLabels().then(setSystemLabels);
   }, []);
 
   const loadCustomTabs = async () => {
@@ -291,34 +340,135 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
 
   const renderCustomFields = (category: string) => {
     const fields = customFieldsConfig.filter(f => f.category === category);
-    if (fields.length === 0) return null;
-
-  
-  return (
-      <div className="mt-6 pt-6 border-t border-slate-100 col-span-full">
-        <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">שדות מותאמים אישית</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {fields.map(field => (
-            <div key={field.id} className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600">{field.label}</label>
-              {field.type === "textarea" ? (
-                <textarea
-                  value={customFieldsValues[field.id] || ""}
-                  onChange={(e) => setCustomFieldsValues(prev => ({...prev, [field.id]: e.target.value}))}
-                  rows={3}
-                  className="flex w-full rounded-2xl border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none"
-                />
-              ) : (
-                <Input
-                  type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                  value={customFieldsValues[field.id] || ""}
-                  onChange={(e) => setCustomFieldsValues(prev => ({...prev, [field.id]: e.target.value}))}
-                  className="rounded-xl bg-white"
-                />
-              )}
-            </div>
-          ))}
+    
+    return (
+      <div className="mt-6 pt-6 border-t border-white/5 col-span-full">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-sm font-black text-amber-500 uppercase tracking-wider">שדות מותאמים אישית</h4>
+          <Button type="button" onClick={() => setShowAddFieldModal(true)} className="bg-transparent border border-amber-500/50 hover:bg-amber-500/10 text-amber-500 rounded-xl text-xs py-1.5 px-3 flex items-center gap-2 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> הוסף שדה ללשונית זו
+          </Button>
         </div>
+        {fields.length === 0 ? (
+          <div className="text-center p-6 border border-dashed border-white/10 rounded-2xl text-amber-500/50 text-sm">
+            אין עדיין שדות מותאמים אישית בלשונית זו.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fields.map((f: any) => (
+              <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' ? 'col-span-1 md:col-span-2' : ''}`}>
+                <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />
+                
+                {f.type === 'documents' ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {(customFieldsValues[f.id] || []).map((doc: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2 bg-[#0a0a0a] text-amber-500 px-3 py-1.5 rounded-lg border border-amber-500/30 text-xs">
+                          <a href={typeof doc === 'string' ? doc : doc.url} target="_blank" className="hover:underline max-w-[200px] truncate font-semibold">
+                            {typeof doc === 'string' ? 'מסמך ' + (i+1) : doc.name}
+                          </a>
+                          <button type="button" onClick={() => {
+                            const newDocs = [...(customFieldsValues[f.id] || [])];
+                            newDocs.splice(i, 1);
+                            setCustomFieldsValues({ ...customFieldsValues, [f.id]: newDocs });
+                          }} className="text-amber-500/70 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 relative">
+                      <Input
+                        type="file"
+                        multiple
+                        disabled={uploadingFieldId === f.id}
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (!files || files.length === 0) return;
+                          setUploadingFieldId(f.id);
+                          const newDocs = [...(customFieldsValues[f.id] || [])];
+                          for (let i = 0; i < files.length; i++) {
+                            const file = files[i];
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            try {
+                              const res = await uploadMediaFile(formData);
+                              if (res.success && res.url) {
+                                newDocs.push({ name: file.name, url: res.url });
+                              }
+                            } catch (err) {
+                              console.error("Upload failed", err);
+                            }
+                          }
+                          setCustomFieldsValues({ ...customFieldsValues, [f.id]: newDocs });
+                          setUploadingFieldId(null);
+                          e.target.value = "";
+                        }}
+                        className="bg-transparent border border-amber-500 text-white rounded-xl text-xs py-2 h-auto focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                      />
+                      {uploadingFieldId === f.id && (
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-white px-2 py-1 rounded-md">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> מעלה...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : f.type === 'repeater' ? (
+                  <div className="space-y-3 bg-[#1a1a1a] p-3 rounded-xl border border-amber-500/30">
+                    {(customFieldsValues[f.id] || []).map((row: any, rIdx: number) => (
+                      <div key={rIdx} className="flex gap-2 items-end bg-[#0a0a0a] p-2 rounded-lg border border-amber-500/30 relative group">
+                        <button type="button" onClick={() => {
+                          const newArr = [...(customFieldsValues[f.id] || [])];
+                          newArr.splice(rIdx, 1);
+                          setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
+                        }} className="absolute -left-2 -top-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all border border-red-100 shadow-sm">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <div className="flex-1 flex flex-wrap gap-2">
+                          {f.subFields?.map((sf: any) => (
+                            <div key={sf.id} className="flex-1 min-w-[120px]">
+                              <label className="text-[10px] font-bold text-amber-500 block mb-1">{sf.label}</label>
+                              <Input
+                                type={sf.type === 'number' ? 'number' : sf.type === 'date' ? 'date' : 'text'}
+                                value={row[sf.id] || ""}
+                                onChange={(e) => {
+                                  const newArr = [...(customFieldsValues[f.id] || [])];
+                                  newArr[rIdx] = { ...newArr[rIdx], [sf.id]: e.target.value };
+                                  setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
+                                }}
+                                className="h-8 text-xs bg-transparent border border-amber-500 text-white placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                                placeholder={sf.label}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <Button type="button" onClick={() => {
+                      setCustomFieldsValues({ ...customFieldsValues, [f.id]: [...(customFieldsValues[f.id] || []), {}] });
+                    }} variant="ghost" className="w-full h-8 text-xs text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
+                      <Plus className="w-3.5 h-3.5 ml-1" /> הוסף פריט ל{f.label}
+                    </Button>
+                  </div>
+                ) : f.type === "textarea" ? (
+                  <textarea
+                    value={customFieldsValues[f.id] || ""}
+                    onChange={(e) => setCustomFieldsValues(prev => ({...prev, [f.id]: e.target.value}))}
+                    rows={3}
+                    className="flex w-full rounded-2xl bg-transparent border border-amber-500 text-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 placeholder:text-white/30"
+                  />
+                ) : (
+                  <Input
+                    type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                    value={customFieldsValues[f.id] || ""}
+                    onChange={(e) => setCustomFieldsValues(prev => ({...prev, [f.id]: e.target.value}))}
+                    className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -434,30 +584,30 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                 <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">מידע בסיסי</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">שם פרטי *</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_name'] || "שם פרטי *"}</label>
                     <Input
                       value={contaName}
                       onChange={(e) => setContaName(e.target.value)}
                       required
                       placeholder="הקלד שם פרטי..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">שם משפחה</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_last_name'] || "שם משפחה"}</label>
                     <Input
                       value={fM}
                       onChange={(e) => setFM(e.target.value)}
                       placeholder="הקלד שם משפחה..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">מגדר</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_gender'] || "מגדר"}</label>
                     <select
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
-                      className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
                     >
                       <option value="">בחר מגדר...</option>
                       <option value="זכר">זכר</option>
@@ -466,12 +616,12 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">תאריך לידה</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_birthdate'] || "תאריך לידה"}</label>
                     <Input
                       type="date"
                       value={birthDate}
                       onChange={(e) => setBirthDate(e.target.value)}
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                 </div>
@@ -481,41 +631,41 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                 <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">פרטי יצירת קשר וכתובת</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">טלפון נייד *</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_phone'] || "טלפון נייד *"}</label>
                     <Input
                       value={contaPhone}
                       onChange={(e) => setContaPhone(e.target.value)}
                       required
                       placeholder="05x-xxxxxxx"
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">דואר אלקטרוני</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_email'] || "דואר אלקטרוני"}</label>
                     <Input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="example@mail.com"
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">עיר</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_city'] || "עיר"}</label>
                     <Input
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="אזור מגורים..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">רחוב</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_street'] || "רחוב"}</label>
                     <Input
                       value={street}
                       onChange={(e) => setStreet(e.target.value)}
                       placeholder="רחוב ומספר..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                 </div>
@@ -765,37 +915,37 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                 <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">תוויות ותיוג</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">תג 1</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_tag1'] || "תג 1"}</label>
                     <Input
                       value={tg1}
                       onChange={(e) => setTg1(e.target.value)}
                       placeholder="הקלד תגית 1..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">תג 2</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_tag2'] || "תג 2"}</label>
                     <Input
                       value={tg2}
                       onChange={(e) => setTg2(e.target.value)}
                       placeholder="הקלד תגית 2..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">תג 3</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_tag3'] || "תג 3"}</label>
                     <Input
                       value={tg3}
                       onChange={(e) => setTg3(e.target.value)}
                       placeholder="הקלד תגית 3..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">הערות כלליות</label>
+                <label className="text-xs font-bold text-amber-500">הערות כלליות</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -830,43 +980,43 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
               <div className="p-6 bg-[#111] animate-in fade-in duration-200">
             <div className="space-y-6 animate-in fade-in">
               <div>
-                <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">תעסוקה וארגון</h4>
+                <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">מידע על החברה</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">שם החברה</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_company'] || "שם החברה / ארגון"}</label>
                     <Input
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="שם מקום העבודה..."
-                      className="rounded-xl"
+                      placeholder="שם העסק..."
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">תפקיד</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_title'] || "תפקיד"}</label>
                     <Input
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
-                      placeholder="הגדרת התפקיד..."
-                      className="rounded-xl"
+                      placeholder="תפקיד בארגון..."
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">טלפון עבודה</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_work_phone'] || "טלפון עבודה"}</label>
                     <Input
                       value={workPhone}
                       onChange={(e) => setWorkPhone(e.target.value)}
                       placeholder="טלפון משרדי..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">אתר אינטרנט</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_website'] || "אתר אינטרנט"}</label>
                     <Input
                       type="url"
                       value={website}
                       onChange={(e) => setWebsite(e.target.value)}
                       placeholder="https://example.com"
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                     />
                   </div>
                 </div>
@@ -876,11 +1026,11 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                 <h4 className="text-sm font-black text-slate-400 mb-3 uppercase tracking-wider">מקור לידים ומעקב</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">מקור הליד</label>
+                    <label className="text-xs font-bold text-amber-500">{systemLabels['conta_lead_source'] || "מקור הליד"}</label>
                     <select
                       value={leadSource}
                       onChange={(e) => setLeadSource(e.target.value)}
-                      className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-10 w-full bg-[#0a0a0a] border border-amber-500 text-white rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
                     >
                       <option value="">בחר מקור...</option>
                       <option value="טופס מהאתר">טופס מהאתר</option>
@@ -892,12 +1042,12 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">טופס אחרון שהוגש</label>
+                    <label className="text-xs font-bold text-amber-500">טופס אחרון שהוגש</label>
                     <Input
                       value={lastFormName}
                       onChange={(e) => setLastFormName(e.target.value)}
                       placeholder="שם הטופס..."
-                      className="rounded-xl"
+                      className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                       disabled
                     />
                   </div>
@@ -1122,7 +1272,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                 ) : (
                   <div className="border rounded-2xl overflow-hidden bg-white shadow-sm max-h-[200px] overflow-y-auto">
                     <table className="w-full text-right text-xs">
-                      <thead className="bg-slate-50 border-b font-bold text-slate-600">
+                      <thead className="bg-slate-50 border-b font-bold text-amber-500">
                         <tr>
                           <th className="p-3">סכום</th>
                           <th className="p-3">תאריך</th>
@@ -1193,7 +1343,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {customFieldsConfig.filter(f => f.category === tab.id).map((f: any) => (
                           <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' ? 'col-span-1 md:col-span-2' : ''}`}>
-                            <label className="text-xs font-bold text-slate-600">{f.label}</label>
+                            <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />
                             
                             {f.type === 'documents' ? (
                               <div className="space-y-2">
@@ -1240,7 +1390,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                                       setUploadingFieldId(null);
                                       e.target.value = "";
                                     }}
-                                    className="bg-white border border-slate-200 rounded-xl text-xs py-2 h-auto"
+                                    className="bg-transparent border border-amber-500 text-white rounded-xl text-xs py-2 h-auto focus-visible:ring-amber-500 focus-visible:border-amber-500"
                                   />
                                   {uploadingFieldId === f.id && (
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-white px-2 py-1 rounded-md">
@@ -1249,13 +1399,50 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                                   )}
                                 </div>
                               </div>
+                            ) : f.type === 'repeater' ? (
+                              <div className="space-y-3 bg-[#1a1a1a] p-3 rounded-xl border border-amber-500/30">
+                                {(customFieldsValues[f.id] || []).map((row: any, rIdx: number) => (
+                                  <div key={rIdx} className="flex gap-2 items-end bg-[#0a0a0a] p-2 rounded-lg border border-amber-500/30 relative group">
+                                    <button type="button" onClick={() => {
+                                      const newArr = [...(customFieldsValues[f.id] || [])];
+                                      newArr.splice(rIdx, 1);
+                                      setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
+                                    }} className="absolute -left-2 -top-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all border border-red-100 shadow-sm">
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                    <div className="flex-1 flex flex-wrap gap-2">
+                                      {f.subFields?.map((sf: any) => (
+                                        <div key={sf.id} className="flex-1 min-w-[120px]">
+                                          <label className="text-[10px] font-bold text-amber-500 block mb-1">{sf.label}</label>
+                                          <Input
+                                            type={sf.type === 'number' ? 'number' : sf.type === 'date' ? 'date' : 'text'}
+                                            value={row[sf.id] || ""}
+                                            onChange={(e) => {
+                                              const newArr = [...(customFieldsValues[f.id] || [])];
+                                              newArr[rIdx] = { ...newArr[rIdx], [sf.id]: e.target.value };
+                                              setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
+                                            }}
+                                            className="h-8 text-xs bg-transparent border border-amber-500 text-white placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
+                                            placeholder={sf.label}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                                <Button type="button" onClick={() => {
+                                  setCustomFieldsValues({ ...customFieldsValues, [f.id]: [...(customFieldsValues[f.id] || []), {}] });
+                                }} variant="ghost" className="w-full h-8 text-xs text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
+                                  <Plus className="w-3.5 h-3.5 ml-1" /> הוסף פריט ל{f.label}
+                                </Button>
+                              </div>
                             ) : (
                               <Input
                                 type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
                                 value={customFieldsValues[f.id] || ""}
                                 onChange={(e) => setCustomFieldsValues({ ...customFieldsValues, [f.id]: e.target.value })}
                                 placeholder={f.label}
-                                className="bg-white border border-slate-200 rounded-xl"
+                                className="bg-transparent border border-amber-500 text-white rounded-xl placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
                               />
                             )}
                           </div>
@@ -1275,17 +1462,20 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
           </div>
 
           {/* Footer buttons */}
-          <Modal.Footer className="bg-transparent border-t-0 p-0 mt-8">
-            <div className="flex w-full justify-start rtl:justify-end">
-              <Button
-                type="submit"
-                variant="primary"
-                className="rounded-2xl font-black bg-[#5B45F8] hover:bg-[#4a36d6] text-white h-[56px] px-8 min-w-[160px] shadow-lg shadow-indigo-500/20"
-                disabled={loading}
-              >
-                {loading ? "שומר..." : (isEdit ? "שמור שינויים" : "צור איש קשר")}
-              </Button>
-            </div>
+          <Modal.Footer className="bg-transparent border-t-0 p-0 mt-8 flex justify-end">
+            <Button
+              type="submit"
+              variant="ghost"
+              className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[#1a1a1a] hover:bg-[#222] border border-white/5 transition-all group"
+              disabled={loading}
+              title={isEdit ? "שמור שינויים" : "צור איש קשר"}
+            >
+              {loading ? (
+                <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+              ) : (
+                <Folder className="w-8 h-8 text-white group-hover:text-amber-500 transition-colors" />
+              )}
+            </Button>
           </Modal.Footer>
         </form>
         </div>
@@ -1311,9 +1501,9 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         onSave={async (data: any) => {
           if (!activeTab) return;
           setIsAddingField(true);
-          const res = await addCustomField({ category: activeTab as string, label: data.label, type: data.type });
+          const res = await addCustomField({ category: activeTab as string, label: data.label, type: data.type, subFields: data.subFields });
           if (res.success && res.field) {
-            const newField = { id: res.field.id, category: activeTab as string, label: data.label, type: data.type };
+            const newField = { id: res.field.id, category: activeTab as string, label: data.label, type: data.type, subFields: data.subFields };
             setCustomFieldsConfig([...customFieldsConfig, newField]);
             setShowAddFieldModal(false);
           }
@@ -1334,7 +1524,7 @@ function AddTabModal({ isOpen, onClose, onSave, isAdding }: any) {
         <h3 className="text-xl font-black text-white text-right">הוספת לשונית חדשה</h3>
         <div className="space-y-1.5 text-right">
           <label className="text-xs font-bold text-slate-400">כותרת הלשונית</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="לדוגמה: פרטי רכב" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="לדוגמה: פרטי רכב" className="bg-[#181818] border-white/10 text-white placeholder:text-slate-500 rounded-xl" />
         </div>
         <div className="space-y-1.5 text-right">
           <label className="text-xs font-bold text-slate-400">אייקון</label>
@@ -1359,14 +1549,31 @@ function AddTabModal({ isOpen, onClose, onSave, isAdding }: any) {
 function AddFieldModal({ isOpen, onClose, onSave, isAdding }: any) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState("text");
+  const [subFields, setSubFields] = useState<any[]>([]);
+
   if (!isOpen) return null;
+
+  const handleAddSubField = () => {
+    setSubFields([...subFields, { id: `sub_${Date.now()}`, label: "", type: "text" }]);
+  };
+
+  const handleSubFieldChange = (index: number, key: string, value: string) => {
+    const updated = [...subFields];
+    updated[index][key] = value;
+    setSubFields(updated);
+  };
+
+  const handleRemoveSubField = (index: number) => {
+    setSubFields(subFields.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-[2rem] p-6 space-y-6 shadow-2xl">
+      <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-[2rem] p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-black text-white text-right">הוספת שדה ללשונית</h3>
         <div className="space-y-1.5 text-right">
-          <label className="text-xs font-bold text-slate-400">שם השדה</label>
-          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="לדוגמה: סוג רכב" />
+          <label className="text-xs font-bold text-slate-400">שם השדה / רשימה</label>
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="לדוגמה: סוג רכב / רכבים" className="bg-[#181818] border-white/10 text-white placeholder:text-slate-500 rounded-xl" />
         </div>
         <div className="space-y-1.5 text-right">
           <label className="text-xs font-bold text-slate-400">סוג נתונים</label>
@@ -1375,11 +1582,36 @@ function AddFieldModal({ isOpen, onClose, onSave, isAdding }: any) {
             <option value="number">מספר (Number)</option>
             <option value="date">תאריך (Date)</option>
             <option value="documents">מסמכים (קובץ/תמונה מרובים)</option>
+            <option value="repeater">שדה חוזר (רשימה)</option>
           </select>
         </div>
+
+        {type === "repeater" && (
+          <div className="space-y-3 border-t border-white/10 pt-4 mt-4">
+            <label className="text-xs font-bold text-slate-400 text-right block">תתי-שדות (מיני-טופס)</label>
+            {subFields.map((sf, idx) => (
+              <div key={sf.id} className="flex gap-2 items-center bg-white/5 p-2 rounded-xl">
+                <select value={sf.type} onChange={e => handleSubFieldChange(idx, 'type', e.target.value)} className="w-1/3 bg-[#181818] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none">
+                  <option value="text">טקסט</option>
+                  <option value="number">מספר</option>
+                  <option value="date">תאריך</option>
+                  <option value="url">URL</option>
+                </select>
+                <Input value={sf.label} onChange={e => handleSubFieldChange(idx, 'label', e.target.value)} placeholder="שם תת-שדה" className="w-1/2 h-8 text-xs bg-[#181818] border-white/10 text-white placeholder:text-slate-500" />
+                <button type="button" onClick={() => handleRemoveSubField(idx)} className="text-red-400 hover:text-red-500 w-1/6 flex justify-center">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <Button type="button" onClick={handleAddSubField} variant="ghost" className="w-full text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 text-xs h-8">
+              <Plus className="w-3.5 h-3.5 ml-1" /> הוסף תת-שדה
+            </Button>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <Button type="button" onClick={onClose} className="flex-1 bg-white/10 text-white rounded-xl">ביטול</Button>
-          <Button type="button" onClick={() => onSave({ label, type })} disabled={isAdding || !label} className="flex-1 bg-emerald-600 text-white rounded-xl">שמור</Button>
+          <Button type="button" onClick={() => onSave({ label, type, subFields: type === 'repeater' ? subFields : undefined })} disabled={isAdding || !label || (type === 'repeater' && subFields.length === 0)} className="flex-1 bg-emerald-600 text-white rounded-xl">שמור</Button>
         </div>
       </div>
     </div>

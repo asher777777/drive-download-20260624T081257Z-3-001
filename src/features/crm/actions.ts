@@ -701,7 +701,20 @@ export async function submitCRMForm(params: {
       updatedAt: new Date().toISOString(),
     };
 
-    // Append any field that was mapped, including custom dynamic fields
+    // Fetch custom fields to check for repeaters
+    let customFieldsMap = new Map();
+    try {
+      const docRef = adminDb.collection("crm_settings").doc(`custom_fields_${finalOwnerId}`);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const fields = docSnap.data()?.fields || [];
+        fields.forEach((f: any) => customFieldsMap.set(f.id, f));
+      }
+    } catch (err) {}
+
+    // Process mapped fields, including custom dynamic fields
+    const repeaterAppends: Record<string, any> = {};
+
     Object.keys(contactData).forEach((key) => {
       if (
         contactData[key] !== undefined && 
@@ -710,8 +723,33 @@ export async function submitCRMForm(params: {
         key !== "email" && 
         key !== "conta_phone"
       ) {
+        // Check if it's a mapping to a repeater sub-field (format: repeaterId.subFieldId)
+        if (key.includes('.')) {
+          const [repeaterId, subFieldId] = key.split('.');
+          if (customFieldsMap.has(repeaterId) && customFieldsMap.get(repeaterId).type === 'repeater') {
+            if (!repeaterAppends[repeaterId]) repeaterAppends[repeaterId] = {};
+            repeaterAppends[repeaterId][subFieldId] = contactData[key];
+            return;
+          }
+        }
+        
+        // Check if it's mapped directly to a repeater field (as a whole string)
+        if (customFieldsMap.has(key) && customFieldsMap.get(key).type === 'repeater') {
+          if (!repeaterAppends[key]) repeaterAppends[key] = {};
+          // Fallback to storing in a default 'value' sub-field or first sub-field
+          const firstSubField = customFieldsMap.get(key).subFields?.[0]?.id || 'value';
+          repeaterAppends[key][firstSubField] = contactData[key];
+          return;
+        }
+
         dbData[key] = contactData[key];
       }
+    });
+
+    // Append repeater objects to existing arrays
+    Object.keys(repeaterAppends).forEach((repeaterId) => {
+      const existingArray = existingData?.[repeaterId] || [];
+      dbData[repeaterId] = [...existingArray, repeaterAppends[repeaterId]];
     });
 
     if (amountPaid) {
@@ -1010,6 +1048,67 @@ export async function addCustomField(field: Omit<{id: string; category: string; 
     return { success: true, field: newField };
   } catch (error: any) {
     console.error("Error in addCustomField:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
+// 15.5 Update custom CRM field
+export async function updateCustomField(fieldId: string, updates: Partial<{ category: string; type: string; label: string; subFields: any[] }>) {
+  try {
+    const ownerId = await getUserId();
+    const docRef = adminDb.collection("crm_settings").doc(`custom_fields_${ownerId}`);
+    const docSnap = await docRef.get();
+    
+    if (!docSnap.exists) {
+      throw new Error("No custom fields found");
+    }
+    
+    const data = docSnap.data();
+    const fields = data?.fields || [];
+    const index = fields.findIndex((f: any) => f.id === fieldId);
+    
+    if (index === -1) {
+      throw new Error("Field not found");
+    }
+    
+    fields[index] = { ...fields[index], ...updates };
+    await docRef.update({ fields });
+    
+    return { success: true, field: fields[index] };
+  } catch (error: any) {
+    console.error("Error in updateCustomField:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
+// 15.6 Get system field labels (Admin override)
+export async function getSystemFieldLabels() {
+  try {
+    const docRef = adminDb.collection("global_settings").doc("crm_labels");
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      return {};
+    }
+    const data = docSnap.data();
+    return (data?.labels || {}) as Record<string, string>;
+  } catch (error) {
+    console.error("Error in getSystemFieldLabels:", error);
+    return {};
+  }
+}
+
+// 15.7 Save system field labels (Admin override)
+export async function saveSystemFieldLabels(labels: Record<string, string>) {
+  try {
+    const isAdmin = await checkIsSuperAdmin();
+    if (!isAdmin) throw new Error("Unauthorized: Only Super Admin can update system labels");
+
+    const docRef = adminDb.collection("global_settings").doc("crm_labels");
+    await docRef.set({ labels }, { merge: true });
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in saveSystemFieldLabels:", error);
     return { success: false, error: error.message || String(error) };
   }
 }
