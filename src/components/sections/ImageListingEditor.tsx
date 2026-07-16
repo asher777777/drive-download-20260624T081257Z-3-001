@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Image, X, Plus, FormInput, Grid3x3, ChevronDown, ChevronUp, Monitor, Smartphone, Layout, Copy } from "lucide-react";
+import { Image, X, Plus, FormInput, Grid3x3, ChevronDown, ChevronUp, Monitor, Smartphone, Layout, Copy, Type } from "lucide-react";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { CRMFormBuilder, type FormConfig } from "@/features/crm/components/CRMFormBuilder";
 
@@ -18,6 +18,7 @@ interface ImageListingEditorProps {
 export function ImageListingEditor({ config, onChange }: ImageListingEditorProps) {
   const [editingFormIndex, setEditingFormIndex] = useState<number | null>(null);
   const [isLayoutExpanded, setIsLayoutExpanded] = useState(false);
+  const [isTitleExpanded, setIsTitleExpanded] = useState(false);
 
   // Normalize images to always be objects
   const images: ImageListingItem[] = (config.images || []).map((img: any) => {
@@ -181,6 +182,61 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                       onChange={(e) => updateField("backgroundColor", e.target.value)}
                       className="bg-[#181818] border border-white/10 rounded-lg px-4 py-3 text-white font-mono text-sm uppercase flex-1 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Title Settings */}
+          <div className="bg-[#181818] rounded-xl border border-white/10 overflow-hidden">
+            <div 
+              className="p-5 flex items-center justify-between cursor-pointer hover:bg-[#1a1a20] transition-colors"
+              onClick={() => setIsTitleExpanded(!isTitleExpanded)}
+            >
+              <div className="flex items-center gap-3">
+                <Type className="w-5 h-5 text-amber-500" />
+                <h3 className="font-semibold text-white text-lg">כותרת האזור</h3>
+              </div>
+              <div className="text-slate-400">
+                {isTitleExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </div>
+            </div>
+            
+            {isTitleExpanded && (
+              <div className="p-5 border-t border-white/10 space-y-6 bg-[#111]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-slate-300 text-sm font-medium flex items-center gap-2">
+                      טקסט כותרת
+                    </label>
+                    <input
+                      type="text"
+                      value={config.title || ""}
+                      onChange={(e) => updateField("title", e.target.value)}
+                      placeholder="הכנס כותרת (אופציונלי)"
+                      className="w-full bg-[#181818] border border-white/10 rounded-lg px-4 py-2.5 text-white outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-300 text-sm font-medium flex items-center gap-2">
+                      צבע כותרת
+                    </label>
+                    <div className="flex gap-2 relative group">
+                      <input
+                        type="color"
+                        value={config.titleColor || "#ffffff"}
+                        onChange={(e) => updateField("titleColor", e.target.value)}
+                        className="w-10 h-10 rounded cursor-pointer border border-white/10"
+                      />
+                      <input
+                        type="text"
+                        value={config.titleColor || "#ffffff"}
+                        onChange={(e) => updateField("titleColor", e.target.value)}
+                        className="flex-1 bg-[#181818] border border-white/10 rounded-lg px-3 py-2 text-white font-mono uppercase focus:border-amber-500/50 outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

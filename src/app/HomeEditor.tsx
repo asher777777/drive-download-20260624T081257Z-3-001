@@ -629,7 +629,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4 border-b border-white/10 pb-4">
+            <div className="grid grid-cols-4 gap-4 border-b border-white/10 pb-4">
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-slate-400 font-medium">צבע רקע</label>
                 <div className="flex items-center gap-2">
@@ -654,6 +654,30 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                   <span className="text-xs text-slate-300" dir="ltr">{config.hero.hoverColor || "#f8fafc"}</span>
                 </div>
               </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 font-medium">צבע כותרת</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={config.hero.titleColor || "#ffffff"}
+                    onChange={(e) => setConfig({ ...config, hero: { ...config.hero, titleColor: e.target.value }})}
+                    className="w-8 h-8 p-0 border-0 rounded cursor-pointer bg-transparent"
+                  />
+                  <span className="text-xs text-slate-300" dir="ltr">{config.hero.titleColor || ""}</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 font-medium">צבע תיאור</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={config.hero.descriptionColor || "#ffffff"}
+                    onChange={(e) => setConfig({ ...config, hero: { ...config.hero, descriptionColor: e.target.value }})}
+                    className="w-8 h-8 p-0 border-0 rounded cursor-pointer bg-transparent"
+                  />
+                  <span className="text-xs text-slate-300" dir="ltr">{config.hero.descriptionColor || ""}</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -664,11 +688,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
               >
                 <option value="fz">המסלול הטבעי (F/Z)</option>
-                <option value="bento">קופסת הבנטו (Bento Grid)</option>
-                <option value="modular">שולחן עבודה (Modular)</option>
-                <option value="progressive">הלובי השקט (Progressive)</option>
                 <option value="spatial">הגלריה היוקרתית (Spatial)</option>
-                <option value="thumb">אזור האגודל (Mobile Thumb)</option>
               </select>
             </div>
           </div>
@@ -707,6 +727,8 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               secondaryButton={config.hero.secondaryButton}
               availableAnchors={availableAnchors}
               backgroundColor={config.hero.backgroundColor}
+              titleColor={config.hero.titleColor}
+              descriptionColor={config.hero.descriptionColor}
               heroStyle={config.hero.heroStyle}
               flexDirection={config.hero.flexDirection}
               formMode={config.hero.formMode}
@@ -1679,6 +1701,8 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             primaryButton={config.hero.primaryButton}
             secondaryButton={config.hero.secondaryButton}
             backgroundColor={config.hero.backgroundColor || globalSettings.backgroundColor}
+            titleColor={config.hero.titleColor}
+            descriptionColor={config.hero.descriptionColor}
             isEditing={false}
             priority={true}
           />
@@ -1849,8 +1873,20 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
     ...(globalSettings.buttonTextColor ? { '--button-text': globalSettings.buttonTextColor } : {}),
   } as React.CSSProperties;
 
+  const resetStyle = { 
+    '--primary': '', 
+    '--secondary': '', 
+    '--background': '', 
+    '--foreground': '',
+    '--heading-1': '',
+    '--heading-2': '',
+    '--heading-3': '',
+    '--button-bg': '',
+    '--button-text': '' 
+  } as React.CSSProperties;
+
   return (
-    <div className="flex flex-col min-h-screen" style={customStyle}>
+    <div className={cn("flex flex-col min-h-screen", globalSettings.theme ? `theme-${globalSettings.theme}` : "theme-navy")} style={customStyle}>
       {((config as any).isHeaderVisible ?? true) && (
         <Navbar 
           layout={globalSettings.headerLayout} 
@@ -1863,7 +1899,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
       
       {/* SEO Editor Panel at Top */}
       {isSeoPanelOpen && (
-        <div className="bg-slate-50 border-b shadow-inner p-6 animate-in slide-in-from-top-4 duration-300 relative z-[200]" dir="rtl">
+        <div className="bg-slate-50 border-b shadow-inner p-6 animate-in slide-in-from-top-4 duration-300 relative z-[200]" dir="rtl" style={resetStyle}>
           <div className="max-w-5xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -2063,7 +2099,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
 
       {/* Side Settings Drawer Modal */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[240] bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
+        <div className="fixed inset-0 z-[240] bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} style={resetStyle} />
       )}
       
       <div 
@@ -2072,6 +2108,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
           isDrawerOpen ? "translate-x-0" : "-translate-x-full"
         )}
         dir="rtl"
+        style={resetStyle}
       >
         {/* Drawer Header */}
         <div className="p-6 border-b flex items-center justify-between bg-slate-50/50">
@@ -2188,7 +2225,19 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                       <button
                         key={t.value}
                         type="button"
-                        onClick={() => setGlobalSettings({ ...globalSettings, theme: t.value as any })}
+                        onClick={() => setGlobalSettings({ 
+                          ...globalSettings, 
+                          theme: t.value as any,
+                          primaryColor: "",
+                          secondaryColor: "",
+                          backgroundColor: "",
+                          textColor: "",
+                          textColorH1: "",
+                          textColorH2: "",
+                          textColorH3: "",
+                          buttonBgColor: "",
+                          buttonTextColor: ""
+                        })}
                         className={cn(
                           "w-full p-3 rounded-xl border flex items-center justify-between text-sm font-semibold transition-all cursor-pointer",
                           isSelected 
@@ -2300,7 +2349,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                       size="sm" 
                       onClick={() => {
                         if (initialGlobalSettings) {
-                          setGlobalSettings(initialGlobalSettings);
+                          setGlobalSettings({ ...initialGlobalSettings });
                         } else {
                           setGlobalSettings({ siteLogoUrl: "", headerLayout: "classic", theme: "navy", navLinks: [] } as any);
                         }

@@ -20,6 +20,8 @@ interface ImageListingSectionProps {
   embeddingPostId?: string;
   embeddingCollection?: string;
   isEditing?: boolean;
+  title?: string;
+  titleColor?: string;
 }
 
 export const ImageListingSection = ({
@@ -32,6 +34,8 @@ export const ImageListingSection = ({
   embeddingPostId,
   embeddingCollection,
   isEditing = false,
+  title,
+  titleColor,
 }: ImageListingSectionProps) => {
   const [selectedImageForm, setSelectedImageForm] = useState<FormConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,31 +55,36 @@ export const ImageListingSection = ({
   const mobileCols = Number(imagesPerRowMobile) || 1;
   const desktopCols = Number(imagesPerRow) || 4;
   
-  const gridColsMobile = {
-    1: "grid-cols-1",
-    2: "grid-cols-2",
-    3: "grid-cols-3",
-    4: "grid-cols-4"
-  }[mobileCols] || "grid-cols-1";
+  const widthMobile = {
+    1: "w-full",
+    2: "w-[calc(50%-0.5rem)]",
+    3: "w-[calc(33.333%-0.666rem)]",
+    4: "w-[calc(25%-0.75rem)]"
+  }[mobileCols] || "w-full";
 
-  const gridColsDesktop = { 
-    1: "sm:grid-cols-1", 
-    2: "sm:grid-cols-2", 
-    3: "sm:grid-cols-3", 
-    4: "sm:grid-cols-4", 
-    5: "sm:grid-cols-5", 
-    6: "sm:grid-cols-6" 
-  }[desktopCols] || "sm:grid-cols-4";
+  const widthDesktop = { 
+    1: "sm:w-full", 
+    2: "sm:w-[calc(50%-0.5rem)]", 
+    3: "sm:w-[calc(33.333%-0.666rem)]", 
+    4: "sm:w-[calc(25%-0.75rem)]", 
+    5: "sm:w-[calc(20%-0.8rem)]", 
+    6: "sm:w-[calc(16.666%-0.833rem)]" 
+  }[desktopCols] || "sm:w-[calc(25%-0.75rem)]";
 
   return (
     <section id={id} className="py-16 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor }} dir="rtl">
       <div className="max-w-7xl mx-auto">
+        {title && (
+          <h2 className="text-3xl md:text-5xl font-bold text-center mb-12" style={{ color: titleColor || 'var(--heading-2)' }}>
+            {title}
+          </h2>
+        )}
         {images.length === 0 ? (
           <div className="text-center p-12 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 bg-slate-50/50">
             לא נבחרו תמונות לאזור זה. בחר תמונות בעורך.
           </div>
         ) : (
-          <div className={`grid ${gridColsMobile} ${gridColsDesktop} gap-4 w-full`}>
+          <div className="flex flex-row flex-wrap justify-center gap-4 w-full">
             {images.map((img, index) => {
               if (!img) return null;
               const url = typeof img === "string" ? img : img.url;
@@ -84,7 +93,7 @@ export const ImageListingSection = ({
               return (
                 <div 
                   key={`${url}-${index}`}
-                  className={`relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
+                  className={`relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${widthMobile} ${widthDesktop} ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
                   onClick={() => handleImageClick(img)}
                 >
                   <img 

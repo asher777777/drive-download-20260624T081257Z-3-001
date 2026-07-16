@@ -51,6 +51,8 @@ interface HeroProps {
   isEditing?: boolean;
   availableAnchors?: { id: string, label: string }[];
   backgroundColor?: string;
+  titleColor?: string;
+  descriptionColor?: string;
   heroStyle?: "hero" | "content" | "landing";
   flexDirection?: "row" | "row-reverse" | "col" | "col-reverse";
   form?: FormConfig;
@@ -68,15 +70,24 @@ const EditableText = ({
   onChange, 
   isEditing, 
   className,
+  style,
   richText = false
 }: any) => {
+  const mergedStyle = style?.color ? {
+    ...style,
+    '--heading-1': style.color,
+    '--heading-2': style.color,
+    '--heading-3': style.color,
+    '--heading-4': style.color
+  } : style;
+
   if (!isEditing) {
-    return <Tag className={className} dangerouslySetInnerHTML={{ __html: value }} />;
+    return <Tag className={className} style={mergedStyle} dangerouslySetInnerHTML={{ __html: value }} />;
   }
   
   if (richText) {
     return (
-      <div className={cn(className, "relative")}>
+      <div className={cn(className, "relative")} style={mergedStyle}>
         <AITextHelper value={value} onChange={onChange} className="left-2 top-2 z-[90]" />
         <RichTextEditor value={value} onChange={onChange} />
       </div>
@@ -90,6 +101,7 @@ const EditableText = ({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={cn(className, "bg-black/20 border border-white/30 rounded-lg p-2 pl-24 outline-none focus:bg-black/40 transition-colors w-full resize-none")}
+          style={mergedStyle}
           rows={3}
         />
         <AITextHelper value={value} onChange={onChange} />
@@ -104,6 +116,7 @@ const EditableText = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(className, "bg-black/20 border border-white/30 rounded-lg p-2 pl-24 outline-none focus:bg-black/40 transition-colors w-full")}
+        style={mergedStyle}
       />
       <AITextHelper value={value} onChange={onChange} />
     </div>
@@ -123,6 +136,8 @@ export const Hero = ({
   isEditing = false,
   availableAnchors = [],
   backgroundColor,
+  titleColor,
+  descriptionColor,
   heroStyle = "hero",
   flexDirection = "row",
   formMode = "visible",
@@ -195,9 +210,9 @@ export const Hero = ({
             {/* Content side */}
             <div className="w-full md:w-1/2 flex flex-col justify-center px-8 md:px-16 py-12 md:py-24 z-20">
               <div className="max-w-xl text-right mx-auto w-full">
-                <EditableText tag="h2" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 leading-tight text-foreground" />
+                <EditableText tag="h2" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 leading-tight text-foreground" style={titleColor ? { color: titleColor } : undefined} />
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-xl md:text-2xl font-medium mb-8 text-foreground" style={{ opacity: 0.8 }} />
-                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-lg text-foreground mb-12" style={{ opacity: 0.8 }} />
+                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-lg text-foreground mb-12" style={{ opacity: 0.8, ...(descriptionColor ? { color: descriptionColor } : {}) }} />
                 <div className="hidden md:block">
                   <HeroActions />
                 </div>
@@ -239,8 +254,8 @@ export const Hero = ({
                 <div className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
                   <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className={`text-sm font-medium ${activeTheme.accent}`} />
                 </div>
-                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] text-white" />
-                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-2xl" />
+                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] text-white" style={titleColor ? { color: titleColor } : undefined} />
+                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-2xl" style={descriptionColor ? { color: descriptionColor } : undefined} />
                 <HeroActions />
                 {formMode === "modal" && form && (
                   <Modal isOpen={isRegisterModalOpen} onClose={() => setIsRegisterModalOpen(false)}>
@@ -298,8 +313,8 @@ export const Hero = ({
             <div className="space-y-8 animate-in slide-in-from-right-8 duration-1000">
               <div className="space-y-4">
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-secondary font-bold tracking-widest uppercase text-sm md:text-base" />
-                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-5xl md:text-7xl font-extrabold text-white tracking-tight leading-tight" />
-                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl text-white/90 leading-relaxed max-w-lg" />
+                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-5xl md:text-7xl font-extrabold text-white tracking-tight leading-tight" style={titleColor ? { color: titleColor } : undefined} />
+                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl text-white/90 leading-relaxed max-w-lg" style={descriptionColor ? { color: descriptionColor } : undefined} />
               </div>
               <HeroActions />
             </div>
@@ -320,12 +335,12 @@ export const Hero = ({
                 style={backgroundColor ? { backgroundColor: `${backgroundColor}99` } : undefined}
               >
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-secondary font-bold tracking-widest uppercase mb-2" />
-                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-6xl font-extrabold text-white leading-tight" />
+                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-6xl font-extrabold text-white leading-tight" style={titleColor ? { color: titleColor } : undefined} />
               </div>
             </div>
             
             <div className="bg-white rounded-[2rem] p-8 md:p-10 flex items-center">
-              <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-lg text-slate-700 leading-relaxed w-full" />
+              <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-lg text-slate-700 leading-relaxed w-full" style={descriptionColor ? { color: descriptionColor } : undefined} />
             </div>
 
             {/* Action Boxes */}
@@ -365,8 +380,8 @@ export const Hero = ({
                   <MoreHorizontal className="text-slate-400" />
                 </div>
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-indigo-600 font-bold text-sm uppercase tracking-widest mb-4" />
-                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-5xl font-black text-slate-900 mb-6" />
-                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-slate-600 text-lg leading-relaxed prose prose-lg max-w-none" />
+                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-5xl font-black text-slate-900 mb-6" style={titleColor ? { color: titleColor } : undefined} />
+                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-slate-600 text-lg leading-relaxed prose prose-lg max-w-none" style={descriptionColor ? { color: descriptionColor } : undefined} />
               </div>
               
               <div className="lg:col-span-4 bg-slate-900 rounded-2xl shadow-xl overflow-hidden relative min-h-[300px] cursor-move">
@@ -387,7 +402,7 @@ export const Hero = ({
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-slate-50 border-l border-slate-100" />
           <div className="relative z-10 px-6 max-w-5xl mx-auto w-full text-center space-y-12">
             <div className="space-y-6">
-              <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-5xl md:text-7xl font-extralight text-slate-900 tracking-tight" />
+              <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-5xl md:text-7xl font-extralight text-slate-900 tracking-tight" style={titleColor ? { color: titleColor } : undefined} />
               <div className="w-12 h-1 bg-slate-900 mx-auto" />
             </div>
             
@@ -397,7 +412,7 @@ export const Hero = ({
                   <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
                </button>
                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-72 md:w-[600px] bg-white shadow-2xl rounded-2xl p-6 border opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-500 translate-y-4 group-hover:translate-y-0">
-                 <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-slate-600 text-sm md:text-base leading-relaxed text-right prose max-w-none" />
+                 <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-slate-600 text-sm md:text-base leading-relaxed text-right prose max-w-none" style={descriptionColor ? { color: descriptionColor } : undefined} />
                  <div className="mt-6">
                    <HeroActions />
                  </div>
@@ -415,10 +430,10 @@ export const Hero = ({
             <div className="lg:col-span-5 space-y-12">
               <div className="space-y-6">
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-white/40 tracking-[0.3em] uppercase text-sm" />
-                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-6xl lg:text-8xl font-light tracking-tighter" />
+                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-6xl lg:text-8xl font-light tracking-tighter" style={titleColor ? { color: titleColor } : undefined} />
               </div>
               <div className="w-full h-[1px] bg-gradient-to-r from-white/20 to-transparent" />
-              <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl text-white/60 font-light leading-relaxed prose prose-invert max-w-none" />
+              <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-xl text-white/60 font-light leading-relaxed prose prose-invert max-w-none" style={descriptionColor ? { color: descriptionColor } : undefined} />
               <div className="hidden lg:block">
                 <HeroActions />
               </div>
@@ -447,12 +462,12 @@ export const Hero = ({
             )}
             <div className="absolute bottom-8 right-6 left-6 text-right">
               <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} className="text-secondary font-bold tracking-widest uppercase mb-2 text-sm" />
-              <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-6xl font-extrabold text-white leading-tight" />
+              <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} className="text-4xl md:text-6xl font-extrabold text-white leading-tight" style={titleColor ? { color: titleColor } : undefined} />
             </div>
           </div>
 
           <div className="flex-grow flex flex-col justify-center px-6 max-w-4xl mx-auto w-full gap-6">
-            <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-foreground/80 text-lg leading-relaxed text-center prose max-w-none" />
+            <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} richText={true} className="text-foreground/80 text-lg leading-relaxed text-center prose max-w-none" style={descriptionColor ? { color: descriptionColor } : undefined} />
             <HeroActions className="justify-center w-full" />
           </div>
         </section>
@@ -470,3 +485,4 @@ export const Hero = ({
     </div>
   );
 };
+

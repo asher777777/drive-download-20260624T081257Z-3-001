@@ -110,6 +110,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             primaryButton={config.hero.primaryButton}
             secondaryButton={config.hero.secondaryButton}
             backgroundColor={config.hero.backgroundColor || globalSettings.backgroundColor}
+            titleColor={config.hero.titleColor}
+            descriptionColor={config.hero.descriptionColor}
             heroStyle={config.hero.heroStyle}
             flexDirection={config.hero.flexDirection}
             formMode={config.hero.formMode}
@@ -229,6 +231,8 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             imagesPerRowMobile={config.imageListing.imagesPerRowMobile}
             form={config.imageListing.form}
             backgroundColor={config.imageListing.backgroundColor || globalSettings.backgroundColor}
+            title={config.imageListing.title}
+            titleColor={config.imageListing.titleColor}
             isEditing={false}
           />
         );
@@ -275,7 +279,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   } as React.CSSProperties;
 
   return (
-    <div className="flex flex-col min-h-screen" style={customStyle}>
+    <div className={`flex flex-col min-h-screen ${globalSettings.theme ? `theme-${globalSettings.theme}` : "theme-navy"}`} style={customStyle}>
       {((config as any).isHeaderVisible ?? true) && (
         <Navbar 
           layout={globalSettings.headerLayout} 

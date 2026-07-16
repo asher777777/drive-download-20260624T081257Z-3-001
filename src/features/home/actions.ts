@@ -50,6 +50,8 @@ export interface HomePageConfig {
     backgroundColor?: string;
     bottomStripeColor?: string;
     hoverColor?: string;
+    titleColor?: string;
+    descriptionColor?: string;
     featuresTextColor?: string;
     heroStyle?: "hero" | "content" | "landing";
     flexDirection?: "row" | "row-reverse" | "col" | "col-reverse";
@@ -167,6 +169,8 @@ export interface HomePageConfig {
     anchorId?: string;
     backgroundColor?: string;
     hoverColor?: string;
+    title?: string;
+    titleColor?: string;
   };
   timer?: {
     visible: boolean;
