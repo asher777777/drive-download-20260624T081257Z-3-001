@@ -51,16 +51,21 @@ export const ImageListingSection = ({
   const mobileCols = Number(imagesPerRowMobile) || 1;
   const desktopCols = Number(imagesPerRow) || 4;
   
-  const mobileWidth = { 1: "w-full", 2: "w-[calc(50%-0.5rem)]", 3: "w-[calc(33.333%-0.666rem)]", 4: "w-[calc(25%-0.75rem)]" }[mobileCols] || "w-full";
-  const desktopWidth = { 
-    1: "sm:w-full", 
-    2: "sm:w-[calc(50%-0.5rem)]", 
-    3: "sm:w-[calc(33.333%-0.666rem)]", 
-    4: "sm:w-[calc(25%-0.75rem)]", 
-    5: "sm:w-[calc(20%-0.8rem)]", 
-    6: "sm:w-[calc(16.666%-0.833rem)]" 
-  }[desktopCols] || "sm:w-[calc(25%-0.75rem)]";
-  const itemWidthClass = `${mobileWidth} ${desktopWidth}`;
+  const gridColsMobile = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4"
+  }[mobileCols] || "grid-cols-1";
+
+  const gridColsDesktop = { 
+    1: "sm:grid-cols-1", 
+    2: "sm:grid-cols-2", 
+    3: "sm:grid-cols-3", 
+    4: "sm:grid-cols-4", 
+    5: "sm:grid-cols-5", 
+    6: "sm:grid-cols-6" 
+  }[desktopCols] || "sm:grid-cols-4";
 
   return (
     <section id={id} className="py-16 px-4 md:px-8 transition-colors duration-500" style={{ backgroundColor }} dir="rtl">
@@ -70,7 +75,7 @@ export const ImageListingSection = ({
             לא נבחרו תמונות לאזור זה. בחר תמונות בעורך.
           </div>
         ) : (
-          <div className="flex flex-wrap justify-center gap-4 w-full">
+          <div className={`grid ${gridColsMobile} ${gridColsDesktop} gap-4 w-full`}>
             {images.map((img, index) => {
               if (!img) return null;
               const url = typeof img === "string" ? img : img.url;
@@ -79,7 +84,7 @@ export const ImageListingSection = ({
               return (
                 <div 
                   key={`${url}-${index}`}
-                  className={`${itemWidthClass} relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
+                  className={`relative aspect-square rounded-xl overflow-hidden shadow-sm transition-all duration-300 ${!isEditing ? "cursor-pointer hover:shadow-xl hover:scale-[1.02] active:scale-95" : ""}`}
                   onClick={() => handleImageClick(img)}
                 >
                   <img 
