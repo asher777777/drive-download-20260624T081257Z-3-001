@@ -115,7 +115,7 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                         e.preventDefault();
                         e.stopPropagation();
                         const current = Number(config.imagesPerRowMobile) || 1;
-                        const next = current >= 3 ? 1 : current + 1;
+                        const next = current >= 4 ? 1 : current + 1;
                         updateField("imagesPerRowMobile", next);
                       }}
                       className="flex items-center gap-2 hover:bg-white/10 px-2 py-1 rounded-md transition-colors"
@@ -159,7 +159,7 @@ export function ImageListingEditor({ config, onChange }: ImageListingEditorProps
                       onChange={(e) => updateField("imagesPerRowMobile", Number(e.target.value))}
                       className="w-full bg-[#181818] border border-white/10 rounded-lg px-4 py-2.5 text-white outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
                     >
-                      {[1, 2, 3].map(num => (
+                      {[1, 2, 3, 4].map(num => (
                         <option key={num} value={num}>{num} עמודות</option>
                       ))}
                     </select>

@@ -51,7 +51,7 @@ export const ImageListingSection = ({
   const mobileCols = Number(imagesPerRowMobile) || 1;
   const desktopCols = Number(imagesPerRow) || 4;
   
-  const mobileWidth = { 1: "w-full", 2: "w-[calc(50%-0.5rem)]", 3: "w-[calc(33.333%-0.666rem)]" }[mobileCols] || "w-full";
+  const mobileWidth = { 1: "w-full", 2: "w-[calc(50%-0.5rem)]", 3: "w-[calc(33.333%-0.666rem)]", 4: "w-[calc(25%-0.75rem)]" }[mobileCols] || "w-full";
   const desktopWidth = { 
     1: "sm:w-full", 
     2: "sm:w-[calc(50%-0.5rem)]", 
