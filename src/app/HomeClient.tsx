@@ -143,6 +143,7 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             description={config.services.description}
             layout={config.services.layout} 
             columns={config.services.columns}
+            columnsMobile={config.services.columnsMobile}
             effect={config.services.effect}
             items={config.services.items} 
             isEditing={false}
@@ -173,7 +174,17 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
         );
       case "livePosts":
         if (!config.livePosts || config.livePosts.visible === false || String(config.livePosts.visible) === "false") return null;
-        return <LivePostsGrid id={config.livePosts.anchorId || "livePosts"} layout={config.livePosts.layout} customPages={config.livePosts.customPages} />;
+        return (
+          <LivePostsGrid 
+            id={config.livePosts.anchorId || "livePosts"} 
+            layout={config.livePosts.layout} 
+            customPages={config.livePosts.customPages} 
+            title={config.livePosts.title}
+            titleColor={config.livePosts.titleColor}
+            description={config.livePosts.description}
+            descriptionColor={config.livePosts.descriptionColor}
+          />
+        );
       case "timer":
         if (!config.timer || config.timer.visible === false || String(config.timer.visible) === "false") return null;
         return (
@@ -183,6 +194,12 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             subtitle={config.timer.subtitle}
             targetDate={config.timer.targetDate}
             layout={config.timer.layout}
+            backgroundColor={config.timer.backgroundColor}
+            titleColor={config.timer.titleColor}
+            subtitleColor={config.timer.subtitleColor}
+            boxBackgroundColor={config.timer.boxBackgroundColor}
+            numberColor={config.timer.numberColor}
+            labelColor={config.timer.labelColor}
             isEditing={false}
           />
         );

@@ -845,21 +845,35 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               </select>
             </div>
 
-            {config.services.layout === "grid" && (
-              <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
-                <label className="text-xs text-slate-400 font-medium">עמודות (במחשב)</label>
-                <select 
-                  value={config.services.columns || 4}
-                  onChange={(e) => setConfig({ ...config, services: { ...config.services, columns: Number(e.target.value) }})}
-                  className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
-                >
-                  <option value={2}>2 עמודות</option>
-                  <option value={3}>3 עמודות</option>
-                  <option value={4}>4 עמודות</option>
-                  <option value={5}>5 עמודות</option>
-                  <option value={6}>6 עמודות</option>
-                </select>
-              </div>
+            {config.services.layout !== "carousel" && (
+              <>
+                <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
+                  <label className="text-xs text-slate-400 font-medium">עמודות (במחשב)</label>
+                  <select 
+                    value={config.services.columns || 4}
+                    onChange={(e) => setConfig({ ...config, services: { ...config.services, columns: Number(e.target.value) }})}
+                    className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
+                  >
+                    <option value={2}>2 עמודות</option>
+                    <option value={3}>3 עמודות</option>
+                    <option value={4}>4 עמודות</option>
+                    <option value={5}>5 עמודות</option>
+                    <option value={6}>6 עמודות</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
+                  <label className="text-xs text-slate-400 font-medium">עמודות (בנייד)</label>
+                  <select 
+                    value={config.services.columnsMobile || 1}
+                    onChange={(e) => setConfig({ ...config, services: { ...config.services, columnsMobile: Number(e.target.value) }})}
+                    className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
+                  >
+                    <option value={1}>1 עמודה</option>
+                    <option value={2}>2 עמודות</option>
+                    <option value={3}>3 עמודות</option>
+                  </select>
+                </div>
+              </>
             )}
 
             <div className="flex flex-col gap-2">
@@ -916,6 +930,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                   description=""
                   layout={config.services.layout} 
                   columns={config.services.columns}
+                  columnsMobile={config.services.columnsMobile}
                   effect={config.services.effect}
                   items={config.services.items} 
                   isEditing={true} 
@@ -935,6 +950,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               description={config.services.description}
               layout={config.services.layout} 
               columns={config.services.columns}
+              columnsMobile={config.services.columnsMobile}
               effect={config.services.effect}
               items={config.services.items} 
               isEditing={false} 
@@ -1164,6 +1180,73 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
 
         const livePostsContentNode = (
           <div className="flex flex-col gap-6 w-full max-w-xl mx-auto px-0 pb-8 mt-4 text-right" dir="rtl">
+            <div className="bg-[#181818] rounded-xl border border-white/10 p-5 space-y-5">
+              <h5 className="text-sm font-bold text-white flex items-center justify-between">כותרת ותיאור</h5>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-slate-300 text-xs font-medium">טקסט כותרת</label>
+                    <input
+                      type="text"
+                      value={config.livePosts.title || ""}
+                      onChange={(e) => setConfig({ ...config, livePosts: { ...config.livePosts, title: e.target.value } as any })}
+                      placeholder="הכנס כותרת (אופציונלי)"
+                      className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-white outline-none focus:border-amber-500/50 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-slate-300 text-xs font-medium">צבע כותרת</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={config.livePosts.titleColor || "#1e293b"}
+                        onChange={(e) => setConfig({ ...config, livePosts: { ...config.livePosts, titleColor: e.target.value } as any })}
+                        className="w-8 h-8 rounded cursor-pointer border border-white/10"
+                      />
+                      <input
+                        type="text"
+                        value={config.livePosts.titleColor || "#1e293b"}
+                        onChange={(e) => setConfig({ ...config, livePosts: { ...config.livePosts, titleColor: e.target.value } as any })}
+                        className="flex-1 bg-[#111] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-slate-300 text-xs font-medium">טקסט תיאור</label>
+                    <textarea
+                      value={config.livePosts.description || ""}
+                      onChange={(e) => setConfig({ ...config, livePosts: { ...config.livePosts, description: e.target.value } as any })}
+                      placeholder="הכנס תיאור (אופציונלי)"
+                      className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-white outline-none focus:border-amber-500/50 text-sm h-20 resize-none custom-scrollbar"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-slate-300 text-xs font-medium">צבע תיאור</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={config.livePosts.descriptionColor || "#475569"}
+                        onChange={(e) => setConfig({ ...config, livePosts: { ...config.livePosts, descriptionColor: e.target.value } as any })}
+                        className="w-8 h-8 rounded cursor-pointer border border-white/10"
+                      />
+                      <input
+                        type="text"
+                        value={config.livePosts.descriptionColor || "#475569"}
+                        onChange={(e) => setConfig({ ...config, livePosts: { ...config.livePosts, descriptionColor: e.target.value } as any })}
+                        className="flex-1 bg-[#111] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="w-full space-y-4">
               <h5 className="text-sm font-bold text-white mb-4 flex items-center justify-between">
                 בחירת דפים מותאמים אישית לליסטינג
@@ -1237,6 +1320,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               id={config.livePosts.anchorId || "livePosts"} 
               layout={config.livePosts.layout} 
               customPages={config.livePosts.customPages} 
+              title={config.livePosts.title}
+              titleColor={config.livePosts.titleColor}
+              description={config.livePosts.description}
+              descriptionColor={config.livePosts.descriptionColor}
             />
           </div>
         );
@@ -1258,7 +1345,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               />
             </div>
             
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
               <label className="text-xs text-slate-400 font-medium">פריסה</label>
               <select 
                 value={config.timer.layout || "modern"}
@@ -1266,9 +1353,57 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
               >
                 <option value="modern">מודרני (Modern)</option>
-                <option value="minimal">מינימלי (Minimal)</option>
-                <option value="cards">כרטיסיות (Cards)</option>
+                <option value="classic">קלאסי (Classic)</option>
+                <option value="compact">קומפקטי (Compact)</option>
               </select>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <label className="text-xs text-slate-400 font-medium">צבעים</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500">רקע כללי</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent" value={config.timer.backgroundColor && config.timer.backgroundColor !== "transparent" ? config.timer.backgroundColor : "#ffffff"} onChange={(e) => setConfig({ ...config, timer: { ...config.timer!, backgroundColor: e.target.value }})} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, timer: { ...config.timer!, backgroundColor: "transparent" }})}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500">כותרת</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent" value={config.timer.titleColor || "#000000"} onChange={(e) => setConfig({ ...config, timer: { ...config.timer!, titleColor: e.target.value }})} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, timer: { ...config.timer!, titleColor: "" }})}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500">תת כותרת</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent" value={config.timer.subtitleColor || "#000000"} onChange={(e) => setConfig({ ...config, timer: { ...config.timer!, subtitleColor: e.target.value }})} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, timer: { ...config.timer!, subtitleColor: "" }})}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500">רקע הריבועים</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent" value={config.timer.boxBackgroundColor || "#ffffff"} onChange={(e) => setConfig({ ...config, timer: { ...config.timer!, boxBackgroundColor: e.target.value }})} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, timer: { ...config.timer!, boxBackgroundColor: "" }})}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500">מספרים</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent" value={config.timer.numberColor || "#000000"} onChange={(e) => setConfig({ ...config, timer: { ...config.timer!, numberColor: e.target.value }})} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, timer: { ...config.timer!, numberColor: "" }})}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500">תוויות זמן</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer bg-transparent" value={config.timer.labelColor || "#000000"} onChange={(e) => setConfig({ ...config, timer: { ...config.timer!, labelColor: e.target.value }})} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, timer: { ...config.timer!, labelColor: "" }})}>נקה</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -1322,6 +1457,12 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               subtitle={config.timer.subtitle}
               targetDate={config.timer.targetDate}
               layout={config.timer.layout}
+              backgroundColor={config.timer.backgroundColor}
+              titleColor={config.timer.titleColor}
+              subtitleColor={config.timer.subtitleColor}
+              boxBackgroundColor={config.timer.boxBackgroundColor}
+              numberColor={config.timer.numberColor}
+              labelColor={config.timer.labelColor}
               isEditing={false}
               onUpdate={() => {}}
             />
@@ -1731,6 +1872,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             description={config.services.description}
             layout={config.services.layout} 
             columns={config.services.columns}
+            columnsMobile={config.services.columnsMobile}
             effect={config.services.effect}
             items={config.services.items} 
             isEditing={false}
@@ -1761,7 +1903,7 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
         );
       case "livePosts":
         if (!config.livePosts || config.livePosts.visible === false || String(config.livePosts.visible) === "false") return null;
-        return <LivePostsGrid id={config.livePosts.anchorId || "livePosts"} layout={config.livePosts.layout} customPages={config.livePosts.customPages} />;
+        return <LivePostsGrid id={config.livePosts.anchorId || "livePosts"} layout={config.livePosts.layout} customPages={config.livePosts.customPages} title={config.livePosts.title} titleColor={config.livePosts.titleColor} description={config.livePosts.description} descriptionColor={config.livePosts.descriptionColor} />;
       case "timer":
         if (!config.timer || config.timer.visible === false || String(config.timer.visible) === "false") return null;
         return (
@@ -1771,6 +1913,12 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             subtitle={config.timer.subtitle}
             targetDate={config.timer.targetDate}
             layout={config.timer.layout}
+            backgroundColor={config.timer.backgroundColor}
+            titleColor={config.timer.titleColor}
+            subtitleColor={config.timer.subtitleColor}
+            boxBackgroundColor={config.timer.boxBackgroundColor}
+            numberColor={config.timer.numberColor}
+            labelColor={config.timer.labelColor}
             isEditing={false}
           />
         );

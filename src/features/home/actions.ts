@@ -81,6 +81,7 @@ export interface HomePageConfig {
     layout: "grid" | "carousel" | "image-card" | "hover-card";
     effect?: "none" | "zoom" | "lift" | "glow";
     columns?: number;
+    columnsMobile?: number;
     visible: boolean;
     items?: ServiceItem[];
     anchorId?: string;
@@ -112,6 +113,10 @@ export interface HomePageConfig {
     anchorId?: string;
     backgroundColor?: string;
     hoverColor?: string;
+    title?: string;
+    titleColor?: string;
+    description?: string;
+    descriptionColor?: string;
   };
   contact?: {
     visible: boolean;
@@ -181,6 +186,11 @@ export interface HomePageConfig {
     anchorId?: string;
     backgroundColor?: string;
     hoverColor?: string;
+    titleColor?: string;
+    subtitleColor?: string;
+    boxBackgroundColor?: string;
+    numberColor?: string;
+    labelColor?: string;
   };
   pricing?: {
     visible: boolean;
@@ -456,14 +466,22 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
     form: DEFAULT_FORM_CONFIG,
     anchorId: "imageListing",
     backgroundColor: "#ffffff",
-    hoverColor: "rgba(59, 130, 246, 0.1)"
+    hoverColor: "rgba(59, 130, 246, 0.1)",
   },
   timer: {
     visible: false,
     title: "הזמן אוזל!",
-    subtitle: "מהרו להירשם לפני סיום ההרשמה",
+    subtitle: "מהרו להירשם",
     targetDate: new Date(Date.now() + 86400000).toISOString(),
     layout: "classic",
+    anchorId: "timer",
+    backgroundColor: "transparent",
+    hoverColor: "",
+    titleColor: "",
+    subtitleColor: "",
+    boxBackgroundColor: "",
+    numberColor: "",
+    labelColor: ""
   },
   pricing: {
     visible: true,
@@ -727,7 +745,7 @@ export async function getAllSitePages() {
         id: doc.id,
         title: data.hero?.title || data.seo?.title || doc.id,
         description: data.hero?.description || data.seo?.description || "",
-        imageSrc: data.hero?.imageSrc || "",
+        imageSrc: data.hero?.imageSrc || data.mainContent?.imageSrc || data.seo?.image || "",
         url: `/service/${doc.id}`,
         icon: "BookOpen"
       });
@@ -745,7 +763,7 @@ export async function getAllSitePages() {
         id: doc.id,
         title: data.hero?.title || data.seo?.title || doc.id,
         description: data.hero?.description || data.seo?.description || "",
-        imageSrc: data.hero?.imageSrc || "",
+        imageSrc: data.hero?.imageSrc || data.mainContent?.imageSrc || data.seo?.image || "",
         url: `/landing/${doc.id}`,
         icon: "Globe"
       });

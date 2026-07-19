@@ -13,6 +13,12 @@ interface TimerSectionProps {
   layout?: "classic" | "modern" | "compact";
   isEditing?: boolean;
   onUpdate?: (field: string, value: any) => void;
+  backgroundColor?: string;
+  titleColor?: string;
+  subtitleColor?: string;
+  boxBackgroundColor?: string;
+  numberColor?: string;
+  labelColor?: string;
 }
 
 export const TimerSection = ({
@@ -22,7 +28,13 @@ export const TimerSection = ({
   targetDate,
   layout = "classic",
   isEditing = false,
-  onUpdate
+  onUpdate,
+  backgroundColor,
+  titleColor,
+  subtitleColor,
+  boxBackgroundColor,
+  numberColor,
+  labelColor
 }: TimerSectionProps) => {
   const effectiveTargetDate = useMemo(() => targetDate || new Date(Date.now() + 86400000).toISOString(), [targetDate]);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -54,7 +66,7 @@ export const TimerSection = ({
   };
 
   return (
-    <section id={id} className="py-12 bg-transparent relative z-20" dir="rtl">
+    <section id={id} className="py-12 relative z-20" dir="rtl" style={{ backgroundColor: backgroundColor && backgroundColor !== "transparent" ? backgroundColor : undefined }}>
       <div className="max-w-5xl mx-auto px-6">
         {isEditing && (
           <div className="mb-8 p-6 bg-slate-50 border border-dashed rounded-3xl text-right max-w-3xl mx-auto space-y-4">
@@ -97,6 +109,55 @@ export const TimerSection = ({
                 ))}
               </div>
             </div>
+
+            <div className="space-y-3 pt-4 border-t">
+              <label className="block text-xs font-bold text-slate-700">צבעי האזור</label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 font-bold">רקע כללי</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer" value={backgroundColor && backgroundColor !== "transparent" ? backgroundColor : "#ffffff"} onChange={(e) => handleFieldChange("backgroundColor", e.target.value)} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-500" onClick={() => handleFieldChange("backgroundColor", "transparent")}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 font-bold">צבע כותרת</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer" value={titleColor || "#000000"} onChange={(e) => handleFieldChange("titleColor", e.target.value)} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-500" onClick={() => handleFieldChange("titleColor", "")}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 font-bold">צבע כותרת משנה</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer" value={subtitleColor || "#000000"} onChange={(e) => handleFieldChange("subtitleColor", e.target.value)} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-500" onClick={() => handleFieldChange("subtitleColor", "")}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 font-bold">רקע לריבועי הזמן</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer" value={boxBackgroundColor || "#ffffff"} onChange={(e) => handleFieldChange("boxBackgroundColor", e.target.value)} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-500" onClick={() => handleFieldChange("boxBackgroundColor", "")}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 font-bold">צבע המספרים</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer" value={numberColor || "#000000"} onChange={(e) => handleFieldChange("numberColor", e.target.value)} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-500" onClick={() => handleFieldChange("numberColor", "")}>נקה</button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-500 font-bold">צבע התוויות</span>
+                  <div className="flex items-center gap-2">
+                    <input type="color" className="w-8 h-8 rounded cursor-pointer" value={labelColor || "#000000"} onChange={(e) => handleFieldChange("labelColor", e.target.value)} />
+                    <button className="text-[10px] text-slate-400 hover:text-red-500" onClick={() => handleFieldChange("labelColor", "")}>נקה</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -142,15 +203,15 @@ export const TimerSection = ({
               <>
                 <h2 className={cn(
                   "text-3xl md:text-4xl font-black leading-tight",
-                  layout === "modern" ? "text-white" : "text-primary"
-                )}>
+                  !titleColor && (layout === "modern" ? "text-white" : "text-primary")
+                )} style={{ color: titleColor || undefined }}>
                   {title}
                 </h2>
                 {subtitle && (
                   <p className={cn(
                     "text-lg",
-                    layout === "modern" ? "text-white/90" : "text-slate-600"
-                  )}>
+                    !subtitleColor && (layout === "modern" ? "text-white/90" : "text-slate-600")
+                  )} style={{ color: subtitleColor || undefined }}>
                     {subtitle}
                   </p>
                 )}
@@ -159,7 +220,7 @@ export const TimerSection = ({
           </div>
 
           {mounted && (
-            <div className="flex gap-4 items-center justify-center flex-row-reverse" dir="ltr">
+            <div className="flex gap-4 items-center justify-center flex-row" dir="ltr">
               {[
                 { label: "ימים", value: timeLeft.days },
                 { label: "שעות", value: timeLeft.hours },
@@ -170,16 +231,17 @@ export const TimerSection = ({
                   key={idx} 
                   className={cn(
                     "flex flex-col items-center justify-center rounded-2xl w-20 h-20 sm:w-24 sm:h-24 shadow-sm border",
-                    layout === "modern" ? "bg-white/20 border-white/30 backdrop-blur-sm text-white" : "bg-white border-slate-100 text-slate-800"
+                    !boxBackgroundColor && (layout === "modern" ? "bg-white/20 border-white/30 backdrop-blur-sm text-white" : "bg-white border-slate-100 text-slate-800")
                   )}
+                  style={{ backgroundColor: boxBackgroundColor || undefined }}
                 >
-                  <span className="text-2xl sm:text-4xl font-black tabular-nums">
+                  <span className="text-2xl sm:text-4xl font-black tabular-nums" style={{ color: numberColor || undefined }}>
                     {unit.value.toString().padStart(2, "0")}
                   </span>
                   <span className={cn(
                     "text-xs font-bold mt-1",
-                    layout === "modern" ? "text-white/80" : "text-slate-500"
-                  )}>
+                    !labelColor && (layout === "modern" ? "text-white/80" : "text-slate-500")
+                  )} style={{ color: labelColor || undefined }}>
                     {unit.label}
                   </span>
                 </div>

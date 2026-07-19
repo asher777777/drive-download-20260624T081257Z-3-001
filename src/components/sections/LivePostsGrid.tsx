@@ -12,9 +12,13 @@ interface LivePostsGridProps {
   id?: string;
   layout?: "grid" | "carousel" | "list" | "bento";
   customPages?: string[];
+  title?: string;
+  titleColor?: string;
+  description?: string;
+  descriptionColor?: string;
 }
 
-export function LivePostsGrid({ id, layout = "grid", customPages }: LivePostsGridProps) {
+export function LivePostsGrid({ id, layout = "grid", customPages, title, titleColor, description, descriptionColor }: LivePostsGridProps) {
   const [displayItems, setDisplayItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,11 +88,11 @@ export function LivePostsGrid({ id, layout = "grid", customPages }: LivePostsGri
         
         {/* Header Block */}
         <div className="text-center max-w-2xl mx-auto space-y-4">
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight">
-            חדשות ועדכונים מהקהילה
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: titleColor || '#1e293b' }}>
+            {title || "חדשות ועדכונים מהקהילה"}
           </h2>
-          <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-            שיעורי תורה, הודעות חשובות, הלכות יומיות ואירועים חמים בקהילה שלנו.
+          <p className="text-sm sm:text-base leading-relaxed" style={{ color: descriptionColor || '#475569' }}>
+            {description || "שיעורי תורה, הודעות חשובות, הלכות יומיות ואירועים חמים בקהילה שלנו."}
           </p>
         </div>
 

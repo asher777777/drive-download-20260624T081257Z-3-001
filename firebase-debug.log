@@ -1624,3 +1624,77 @@ For CI servers and headless environments, generate a new token with firebase log
 [debug] [2026-07-16T11:18:32.172Z] Error: ENOENT: no such file or directory, open 'C:\Users\ovt57\Downloads\drive-download-20260624T081257Z-3-001\.next\export-marker.json'
 [error] 
 [error] Error: An unexpected error has occurred.
+[debug] [2026-07-16T14:00:04.236Z] ----------------------------------------------------------------------
+[debug] [2026-07-16T14:00:04.240Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\ovt57\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy
+[debug] [2026-07-16T14:00:04.241Z] CLI Version:   15.22.2
+[debug] [2026-07-16T14:00:04.241Z] Platform:      win32
+[debug] [2026-07-16T14:00:04.241Z] Node Version:  v24.12.0
+[debug] [2026-07-16T14:00:04.241Z] Detected Agent: unknown
+[debug] [2026-07-16T14:00:04.241Z] Time:          Thu Jul 16 2026 17:00:04 GMT+0300 (Israel Daylight Time)
+[debug] [2026-07-16T14:00:04.242Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-16T14:00:11.741Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-16T14:00:11.742Z] > authorizing via signed-in user (ovt5771@gmail.com)
+[debug] [2026-07-16T14:00:11.742Z] [iam] checking project c-g-ltd for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-07-16T14:00:11.744Z] Checked if tokens are valid: false, expires at: 1784203899279
+[debug] [2026-07-16T14:00:11.744Z] Checked if tokens are valid: false, expires at: 1784203899279
+[debug] [2026-07-16T14:00:11.744Z] > refreshing access token with scopes: []
+[debug] [2026-07-16T14:00:11.747Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-07-16T14:00:11.747Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-16T14:00:12.027Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-07-16T14:00:12.028Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-16T14:00:12.043Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions [none]
+[debug] [2026-07-16T14:00:12.043Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions  x-goog-user-project=c-g-ltd
+[debug] [2026-07-16T14:00:12.043Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-07-16T14:00:12.467Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions 200
+[debug] [2026-07-16T14:00:12.467Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/c-g-ltd:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-07-16T14:00:12.468Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:12.468Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:12.468Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd [none]
+[debug] [2026-07-16T14:00:12.956Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd 200
+[debug] [2026-07-16T14:00:12.956Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd {"projectId":"c-g-ltd","projectNumber":"155444280341","displayName":"c-g-LTD","name":"projects/c-g-ltd","resources":{"hostingSite":"c-g-ltd"},"state":"ACTIVE","labels":{"firebase":"enabled","firebaseworkflows/environment":"production","firebase/storage-default-bucket":"created"},"etag":"1_da4a5971-ca04-46f3-ac0d-a76d220aa45d"}
+[debug] [2026-07-16T14:00:18.733Z] defaultcredentials: writing to file C:\Users\ovt57\AppData\Roaming\firebase\ovt5771_gmail_com_application_default_credentials.json
+[debug] [2026-07-16T14:00:18.735Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:18.735Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:18.735Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites pageToken=&pageSize=10
+[debug] [2026-07-16T14:00:20.538Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites 200
+[debug] [2026-07-16T14:00:20.539Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites {"sites":[{"name":"projects/c-g-ltd/sites/c-g-ltd","defaultUrl":"https://c-g-ltd.web.app","type":"DEFAULT_SITE"},{"name":"projects/c-g-ltd/sites/mcholl","defaultUrl":"https://mcholl.web.app","appId":"1:155444280341:web:29c5189c56a855cf8f221c","type":"USER_SITE"}]}
+[debug] [2026-07-16T14:00:20.540Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:20.540Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:20.540Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites 
+[debug] [2026-07-16T14:00:21.754Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites 200
+[debug] [2026-07-16T14:00:21.755Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites {"sites":[{"name":"projects/c-g-ltd/sites/c-g-ltd","defaultUrl":"https://c-g-ltd.web.app","type":"DEFAULT_SITE"},{"name":"projects/c-g-ltd/sites/mcholl","defaultUrl":"https://mcholl.web.app","appId":"1:155444280341:web:29c5189c56a855cf8f221c","type":"USER_SITE"}]}
+[debug] [2026-07-16T14:00:21.755Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:21.755Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:21.755Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd/webApps/-/config [none]
+[debug] [2026-07-16T14:00:22.754Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd/webApps/-/config 200
+[debug] [2026-07-16T14:00:22.754Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/c-g-ltd/webApps/-/config {"projectId":"c-g-ltd","appId":"1:155444280341:web:29c5189c56a855cf8f221c","storageBucket":"c-g-ltd.firebasestorage.app","apiKey":"AIzaSyAhqcOjsn9Vq2xpmhtw1IdFwP3-zn3cD7I","authDomain":"c-g-ltd.firebaseapp.com","messagingSenderId":"155444280341","measurementId":"G-HG9F991F7C","projectNumber":"155444280341","version":"2"}
+[info] 
+   Thank you for trying our early preview of Next.js support on Firebase Hosting.
+   During the preview, support is best-effort and breaking changes can be expected. Proceed with caution.
+   The integration is known to work with Next.js version 12 - 16.0. You may encounter errors.
+
+   Documentation: https://firebase.google.com/docs/hosting/frameworks/nextjs
+   File a bug: https://github.com/firebase/firebase-tools/issues/new?template=bug_report.md
+   Submit a feature request: https://github.com/firebase/firebase-tools/issues/new?template=feature_request.md
+
+   We'd love to learn from you. Express your interest in helping us shape the future of Firebase Hosting: https://goo.gle/41enW5X
+
+[debug] [2026-07-16T14:00:35.634Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:35.634Z] Checked if tokens are valid: true, expires at: 1784214011028
+[debug] [2026-07-16T14:00:35.635Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites/c-g-ltd [none]
+[debug] [2026-07-16T14:00:36.951Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites/c-g-ltd 200
+[debug] [2026-07-16T14:00:36.951Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/c-g-ltd/sites/c-g-ltd {"name":"projects/c-g-ltd/sites/c-g-ltd","defaultUrl":"https://c-g-ltd.web.app","type":"DEFAULT_SITE"}
+[info] ▲ Next.js 16.2.7 (Turbopack)
+
+[info] - Environments: .env.local, .env.production
+- Experiments (use with caution):
+  · serverActions
+
+
+[info]   Creating an optimized production build ...
+
+[info] ✓ Compiled successfully in 25.5s
+
+[info]   Running TypeScript ...
+

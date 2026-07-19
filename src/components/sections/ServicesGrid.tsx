@@ -21,6 +21,7 @@ interface ServicesGridProps {
   layout?: "grid" | "carousel" | "image-card" | "hover-card";
   effect?: "none" | "zoom" | "lift" | "glow";
   columns?: number;
+  columnsMobile?: number;
   items?: ServiceItem[];
   isEditing?: boolean;
   onUpdate?: (newItems: ServiceItem[]) => void;
@@ -82,7 +83,7 @@ const getIcon = (iconName: string) => {
   return Icon || LucideIcons.FileQuestion;
 };
 
-export const ServicesGrid = ({ id, title, description, layout = "grid", columns, effect = "none", items = [], isEditing, onUpdate, onHeaderUpdate }: ServicesGridProps) => {
+export const ServicesGrid = ({ id, title, description, layout = "grid", columns, columnsMobile = 1, effect = "none", items = [], isEditing, onUpdate, onHeaderUpdate }: ServicesGridProps) => {
   const visibleItems = isEditing ? items : items.filter(item => item.isVisible !== false);
 
   const renderAdminPanel = () => {
@@ -102,19 +103,42 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
       return "";
     };
 
-    const getWidthClass = (cols?: number, gapSize: number = 1.5) => { // gap-6 = 1.5rem, gap-8 = 2rem
+    const getWidthClass = (cols?: number, gapSize: number = 1.5) => {
       const c = cols || 4;
-      if (c === 1) return "lg:w-full";
-      // Calc: (100% - total_gap_width) / columns
-      // total_gap_width for N columns is (N-1) * gapSize
-      // so width per item is calc( (100% - (N-1)*gapSize) / N )
-      // Simplified: calc(100%/N - ((N-1)/N)*gapSize)
-      if (c === 2) return `lg:w-[calc(50%-${gapSize / 2}rem)]`;
-      if (c === 3) return `lg:w-[calc(33.333%-${(2 * gapSize) / 3}rem)]`;
-      if (c === 4) return `lg:w-[calc(25%-${(3 * gapSize) / 4}rem)]`;
-      if (c === 5) return `lg:w-[calc(20%-${(4 * gapSize) / 5}rem)]`;
-      if (c === 6) return `lg:w-[calc(16.666%-${(5 * gapSize) / 6}rem)]`;
-      return `lg:w-[calc(25%-${(3 * gapSize) / 4}rem)]`;
+      if (gapSize === 1.5) {
+        if (c === 1) return "md:w-full";
+        if (c === 2) return "md:w-[calc(50%-0.75rem)]";
+        if (c === 3) return "md:w-[calc(33.333%-1rem)]";
+        if (c === 4) return "md:w-[calc(25%-1.125rem)]";
+        if (c === 5) return "md:w-[calc(20%-1.2rem)]";
+        if (c === 6) return "md:w-[calc(16.666%-1.25rem)]";
+        return "md:w-[calc(25%-1.125rem)]";
+      } else if (gapSize === 2) {
+        if (c === 1) return "md:w-full";
+        if (c === 2) return "md:w-[calc(50%-1rem)]";
+        if (c === 3) return "md:w-[calc(33.333%-1.333rem)]";
+        if (c === 4) return "md:w-[calc(25%-1.5rem)]";
+        if (c === 5) return "md:w-[calc(20%-1.6rem)]";
+        if (c === 6) return "md:w-[calc(16.666%-1.666rem)]";
+        return "md:w-[calc(25%-1.5rem)]";
+      }
+      return "md:w-full";
+    };
+
+    const getMobileWidthClass = (cols?: number, gapSize: number = 1.5) => {
+      const c = cols || 1;
+      if (gapSize === 1.5) {
+        if (c === 1) return "w-full";
+        if (c === 2) return "w-[calc(50%-0.75rem)]";
+        if (c === 3) return "w-[calc(33.333%-1rem)]";
+        return "w-full";
+      } else if (gapSize === 2) {
+        if (c === 1) return "w-full";
+        if (c === 2) return "w-[calc(50%-1rem)]";
+        if (c === 3) return "w-[calc(33.333%-1.333rem)]";
+        return "w-full";
+      }
+      return "w-full";
     };
 
     const getEffectClass = () => {
@@ -140,7 +164,9 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
               href={service.url || "#"}
               className={cn(
                 "bg-card border rounded-3xl group cursor-pointer overflow-hidden",
-                layout === "grid" && `p-8 flex flex-col items-center text-center w-full sm:w-[calc(50%-0.75rem)] ${getWidthClass(columns, 1.5)}`,
+                layout === "grid" && "p-8 flex flex-col items-center text-center",
+                getMobileWidthClass(columnsMobile, 1.5),
+                getWidthClass(columns, 1.5),
                 layout === "carousel" && "min-w-[280px] p-8 flex flex-col items-center text-center snap-center",
                 getEffectClass()
               )}
@@ -173,7 +199,7 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
           {visibleItems.map((service, index) => {
             const Icon = getIcon(service.icon);
             return (
-              <Link key={index} href={service.url || "#"} className={cn("group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 w-full sm:w-[calc(50%-1rem)]", getWidthClass(columns, 2), getEffectClass())}>
+              <Link key={index} href={service.url || "#"} className={cn("group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100", getMobileWidthClass(columnsMobile, 2), getWidthClass(columns, 2), getEffectClass())}>
                 <div className="w-full aspect-[4/3] bg-slate-100 relative overflow-hidden flex items-center justify-center">
                   {service.imageSrc ? (
                     <Image src={service.imageSrc} alt={service.title} fill className="object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" />
@@ -204,22 +230,24 @@ export const ServicesGrid = ({ id, title, description, layout = "grid", columns,
           {visibleItems.map((service, index) => {
             const Icon = getIcon(service.icon);
             return (
-              <Link key={index} href={service.url || "#"} className={cn("group relative bg-slate-900 rounded-[2rem] overflow-hidden aspect-square flex flex-col justify-end p-8 w-full sm:w-[calc(50%-0.75rem)]", getWidthClass(columns, 1.5), getEffectClass())}>
+              <Link key={index} href={service.url || "#"} className={cn("group relative bg-slate-900 rounded-[2rem] overflow-hidden aspect-square flex flex-col justify-end p-8", getMobileWidthClass(columnsMobile, 1.5), getWidthClass(columns, 1.5), getEffectClass())}>
                 {/* Background Image */}
-                <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-0 bg-slate-900">
                   {service.imageSrc ? (
-                    <Image src={service.imageSrc} alt="" fill className="object-cover opacity-50 group-hover:opacity-30 group-hover:scale-110 transition-all duration-700" loading="lazy" />
+                    <>
+                      <Image src={service.imageSrc} alt="" fill className="object-cover opacity-100 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700" loading="lazy" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent group-hover:from-black/90 group-hover:via-black/60 transition-all duration-700" />
+                    </>
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-slate-900 group-hover:scale-110 transition-transform duration-700" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                 </div>
                 
                 <div className="relative z-10 flex flex-col h-full justify-end">
                   {!service.imageSrc && (
                     <Icon className="w-10 h-10 text-white/50 mb-auto" />
                   )}
-                  <h3 className="text-3xl font-bold text-white mb-2 transform translate-y-8 group-hover:translate-y-0 transition-transform duration-500">{service.title}</h3>
+                  <div className="text-xl md:text-2xl font-bold text-white mb-2 transform translate-y-8 group-hover:translate-y-0 transition-transform duration-500">{service.title}</div>
                   
                   <div className="h-0 opacity-0 group-hover:h-auto group-hover:opacity-100 group-hover:mt-4 transition-all duration-500 overflow-hidden">
                     <p className="text-white/80 text-sm leading-relaxed mb-6">{service.description}</p>

@@ -6,6 +6,19 @@ import { auth } from "@/lib/auth";
 import { Contact } from "./types";
 import { revalidatePath } from "next/cache";
 
+// Helper to normalize phone numbers globally
+function normalizePhone(phone?: string) {
+  if (!phone) return "";
+  let clean = phone.replace(/\D/g, "");
+  if (clean.startsWith("972") && clean.length > 9) {
+    return "0" + clean.slice(3);
+  }
+  if (!clean.startsWith("0") && clean.length === 9) {
+    return "0" + clean;
+  }
+  return clean;
+}
+
 // Helper to get authenticated user ID
 async function getUserId(): Promise<string> {
   const session = await auth();
@@ -235,7 +248,7 @@ export async function createContact(contactData: Partial<Contact>) {
       status: contactData.status || "active",
       conta_name: contactData.conta_name,
       f_m: contactData.f_m || "",
-      conta_phone: contactData.conta_phone,
+      conta_phone: normalizePhone(contactData.conta_phone),
       email: contactData.email || "",
       gender: contactData.gender || "",
       mh_crm_city: contactData.mh_crm_city || "",
@@ -312,6 +325,10 @@ export async function updateContact(id: string, contactData: Partial<Contact>) {
       updatedAt: new Date().toISOString(),
     };
     
+    if (updatedFields.conta_phone !== undefined) {
+      updatedFields.conta_phone = normalizePhone(updatedFields.conta_phone);
+    }
+
     // Safety check: Never overwrite ownerId
     delete updatedFields.ownerId;
     delete updatedFields.id;
@@ -484,6 +501,10 @@ export async function importContacts(importedContacts: Partial<Contact>[]) {
         skipped++;
         continue;
       }
+      
+      if (cData.conta_phone !== undefined) {
+        cData.conta_phone = normalizePhone(cData.conta_phone);
+      }
 
       let existingDocId = "";
 
@@ -612,19 +633,6 @@ export async function submitCRMForm(params: {
     }
 
     const rawPhone = contactData.conta_phone;
-
-    // Normalize phone number
-    const normalizePhone = (phone?: string) => {
-      if (!phone) return "";
-      let clean = phone.replace(/\D/g, "");
-      if (clean.startsWith("972") && clean.length > 9) {
-        return "0" + clean.slice(3);
-      }
-      if (!clean.startsWith("0") && clean.length === 9) {
-        return "0" + clean;
-      }
-      return clean;
-    };
     const phone = normalizePhone(rawPhone);
     if (phone) {
       contactData.conta_phone = phone;
@@ -788,9 +796,23 @@ export async function submitCRMForm(params: {
 
     if (contactId) {
       const updatedEvents = [...(existingData?.events || []), newEvent];
+      
+      // Save previous version history
+      const prevHistory = existingData?.history || [];
+      // Clean up the history from the data to avoid exponential growth
+      const previousDataWithoutHistory = { ...existingData };
+      delete previousDataWithoutHistory.history;
+      
+      const newHistoryEntry = {
+        updatedAt: new Date().toISOString(),
+        updatedBy: `Form: ${formTitle}`,
+        previousData: previousDataWithoutHistory
+      };
+
       await contactsRef.doc(contactId).update({
         ...dbData,
-        events: updatedEvents
+        events: updatedEvents,
+        history: [...prevHistory, newHistoryEntry]
       });
     } else {
       await contactsRef.add({
