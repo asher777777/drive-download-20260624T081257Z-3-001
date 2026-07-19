@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Trash2, Settings, Check, Sparkles, Copy,
   Settings2, MoveUp, MoveDown, Clock, Coins, Save, Folder, ChevronDown, LayoutTemplate, MessageCircle, Palette, Users,
@@ -218,6 +218,64 @@ const FIELD_TYPES = [
   { id: "payment_cc", label: "שלב תשלום: נתוני אשראי" }
 ];
 
+function SearchableSelect({ value, onChange, options, placeholder = "חפש שדה למיפוי..." }: { value: string, onChange: (v: string) => void, options: {value: string, label: string, group?: string}[], placeholder?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  
+  const filteredOptions = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()) || o.value.toLowerCase().includes(search.toLowerCase()));
+  const selectedLabel = options.find(o => o.value === value)?.label || value;
+
+  return (
+    <div className="relative w-full">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none cursor-pointer flex justify-between items-center"
+      >
+        <span className={value ? "text-white" : "text-slate-400"}>{selectedLabel || "-- ללא מיפוי --"}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180 text-white" : "text-slate-400"}`} />
+      </div>
+      
+      {isOpen && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-zinc-900 border border-white/10 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+          <div className="p-2 sticky top-0 bg-zinc-900 border-b border-white/10 z-10">
+            <input 
+              type="text"
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={placeholder}
+              className="w-full bg-black/50 text-white border border-white/10 rounded-lg p-2 text-sm outline-none focus:border-amber-500/50"
+            />
+          </div>
+          <div className="p-1">
+            <div 
+              onClick={() => { onChange(""); setIsOpen(false); setSearch(""); }}
+              className="p-2 hover:bg-white/5 rounded-lg cursor-pointer text-sm text-slate-400"
+            >
+              -- ללא מיפוי --
+            </div>
+            {filteredOptions.map((opt, i) => {
+              const showGroup = i === 0 || filteredOptions[i-1].group !== opt.group;
+              return (
+                <div key={`${opt.value}-${i}`}>
+                  {showGroup && opt.group && <div className="px-2 pt-2 pb-1 text-xs font-bold text-amber-500/70">{opt.group}</div>}
+                  <div 
+                    onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(""); }}
+                    className={`p-2 hover:bg-white/5 rounded-lg cursor-pointer text-sm ${value === opt.value ? "text-amber-400 bg-amber-500/10 font-bold" : "text-white"}`}
+                  >
+                    {opt.label}
+                  </div>
+                </div>
+              );
+            })}
+            {filteredOptions.length === 0 && <div className="p-2 text-slate-500 text-sm text-center">לא נמצאו תוצאות</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProps) {
   const value = { ...rawValue, fields: rawValue.fields || [] };
   const [mainTab, setMainTab] = useState<"settings" | "fields">("fields");
@@ -243,6 +301,30 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
     getCustomTabs().then(setCustomTabs);
     getCommunities().then(setCommunities);
   }, []);
+
+  const mappingOptions = useMemo(() => {
+    const opts: {value: string, label: string, group?: string}[] = [];
+    
+    // Core fields
+    Object.entries(CRM_DB_FIELDS).forEach(([k, v]) => {
+      if (k !== "") opts.push({ value: k, label: v, group: "שדות מערכת" });
+    });
+    
+    // Custom fields
+    customFields.forEach(cf => {
+      if (cf.type === "repeater" && cf.subFields && cf.subFields.length > 0) {
+        cf.subFields.forEach((sub: any) => {
+          opts.push({ value: `${cf.id}.${sub.id}`, label: `${cf.label} -> ${sub.label}`, group: "שדות חוזרים (מערכים)" });
+        });
+      } else {
+        opts.push({ value: cf.id, label: cf.label, group: "שדות מותאמים אישית" });
+      }
+    });
+    
+    opts.push({ value: "__other__", label: "אחר (הוסף שדה חדש)...", group: "פעולות" });
+    
+    return opts;
+  }, [customFields]);
 
   const handleAddCustomField = async () => {
     if (!newCustomFieldLabel.trim()) return alert("נא להזין שם שדה");
@@ -683,8 +765,8 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
 
           <div className={mainTab === "fields" ? "w-full animate-in fade-in duration-300" : "hidden"}>
           {/* TAB 1: FIELDS & LOGIC */}
-          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden transition-all">
-            <div className="p-4 bg-zinc-900 border-white/5 space-y-4 max-w-3xl mx-auto">
+          <div className="w-full bg-zinc-950 border border-white/5 rounded-2xl transition-all relative">
+            <div className="p-4 bg-zinc-900 border-white/5 space-y-4 max-w-3xl mx-auto relative">
               <div className="flex justify-between items-center bg-zinc-950 border border-white/5 p-4 rounded-2xl">
                 <span className="text-xs font-bold text-slate-400">
                   סה"כ פריטים בטופס: {value.fields.length}
@@ -713,8 +795,8 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                   return (
                     <div 
                       key={idx}
-                      className={`bg-zinc-950 rounded-2xl border transition-all shadow-sm ${
-                        isExpanded ? "ring-2 ring-amber-500/20 border-amber-500/50" : "border-white/5"
+                      className={`bg-zinc-950 rounded-2xl border transition-all shadow-sm relative !overflow-visible ${
+                        isExpanded ? "ring-2 ring-amber-500/20 border-amber-500/50 z-50" : "border-white/5 z-0"
                       }`}
                     >
                       {/* Accordion Trigger */}
@@ -795,7 +877,7 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
 
                       {/* Expandable options details */}
                       {isExpanded && (
-                        <div className="border-t border-white/5 bg-black/20 rounded-b-2xl overflow-hidden text-xs">
+                        <div className="border-t border-white/5 bg-black/20 rounded-b-2xl text-xs relative !overflow-visible">
                           {/* Tabs */}
                           <div className="flex bg-black/40 border-b border-white/5 overflow-x-auto custom-scrollbar">
                             <button type="button" onClick={(e) => { e.stopPropagation(); setActiveFieldTab("settings"); }} className={`px-4 py-3 font-bold whitespace-nowrap transition-colors ${activeFieldTab === "settings" ? "text-amber-400 border-b-2 border-amber-400 bg-amber-500/5" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>הגדרות השדה</button>
@@ -1281,32 +1363,22 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                             {/* Tab: Mapping */}
                             {activeFieldTab === "mapping" && (
                               <div className="flex flex-col gap-4 animate-in fade-in">
-                                <div>
+                                <div className="relative z-20">
                                   <label className="block font-semibold mb-1 text-slate-400">מיפוי לשדה CRM</label>
-                                  <select
+                                  <SearchableSelect
                                     value={field.map_to}
-                                    onChange={(e) => {
-                                      if (e.target.value === "__other__") {
+                                    onChange={(val) => {
+                                      if (val === "__other__") {
                                         setShowAddCustomFieldModal(true);
                                       } else {
-                                        handleFieldChange(idx, { map_to: e.target.value });
+                                        handleFieldChange(idx, { map_to: val });
                                       }
                                     }}
-                                    className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none"
-                                  >
-                                    {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
-                                      <option key={k} value={k}>{v}</option>
-                                    ))}
-                                    {customFields.length > 0 && <optgroup label="שדות מותאמים אישית">
-                                      {customFields.map(cf => (
-                                        <option key={cf.id} value={cf.id}>{cf.label}</option>
-                                      ))}
-                                    </optgroup>}
-                                    <option value="__other__" className="font-bold text-amber-500">אחר (הוסף שדה חדש)...</option>
-                                  </select>
+                                    options={mappingOptions}
+                                  />
                                 </div>
                                 
-                                <div className="border-t border-white/5 pt-3">
+                                <div className="border-t border-white/5 pt-3 relative z-10">
                                   <div className="flex items-center gap-2 mb-2">
                                     <input
                                       id={`field-map-2-${idx}`}
@@ -1320,28 +1392,18 @@ export function CRMFormBuilder({ value: rawValue, onChange }: CRMFormBuilderProp
                                     </label>
                                   </div>
                                   {field.map_to_2 && (
-                                    <div>
-                                      <select
+                                    <div className="mt-1">
+                                      <SearchableSelect
                                         value={field.map_to_2}
-                                        onChange={(e) => {
-                                          if (e.target.value === "__other__") {
+                                        onChange={(val) => {
+                                          if (val === "__other__") {
                                             setShowAddCustomFieldModal(true);
                                           } else {
-                                            handleFieldChange(idx, { map_to_2: e.target.value });
+                                            handleFieldChange(idx, { map_to_2: val });
                                           }
                                         }}
-                                        className="w-full bg-zinc-950 text-white border border-white/10 rounded-xl p-2.5 outline-none mt-1"
-                                      >
-                                        {Object.entries(CRM_DB_FIELDS).map(([k, v]) => (
-                                          <option key={k} value={k}>{v}</option>
-                                        ))}
-                                        {customFields.length > 0 && <optgroup label="שדות מותאמים אישית">
-                                          {customFields.map(cf => (
-                                            <option key={cf.id} value={cf.id}>{cf.label}</option>
-                                          ))}
-                                        </optgroup>}
-                                        <option value="__other__" className="font-bold text-amber-400">אחר (הוסף שדה חדש)...</option>
-                                      </select>
+                                        options={mappingOptions}
+                                      />
                                     </div>
                                   )}
                                 </div>
