@@ -10,7 +10,6 @@ import { stopImpersonating } from "@/features/users/impersonate";
 
 interface DashboardShellProps {
   children: React.ReactNode;
-  modal: React.ReactNode;
   geminiActive: boolean;
   kesherActive: boolean;
   dbActive: boolean;
@@ -21,7 +20,6 @@ interface DashboardShellProps {
 
 export function DashboardShellTest({
   children,
-  modal,
   userLogoUrl,
   miniSiteSlug,
   isImpersonating,
@@ -215,8 +213,7 @@ export function DashboardShellTest({
           </AnimatePresence>
         </main>
 
-        {/* Modal Injection */}
-        {modal}
+
 
         {pathname !== "/dashboard-test/crm" && <DashboardQuickActions />}
 

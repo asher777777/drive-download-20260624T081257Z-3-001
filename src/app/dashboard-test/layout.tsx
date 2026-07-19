@@ -10,14 +10,13 @@ export const dynamic = 'force-dynamic';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  modal: React.ReactNode;
 }
 
 export default async function DashboardLayout({
   children,
-  modal,
 }: DashboardLayoutProps) {
-  const [aiSettings, kesherSettings, dbActive, globalSettings] = await Promise.all([
+  // Run checks concurrently to avoid sequential blocking waterfalls (improves page transition speeds)
+    const [aiSettings, kesherSettings, dbActive, globalSettings] = await Promise.all([
     (async () => {
       if (process.env.GEMINI_API_KEY) return { googleAiKey: process.env.GEMINI_API_KEY };
       try {
@@ -35,6 +34,7 @@ export default async function DashboardLayout({
     })(),
     (async () => {
       try {
+        // Quick probe to check if adminDb is initialized and connected
         await adminDb.collection("configs").limit(1).get();
         return true;
       } catch (error) {
@@ -54,6 +54,7 @@ export default async function DashboardLayout({
   const geminiActive = !!(process.env.GEMINI_API_KEY || aiSettings?.googleAiKey);
   const kesherActive = !!(kesherSettings?.isActive);
 
+  // Check if impersonating
   const session = await auth();
   const isImpersonating = !!(session?.user as any)?.isImpersonating;
 
@@ -62,7 +63,6 @@ export default async function DashboardLayout({
       geminiActive={geminiActive}
       kesherActive={kesherActive}
       dbActive={dbActive}
-      modal={modal}
       miniSiteSlug={globalSettings?.miniSiteSlug}
       isImpersonating={isImpersonating}
     >

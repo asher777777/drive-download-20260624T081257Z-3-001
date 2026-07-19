@@ -758,3 +758,11 @@
 {"time":"2026-07-15T11:09:32.356Z","ownerId":"1","status":"active","snapshotSize":91,"contactsCount":91}
 {"time":"2026-07-15T11:11:43.074Z","ownerId":"1","status":"active","snapshotSize":91,"contactsCount":91}
 {"time":"2026-07-15T11:24:18.662Z","ownerId":"1","status":"active","snapshotSize":91,"contactsCount":91}
+{"time":"2026-07-19T09:45:44.623Z","ownerId":"1","status":"active","snapshotSize":93,"contactsCount":93}
+{"time":"2026-07-19T09:45:45.023Z","ownerId":"1","status":"active","snapshotSize":93,"contactsCount":93}
+{"time":"2026-07-19T10:56:42.934Z","ownerId":"1","status":"active","snapshotSize":93,"contactsCount":93}
+{"time":"2026-07-19T10:56:43.457Z","ownerId":"1","status":"active","snapshotSize":93,"contactsCount":93}
+{"time":"2026-07-19T10:57:03.220Z","ownerId":"1","status":"active","snapshotSize":93,"contactsCount":93}
+{"time":"2026-07-19T10:57:23.062Z","ownerId":"1","status":"active","snapshotSize":0,"contactsCount":0}
+{"time":"2026-07-19T10:57:28.903Z","ownerId":"1","status":"trashed","snapshotSize":93,"contactsCount":93}
+{"time":"2026-07-19T10:57:42.336Z","ownerId":"1","status":"trashed","snapshotSize":0,"contactsCount":0}
