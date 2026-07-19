@@ -44,6 +44,18 @@ export function DashboardShell({
     { href: "/dashboard/settings", label: "הגדרות", icon: Settings },
   ];
 
+  const isWidePage = pathname?.includes("/dashboard/generator");
+
+  if (isWidePage) {
+    return (
+      <div className="flex flex-col h-[100dvh] bg-slate-950 text-white overflow-hidden w-full" dir="rtl">
+        <div className="flex-grow flex flex-col w-full h-full relative overflow-hidden">
+          {children}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 md:items-center md:justify-center overflow-hidden" dir="rtl">
       

@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Users, Sparkles, Home, MessageSquare, 
-  FileText, Mail, Network, Menu, X, Calendar, LayoutGrid, Receipt
+  FileText, Mail, Network, Menu, X, Calendar, LayoutGrid, Receipt,
+  Wand2
 } from "lucide-react";
 
 export function NavigationMenuPopup() {
@@ -25,6 +26,7 @@ export function NavigationMenuPopup() {
         { name: "הוצאות", href: "/dashboard/expenses", icon: Receipt },
         { name: "קבלות ידניות", href: "/dashboard/receipts", icon: FileText },
         { name: "יצירת תוכן", href: "/dashboard/services", icon: Sparkles },
+        { name: "מחולל פרויקטים", href: "/dashboard/generator", icon: Wand2 },
       ]
     },
     {

@@ -3,8 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Database, LogOut, Settings, FileText, Receipt, Wand2, Calendar, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, Database, LogOut, Settings, FileText, Receipt, Wand2, Calendar, Menu, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 interface AdminSidebarTestProps {
   onSignOut: () => Promise<void>;
@@ -29,6 +30,7 @@ export function AdminSidebarTest({ onSignOut, children }: AdminSidebarTestProps)
     { href: "/admin/content", label: "תוכן וטפסים (אתר)", icon: FileText },
     { href: "/admin/settings", label: "הגדרות API גלובליות", icon: Settings },
     { href: "/admin/calendar", label: "יומן המחולל", icon: Calendar },
+    { href: "/dashboard/generator", label: "מחולל פרויקטים", icon: Sparkles },
   ];
 
   const sidebarContent = (
@@ -77,6 +79,10 @@ export function AdminSidebarTest({ onSignOut, children }: AdminSidebarTestProps)
           <span className="text-sm">למערכת ה-CRM שלי</span>
         </Link>
       </nav>
+      
+      <div className="my-2">
+        <ThemeToggle />
+      </div>
 
       <form action={onSignOut} className="mt-auto pt-4 border-t border-slate-800">
         <button type="submit" className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-400/10 w-full transition-colors font-semibold cursor-pointer">

@@ -80,6 +80,68 @@ const EditableLabel = ({ label, fieldId, isCustom, onSave, canEdit = true }: { l
   );
 };
 
+const RepeaterFieldAccordion = ({ f, customFieldsValues, setCustomFieldsValues, handleSaveLabel }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const rows = customFieldsValues[f.id] || [];
+
+  return (
+    <div className="border border-white/5 rounded-xl bg-zinc-950/50 overflow-hidden transition-all duration-200 mt-2">
+      <div 
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsOpen(!isOpen)} 
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsOpen(!isOpen); } }}
+        className="w-full p-3 flex justify-between items-center bg-zinc-900 hover:bg-zinc-800/80 transition-colors border-b border-transparent cursor-pointer"
+        style={{ borderColor: isOpen ? 'rgba(245, 158, 11, 0.1)' : 'transparent' }}
+      >
+        <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
+          <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />
+          <span className="text-[10px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded-full">{rows.length} פריטים</span>
+        </div>
+        {isOpen ? <ChevronUp className="w-4 h-4 text-white/50" /> : <ChevronDown className="w-4 h-4 text-white/50" />}
+      </div>
+      {isOpen && (
+        <div className="p-3 space-y-3 bg-zinc-950/50">
+          {rows.map((row: any, rIdx: number) => (
+            <div key={rIdx} className="flex gap-3 items-end bg-zinc-900 p-3 rounded-lg border border-white/5 relative group transition-all hover:border-amber-500/30">
+              <button type="button" onClick={() => {
+                const newArr = [...rows];
+                newArr.splice(rIdx, 1);
+                setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
+              }} className="absolute -left-2 -top-2 bg-zinc-800 text-red-400 hover:bg-red-500 hover:text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all border border-white/10 shadow-sm">
+                <Trash2 className="w-3 h-3" />
+              </button>
+              <div className="flex-1 flex flex-wrap gap-2">
+                {f.subFields?.map((sf: any) => (
+                  <div key={sf.id} className="flex-1 min-w-[120px] group/field">
+                    <label className="text-[10px] font-bold text-slate-400 block mb-1 group-focus-within/field:text-amber-400 transition-colors">{sf.label}</label>
+                    <Input
+                      type={sf.type === 'number' ? 'number' : sf.type === 'date' ? 'date' : 'text'}
+                      value={row[sf.id] || ""}
+                      onChange={(e) => {
+                        const newArr = [...rows];
+                        newArr[rIdx] = { ...newArr[rIdx], [sf.id]: e.target.value };
+                        setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
+                      }}
+                      className="bg-zinc-950 border border-white/10 text-white h-9 rounded-lg text-xs px-3 placeholder:text-white/20 focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:border-amber-500 transition-all"
+                      placeholder={sf.label}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <Button type="button" onClick={() => {
+            setCustomFieldsValues({ ...customFieldsValues, [f.id]: [...rows, {}] });
+          }} variant="ghost" className="w-full border border-dashed border-white/10 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 text-xs h-9 rounded-lg transition-all font-bold">
+            <Plus className="w-3.5 h-3.5 ml-1" /> הוסף פריט ל{f.label}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactModalProps) {
   const isEdit = !!contact;
   const [activeTab, setActiveTab] = useState<TabType | "">("");
@@ -357,8 +419,8 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {fields.map((f: any) => (
-              <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' ? 'col-span-1 md:col-span-2' : ''}`}>
-                <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />
+              <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' || f.type === 'repeater' ? 'col-span-1 md:col-span-2' : ''}`}>
+                {f.type !== 'repeater' && <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />}
                 
                 {f.type === 'documents' ? (
                   <div className="space-y-2">
@@ -415,42 +477,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                     </div>
                   </div>
                 ) : f.type === 'repeater' ? (
-                  <div className="space-y-3 bg-[#1a1a1a] p-3 rounded-xl border border-amber-500/30">
-                    {(customFieldsValues[f.id] || []).map((row: any, rIdx: number) => (
-                      <div key={rIdx} className="flex gap-2 items-end bg-[#0a0a0a] p-2 rounded-lg border border-amber-500/30 relative group">
-                        <button type="button" onClick={() => {
-                          const newArr = [...(customFieldsValues[f.id] || [])];
-                          newArr.splice(rIdx, 1);
-                          setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
-                        }} className="absolute -left-2 -top-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all border border-red-100 shadow-sm">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                        <div className="flex-1 flex flex-wrap gap-2">
-                          {f.subFields?.map((sf: any) => (
-                            <div key={sf.id} className="flex-1 min-w-[120px]">
-                              <label className="text-[10px] font-bold text-amber-500 block mb-1">{sf.label}</label>
-                              <Input
-                                type={sf.type === 'number' ? 'number' : sf.type === 'date' ? 'date' : 'text'}
-                                value={row[sf.id] || ""}
-                                onChange={(e) => {
-                                  const newArr = [...(customFieldsValues[f.id] || [])];
-                                  newArr[rIdx] = { ...newArr[rIdx], [sf.id]: e.target.value };
-                                  setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
-                                }}
-                                className="h-8 text-xs bg-transparent border border-amber-500 text-white placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
-                                placeholder={sf.label}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    <Button type="button" onClick={() => {
-                      setCustomFieldsValues({ ...customFieldsValues, [f.id]: [...(customFieldsValues[f.id] || []), {}] });
-                    }} variant="ghost" className="w-full h-8 text-xs text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
-                      <Plus className="w-3.5 h-3.5 ml-1" /> הוסף פריט ל{f.label}
-                    </Button>
-                  </div>
+                  <RepeaterFieldAccordion f={f} customFieldsValues={customFieldsValues} setCustomFieldsValues={setCustomFieldsValues} handleSaveLabel={handleSaveLabel} />
                 ) : f.type === "textarea" ? (
                   <textarea
                     value={customFieldsValues[f.id] || ""}
@@ -1199,8 +1226,8 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {customFieldsConfig.filter(f => f.category === tab.id).map((f: any) => (
-                          <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' ? 'col-span-1 md:col-span-2' : ''}`}>
-                            <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />
+                          <div key={f.id} className={`space-y-1.5 ${f.type === 'documents' || f.type === 'repeater' ? 'col-span-1 md:col-span-2' : ''}`}>
+                            {f.type !== 'repeater' && <EditableLabel label={f.label} fieldId={f.id} isCustom={true} onSave={handleSaveLabel} />}
                             
                             {f.type === 'documents' ? (
                               <div className="space-y-2">
@@ -1257,42 +1284,7 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
                                 </div>
                               </div>
                             ) : f.type === 'repeater' ? (
-                              <div className="space-y-3 bg-[#1a1a1a] p-3 rounded-xl border border-amber-500/30">
-                                {(customFieldsValues[f.id] || []).map((row: any, rIdx: number) => (
-                                  <div key={rIdx} className="flex gap-2 items-end bg-[#0a0a0a] p-2 rounded-lg border border-amber-500/30 relative group">
-                                    <button type="button" onClick={() => {
-                                      const newArr = [...(customFieldsValues[f.id] || [])];
-                                      newArr.splice(rIdx, 1);
-                                      setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
-                                    }} className="absolute -left-2 -top-2 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all border border-red-100 shadow-sm">
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                    <div className="flex-1 flex flex-wrap gap-2">
-                                      {f.subFields?.map((sf: any) => (
-                                        <div key={sf.id} className="flex-1 min-w-[120px]">
-                                          <label className="text-[10px] font-bold text-amber-500 block mb-1">{sf.label}</label>
-                                          <Input
-                                            type={sf.type === 'number' ? 'number' : sf.type === 'date' ? 'date' : 'text'}
-                                            value={row[sf.id] || ""}
-                                            onChange={(e) => {
-                                              const newArr = [...(customFieldsValues[f.id] || [])];
-                                              newArr[rIdx] = { ...newArr[rIdx], [sf.id]: e.target.value };
-                                              setCustomFieldsValues({ ...customFieldsValues, [f.id]: newArr });
-                                            }}
-                                            className="h-8 text-xs bg-transparent border border-amber-500 text-white placeholder:text-white/30 focus-visible:ring-amber-500 focus-visible:border-amber-500"
-                                            placeholder={sf.label}
-                                          />
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                                <Button type="button" onClick={() => {
-                                  setCustomFieldsValues({ ...customFieldsValues, [f.id]: [...(customFieldsValues[f.id] || []), {}] });
-                                }} variant="ghost" className="w-full h-8 text-xs text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
-                                  <Plus className="w-3.5 h-3.5 ml-1" /> הוסף פריט ל{f.label}
-                                </Button>
-                              </div>
+                              <RepeaterFieldAccordion f={f} customFieldsValues={customFieldsValues} setCustomFieldsValues={setCustomFieldsValues} handleSaveLabel={handleSaveLabel} />
                             ) : (
                               <Input
                                 type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
@@ -1445,10 +1437,10 @@ function AddFieldModal({ isOpen, onClose, onSave, isAdding }: any) {
 
         {type === "repeater" && (
           <div className="space-y-3 border-t border-white/10 pt-4 mt-4">
-            <label className="text-xs font-bold text-slate-400 text-right block">תתי-שדות (מיני-טופס)</label>
+            <label className="text-xs font-bold text-slate-400 text-right block">תתי-שדות (תצורת מערך)</label>
             {subFields.map((sf, idx) => (
-              <div key={sf.id} className="flex gap-2 items-center bg-white/5 p-2 rounded-xl">
-                <select value={sf.type} onChange={e => handleSubFieldChange(idx, 'type', e.target.value)} className="w-1/3 bg-[#181818] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none">
+              <div key={sf.id} className="flex gap-2 items-center bg-zinc-900 border border-white/5 p-2 rounded-lg transition-all hover:border-amber-500/30">
+                <select value={sf.type} onChange={e => handleSubFieldChange(idx, 'type', e.target.value)} className="w-1/3 bg-zinc-950 border border-white/10 focus:border-amber-500/50 rounded-lg px-2 py-1.5 text-xs text-white outline-none transition-all">
                   <option value="text">טקסט</option>
                   <option value="number">מספר</option>
                   <option value="date">תאריך</option>

@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Users, Database, LogOut, Settings, FileText, Receipt, Wand2, Calendar } from "lucide-react";
+import { LayoutDashboard, Users, Database, LogOut, Settings, FileText, Receipt, Wand2, Calendar, Sparkles } from "lucide-react";
 import { signOut } from "@/lib/auth";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -42,6 +43,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Calendar className="w-5 h-5" />
             יומן המחולל
           </Link>
+          <Link href="/dashboard/generator" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            מחולל פרויקטים
+          </Link>
           <div className="my-4 border-t border-slate-800"></div>
           <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
             <Database className="w-5 h-5" />
@@ -49,6 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
         </nav>
 
+        <ThemeToggle />
         <form action={async () => {
           "use server";
           await signOut();

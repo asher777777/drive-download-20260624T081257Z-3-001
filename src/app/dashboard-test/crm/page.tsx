@@ -537,7 +537,7 @@ export default function CRMDashboardPage() {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-5xl mx-auto pb-32 h-full overflow-y-auto no-scrollbar" dir="rtl">
+    <div className="flex flex-col w-full max-w-[1600px] mx-auto pb-32 h-full overflow-y-auto no-scrollbar" dir="rtl">
       
       {/* Header section */}
       <div className="flex flex-col gap-3 mb-4 mt-2 relative z-50">
