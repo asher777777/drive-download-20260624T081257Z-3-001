@@ -49,7 +49,7 @@ export function DashboardShell({
   if (isWidePage) {
     return (
       <div className="flex flex-col h-[100dvh] bg-slate-950 text-white overflow-hidden w-full" dir="rtl">
-        <div className="flex-grow flex flex-col w-full h-full relative overflow-hidden">
+        <div className="flex-grow flex flex-col w-full h-full relative overflow-y-auto no-scrollbar">
           {children}
         </div>
       </div>

@@ -11,9 +11,10 @@ interface ValidatorStepProps {
   smartGoals: SmartGoals;
   onNext: (validator: ValidatorResult, charter: ProjectCharter, type: "new" | "recurring") => void;
   onBack: () => void;
+  isLoading?: boolean;
 }
 
-export default function ValidatorStep({ title, smartGoals, onNext, onBack }: ValidatorStepProps) {
+export default function ValidatorStep({ title, smartGoals, onNext, onBack, isLoading }: ValidatorStepProps) {
   // Step sub-states: 
   // 1. Ask question "New or Recurring"
   // 2. Loading / Processing
@@ -337,10 +338,17 @@ export default function ValidatorStep({ title, smartGoals, onNext, onBack }: Val
               <button
                 type="button"
                 onClick={handleProceed}
-                disabled={!isSigned}
-                className="flex items-center gap-2 bg-[#f59e0b] text-black font-semibold px-8 py-3 rounded-xl hover:bg-[#d97706] shadow-[0_0_25px_rgba(245,158,11,0.2)] transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                disabled={!isSigned || isLoading}
+                className="flex items-center gap-2 bg-[#f59e0b] text-black font-semibold px-8 py-3 rounded-xl hover:bg-[#d97706] shadow-[0_0_25px_rgba(245,158,11,0.2)] transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
-                <span>עבור לעץ משימות ו-RACI</span>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>מייצר עץ משימות...</span>
+                  </>
+                ) : (
+                  <span>עבור לעץ משימות ו-RACI</span>
+                )}
               </button>
             </div>
           </motion.div>

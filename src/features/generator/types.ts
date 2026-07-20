@@ -49,4 +49,63 @@ export interface ProjectData {
   createdAt?: string;
   updatedAt?: string;
   userId: string;
+  baseline?: ProjectBaseline;
+  roles?: RoleRequirement[];
+  changeRequests?: ChangeRequest[];
+  warRoomMessages?: WarRoomMessage[];
+  metrics?: {
+    budget: number;
+    hours: number;
+    deadlineDays: number;
+  };
+}
+
+export interface RiskItem {
+  id: string;
+  risk: string;
+  probability: "Low" | "Medium" | "High";
+  impact: "Low" | "Medium" | "High";
+  mitigation: string;
+  approved: boolean;
+}
+
+export interface ProjectBaseline {
+  inScope: string[];
+  outScope: string[];
+  milestones: { taskId: string; financialFlag?: string; contractualFlag?: string }[];
+  risks: RiskItem[];
+  lockedAt?: string;
+}
+
+export interface RoleRequirement {
+  id: string;
+  taskId: string;
+  roleTitle: string;
+  requirements: string;
+  budget: number;
+  presenceMilestoneId?: string; // milestone presence required
+  assignedContactId?: string;
+  assignedContactName?: string;
+  status: "draft" | "invited" | "signed" | "active";
+}
+
+export interface ChangeRequest {
+  id: string;
+  title: string;
+  description: string;
+  budgetImpact: number;
+  scheduleImpactDays: number;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected";
+  approvedBy?: string[];
+}
+
+export interface WarRoomMessage {
+  id: string;
+  senderName: string;
+  senderRole: string;
+  message: string;
+  timestamp: string;
+  channel: string;
 }

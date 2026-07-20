@@ -4,7 +4,8 @@ import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAiSettings } from "@/features/ai/actions";
-import { WbsTask, SmartGoals, ValidatorResult, ProjectData } from "./types";
+import { WbsTask, SmartGoals, ValidatorResult, ProjectData, RiskItem, ProjectBaseline, RoleRequirement, ChangeRequest, WarRoomMessage } from "./types";
+import { Contact } from "@/features/crm/types";
 import { revalidatePath } from "next/cache";
 
 // Helper to get Google Generative AI client
@@ -361,5 +362,556 @@ export async function saveProject(project: ProjectData): Promise<{ success: bool
   } catch (error: any) {
     console.error("Error in saveProject:", error);
     return { success: false, error: error.message || "שגיאה בשמירת הפרויקט לשרת" };
+  }
+}
+
+// 7. Get Projects for current user
+export async function getProjects(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה - יש להתחבר למערכת" };
+
+    const snapshot = await adminDb
+      .collection("projects")
+      .where("userId", "==", session.user.id)
+      .get();
+
+    const projects = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id
+      };
+    });
+
+    // Sort in memory to avoid index requirements
+    projects.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    return { success: true, data: projects };
+  } catch (err: any) {
+    console.error("Error fetching projects:", err);
+    return { success: false, error: err.message || "נכשל באחזור פרויקטים" };
+  }
+}
+
+// 8. Delete Project
+export async function deleteProject(projectId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה" };
+
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    const doc = await projectRef.get();
+    if (!doc.exists) return { success: false, error: "הפרויקט לא נמצא" };
+    if (doc.data()?.userId !== session.user.id) return { success: false, error: "אין הרשאה למחוק פרויקט זה" };
+
+    await projectRef.delete();
+    revalidatePath("/dashboard/generator");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה במחיקת הפרויקט" };
+  }
+}
+
+// 9. Generate Scope and Risks baseline using Gemini
+export async function generateScopeAndRisks(title: string, tasks: WbsTask[]): Promise<{ success: boolean; data?: ProjectBaseline; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה - יש להתחבר למערכת" };
+
+    const genAI = await getGenAIClient();
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+
+    const prompt = `אתה מנוע ניתוח תכולה וניהול סיכונים עבור פרויקטים קהילתיים בארגונים ומלכ"רים.
+לפניך רשימת המשימות המתוכננות לפרויקט בשם "${title}".
+
+עליך לנתח את המשימות ולהפיק:
+1. "inScope": רשימה של 4-6 תוצרים/נושאים מרכזיים שנכללים בבירור בפרויקט (למשל: "הפקת חומרי שיווק דיגיטליים", "השכרת ציוד הגברה").
+2. "outScope": רשימה של 3-5 נושאים סבירים שאינם נכללים בפרויקט וימנעו זליגת תכולה (למשל: "מימון פרסום ממומן בגוגל", "רכישת ציוד הגברה קבוע").
+3. "risks": רשימה של 3-5 סיכונים פוטנציאליים המבוססים על המשימות. לכל סיכון הגדר:
+   - risk: תיאור הסיכון.
+   - probability: הסתברות (High, Medium, Low).
+   - impact: השפעה על הפרויקט (High, Medium, Low).
+   - mitigation: תוכנית מגירה/פתרון מוצע.
+   - approved: כרגע false.
+
+החזר את התשובה אך ורק במבנה JSON הבא:
+{
+  "inScope": ["פריט תכולה 1", "פריט תכולה 2"],
+  "outScope": ["מחוץ לתכולה 1", "מחוץ לתכולה 2"],
+  "risks": [
+    {
+      "id": "risk_1",
+      "risk": "תיאור הסיכון",
+      "probability": "Low" | "Medium" | "High",
+      "impact": "Low" | "Medium" | "High",
+      "mitigation": "תוכנית מגירה",
+      "approved": false
+    }
+  ]
+}
+
+רשימת המשימות:
+${JSON.stringify(tasks.map(t => ({ title: t.title, cost: t.cost, durationDays: t.durationDays })), null, 2)}`;
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const responseText = result.response.text();
+    const parsedData = JSON.parse(responseText);
+    
+    // Add IDs if missing
+    if (parsedData.risks) {
+      parsedData.risks = parsedData.risks.map((r: any, idx: number) => ({
+        ...r,
+        id: r.id || `risk_${Date.now()}_${idx}`
+      }));
+    }
+
+    return { 
+      success: true, 
+      data: {
+        inScope: parsedData.inScope || [],
+        outScope: parsedData.outScope || [],
+        risks: parsedData.risks || [],
+        milestones: []
+      }
+    };
+  } catch (error: any) {
+    console.error("Error in generateScopeAndRisks:", error);
+    return { success: false, error: error.message || "שגיאה בניתוח הסיכונים והתכולה" };
+  }
+}
+
+// 10. Load a single project by ID (Server side helper)
+export async function getProjectById(projectId: string): Promise<{ success: boolean; data?: ProjectData; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה" };
+
+    const docRef = adminDb.collection("projects").doc(projectId);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: false, error: "הפרויקט לא נמצא" };
+
+    const data = snap.data();
+    if (data.userId !== session.user.id) return { success: false, error: "אין הרשאה לפרויקט זה" };
+
+    return { success: true, data: { ...data, id: snap.id } as ProjectData };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה באחזור הפרויקט" };
+  }
+}
+
+// 11. Match CRM Contacts with Role Requirements using Gemini or fallback
+export async function matchCrmContactsAction(roleTitle: string, roleRequirements: string): Promise<{ success: boolean; data?: { contact: Contact; score: number; reason: string }[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה" };
+
+    const ownerId = session.user.id;
+    const contactsSnap = await adminDb.collection("contacts")
+      .where("ownerId", "==", ownerId)
+      .where("status", "==", "active")
+      .get();
+
+    if (contactsSnap.empty) {
+      return { success: true, data: [] };
+    }
+
+    const contactsList = contactsSnap.docs.map((doc: any) => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Contact[];
+
+    try {
+      const genAI = await getGenAIClient();
+      const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+
+      const prompt = `אתה רכיב ה-Matchmaker של מערכת ניהול משאבים קהילתיים.
+עליך לדרג רשימה של אנשי קשר מה-CRM בהתבסס על מידת התאמתם לדרישות תפקיד ספציפי.
+
+פרטי התפקיד הנדרש:
+- תואר תפקיד: "${roleTitle}"
+- דרישות וכישורים: "${roleRequirements}"
+
+אנשי קשר זמינים ב-CRM:
+${JSON.stringify(contactsList.map(c => ({ id: c.id, name: c.conta_name, job_title: c.job_title || "", tags: [c.tg1, c.tg2, c.tg3].filter(Boolean), notes: c.notes || "" })), null, 2)}
+
+עליך להחזיר דירוג התאמה לכל איש קשר (בין 0 ל-100) והסבר קצר בן משפט אחד בעברית מדוע הוא מתאים.
+החזר אך ורק במבנה JSON הבא:
+{
+  "matches": [
+    {
+      "contactId": "מזהה איש הקשר",
+      "score": 85,
+      "reason": "הסבר ההתאמה בעברית"
+    }
+  ]
+}
+`;
+
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      });
+
+      const responseText = result.response.text();
+      const parsed = JSON.parse(responseText) as { matches: { contactId: string; score: number; reason: string }[] };
+
+      const scoredList = parsed.matches.map(match => {
+        const contact = contactsList.find(c => c.id === match.contactId);
+        if (!contact) return null;
+        return {
+          contact,
+          score: match.score,
+          reason: match.reason
+        };
+      }).filter(Boolean) as { contact: Contact; score: number; reason: string }[];
+
+      scoredList.sort((a, b) => b.score - a.score);
+      return { success: true, data: scoredList };
+    } catch (aiErr) {
+      console.warn("AI CRM Match failed, using fallback similarity:", aiErr);
+      const normalizedRole = roleTitle.toLowerCase();
+      const scoredList = contactsList.map(c => {
+        let score = 20;
+        let reason = "איש קשר זמין מה-CRM.&rlm;";
+
+        if (c.job_title && c.job_title.toLowerCase().includes(normalizedRole)) {
+          score += 60;
+          reason = `התאמה גבוהה לפי הגדרת תפקיד (${c.job_title}).&rlm;`;
+        } else if (c.notes && c.notes.toLowerCase().includes(normalizedRole)) {
+          score += 30;
+          reason = "נמצאו מילות מפתח תואמות בהערות איש הקשר.&rlm;";
+        } else if ([c.tg1, c.tg2, c.tg3].some(t => t && t.toLowerCase().includes(normalizedRole))) {
+          score += 40;
+          reason = "נמצא תיוג תואם לתחום העיסוק.&rlm;";
+        }
+
+        return { contact: c, score: Math.min(score, 100), reason };
+      });
+
+      scoredList.sort((a, b) => b.score - a.score);
+      return { success: true, data: scoredList };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה בשידוך אנשי קשר מה-CRM" };
+  }
+}
+
+// 12. Create Public Recruitment Page
+export async function createPublicRecruitmentPage(
+  projectId: string,
+  roleId: string,
+  roleTitle: string,
+  roleRequirements: string,
+  budget: number
+): Promise<{ success: boolean; pageId?: string; url?: string; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה" };
+
+    const pageId = `${projectId}_${roleId}`;
+    const pageRef = adminDb.collection("recruitment_pages").doc(pageId);
+    
+    await pageRef.set({
+      projectId,
+      roleId,
+      roleTitle,
+      roleRequirements,
+      budget,
+      ownerId: session.user.id,
+      createdAt: new Date().toISOString()
+    });
+
+    const url = `/generator/onboard/${pageId}`;
+    return { success: true, pageId, url };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה ביצירת עמוד הגיוס" };
+  }
+}
+
+// 13. Submit Digital signature & terms on public onboarding form
+export async function submitDigitalSignatureAction(
+  pageId: string,
+  candidateName: string,
+  candidatePhone: string,
+  candidateEmail: string,
+  agreedPrice: number,
+  signatureData: string
+): Promise<{ success: boolean; projectId?: string; error?: string }> {
+  try {
+    const [projectId, roleId] = pageId.split("_");
+    if (!projectId || !roleId) return { success: false, error: "מזהה עמוד שגוי" };
+
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    const snap = await projectRef.get();
+    if (!snap.exists) return { success: false, error: "הפרויקט לא נמצא" };
+
+    const projectData = snap.data() as ProjectData;
+
+    // Create/update contact in owner's CRM
+    const contactsRef = adminDb.collection("contacts");
+    let contactId = "";
+    
+    const phone = candidatePhone.replace(/\D/g, "");
+    const existingContact = await contactsRef
+      .where("ownerId", "==", projectData.userId)
+      .where("conta_phone", "==", phone)
+      .limit(1)
+      .get();
+
+    if (!existingContact.empty) {
+      contactId = existingContact.docs[0].id;
+      await contactsRef.doc(contactId).update({
+        conta_name: candidateName,
+        email: candidateEmail,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      const newContact = {
+        ownerId: projectData.userId,
+        status: "active",
+        conta_name: candidateName,
+        conta_phone: phone,
+        email: candidateEmail,
+        job_title: roleId, // use role identifier
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      const res = await contactsRef.add(newContact);
+      contactId = res.id;
+    }
+
+    // Update roles list
+    let rolesList = projectData.roles || [];
+    const roleIdx = rolesList.findIndex(r => r.id === roleId);
+    if (roleIdx !== -1) {
+      rolesList[roleIdx] = {
+        ...rolesList[roleIdx],
+        assignedContactId: contactId,
+        assignedContactName: candidateName,
+        status: "active"
+      };
+    } else {
+      const task = projectData.tasks.find(t => t.id === roleId);
+      rolesList.push({
+        id: roleId,
+        taskId: roleId,
+        roleTitle: task ? task.title : "ספק חיצוני",
+        requirements: "קליטה חיצונית",
+        budget: agreedPrice,
+        assignedContactId: contactId,
+        assignedContactName: candidateName,
+        status: "active"
+      });
+    }
+
+    // Create onboarding log message in War Room
+    const newMsg: WarRoomMessage = {
+      id: `msg_onboard_${Date.now()}`,
+      senderName: "מערכת",
+      senderRole: "מערכת",
+      message: `הספק ${candidateName} השלים קליטה וחתם על משימת "${rolesList.find(r => r.id === roleId)?.roleTitle || 'ספק חיצוני'}" בסכום של ₪${agreedPrice.toLocaleString()}.&rlm;`,
+      timestamp: new Date().toISOString(),
+      channel: "כללי"
+    };
+
+    const updatedMsgs = [...(projectData.warRoomMessages || []), newMsg];
+
+    await projectRef.update({
+      roles: rolesList,
+      warRoomMessages: updatedMsgs,
+      updatedAt: new Date().toISOString()
+    });
+
+    return { success: true, projectId };
+  } catch (err: any) {
+    console.error("Error in submitDigitalSignatureAction:", err);
+    return { success: false, error: err.message || "שגיאה בתהליך החתימה" };
+  }
+}
+
+// 14. Submit Change Request in War Room
+export async function submitChangeRequestAction(
+  projectId: string, 
+  title: string, 
+  description: string, 
+  budgetImpact: number, 
+  scheduleImpactDays: number, 
+  requestedBy: string
+): Promise<{ success: boolean; changeRequests?: ChangeRequest[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה" };
+
+    const docRef = adminDb.collection("projects").doc(projectId);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: false, error: "הפרויקט לא נמצא" };
+
+    const projectData = snap.data();
+    if (projectData.userId !== session.user.id) return { success: false, error: "אין הרשאה לפרויקט זה" };
+
+    const newRequest: ChangeRequest = {
+      id: `cr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title,
+      description,
+      budgetImpact: Number(budgetImpact) || 0,
+      scheduleImpactDays: Number(scheduleImpactDays) || 0,
+      requestedBy,
+      requestedAt: new Date().toISOString(),
+      status: "pending",
+      approvedBy: []
+    };
+
+    const currentRequests = projectData.changeRequests || [];
+    const updatedRequests = [...currentRequests, newRequest];
+
+    await docRef.update({
+      changeRequests: updatedRequests,
+      updatedAt: new Date().toISOString()
+    });
+
+    return { success: true, changeRequests: updatedRequests };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה בהגשת בקשת השינוי" };
+  }
+}
+
+// 15. Approve Change Request and update Project baseline
+export async function approveChangeRequestAction(
+  projectId: string, 
+  requestId: string, 
+  approverName: string
+): Promise<{ success: boolean; data?: ProjectData; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "לא מורשה" };
+
+    const docRef = adminDb.collection("projects").doc(projectId);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: false, error: "הפרויקט לא נמצא" };
+
+    const projectData = snap.data() as ProjectData;
+    if (projectData.userId !== session.user.id) return { success: false, error: "אין הרשאה לפרויקט זה" };
+
+    const updatedRequests = (projectData.changeRequests || []).map(req => {
+      if (req.id === requestId) {
+        return {
+          ...req,
+          status: "approved" as const,
+          approvedBy: [...(req.approvedBy || []), approverName]
+        };
+      }
+      return req;
+    });
+
+    const approvedRequest = updatedRequests.find(r => r.id === requestId);
+    if (!approvedRequest) return { success: false, error: "בקשת השינוי לא נמצאה" };
+
+    // Apply impact to project metrics and tasks
+    let updatedTasks = [...projectData.tasks];
+    let updatedMetrics = { ...(projectData.metrics || { budget: 0, hours: 0, deadlineDays: 0 }) };
+
+    if (approvedRequest.budgetImpact !== 0 || approvedRequest.scheduleImpactDays !== 0) {
+      const changeTask: WbsTask = {
+        id: `task_change_${approvedRequest.id}`,
+        parentId: null,
+        title: `שינוי מאושר: ${approvedRequest.title}`,
+        durationDays: approvedRequest.scheduleImpactDays,
+        cost: approvedRequest.budgetImpact,
+        dependencies: [],
+        raci: {
+          r: approvedRequest.requestedBy,
+          a: approverName,
+          c: "",
+          i: ""
+        }
+      };
+      updatedTasks.push(changeTask);
+
+      let totalBudget = 0;
+      let totalHours = 0;
+      let maxDuration = 0;
+
+      updatedTasks.forEach(t => {
+        totalBudget += t.cost || 0;
+        totalHours += (t.durationDays || 0) * 8;
+        if (!t.parentId) {
+          maxDuration = Math.max(maxDuration, t.durationDays || 0);
+        }
+      });
+
+      updatedMetrics.budget = totalBudget;
+      updatedMetrics.hours = totalHours;
+      updatedMetrics.deadlineDays = projectData.charter?.durationDays ? (projectData.charter.durationDays + approvedRequest.scheduleImpactDays) : maxDuration;
+    }
+
+    const updatePayload: Partial<ProjectData> = {
+      changeRequests: updatedRequests,
+      tasks: updatedTasks,
+      metrics: updatedMetrics,
+      updatedAt: new Date().toISOString()
+    };
+
+    await docRef.update(updatePayload);
+
+    return { 
+      success: true, 
+      data: {
+        ...projectData,
+        ...updatePayload
+      }
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה באישור בקשת השינוי" };
+  }
+}
+
+// 16. Post message in Virtual War Room
+export async function addWarRoomMessage(
+  projectId: string,
+  msg: Omit<WarRoomMessage, "id" | "timestamp">
+): Promise<{ success: boolean; message?: WarRoomMessage; error?: string }> {
+  try {
+    const docRef = adminDb.collection("projects").doc(projectId);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: false, error: "הפרויקט לא נמצא" };
+
+    const projectData = snap.data();
+    
+    const newMsg: WarRoomMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      ...msg,
+      timestamp: new Date().toISOString()
+    };
+
+    const currentMsgs = projectData.warRoomMessages || [];
+    const updatedMsgs = [...currentMsgs, newMsg];
+
+    await docRef.update({
+      warRoomMessages: updatedMsgs,
+      updatedAt: new Date().toISOString()
+    });
+
+    return { success: true, message: newMsg };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה בשליחת ההודעה" };
+  }
+}
+
+// 17. Load recruitment page data (public route helper)
+export async function getRecruitmentPageData(pageId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const docRef = adminDb.collection("recruitment_pages").doc(pageId);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: false, error: "עמוד הגיוס לא נמצא" };
+    return { success: true, data: snap.data() };
+  } catch (err: any) {
+    return { success: false, error: err.message || "שגיאה באחזור עמוד הגיוס" };
   }
 }
