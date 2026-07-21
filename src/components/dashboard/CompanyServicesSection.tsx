@@ -69,7 +69,7 @@ export function CompanyServicesSection({ companyVision, onSave }: CompanyService
     try {
       const { suggestSingleServiceFromVisionWithAI } = await import("@/features/ai/actions");
       const existingNames = services.map(s => s.name);
-      const res = await suggestSingleServiceFromVisionWithAI(companyVision, existingNames, allAudiencesOptions);
+      const res = await suggestSingleServiceFromVisionWithAI(companyVision, existingNames, allAudiencesOptions, true);
       if (res.success && res.service) {
         const processedProblems = (res.service.problems || []).map((p: any) => ({
           ...p,
@@ -369,7 +369,7 @@ function ServiceAccordionItem({
   const handleGeneratePainPointsWithAI = async () => {
     if (!problemTitle) return alert("יש להזין נושא או כותרת תחילה");
     setGeneratingPainPoints(true);
-    const res = await suggestPainPointsWithAI(problemTitle, targetAudiences);
+    const res = await suggestPainPointsWithAI(problemTitle, targetAudiences, true);
     if (res.success && res.painPoints) {
       setPainPoints(res.painPoints.map((p: any, i: number) => ({ id: Date.now() + i, ...p })));
     } else {
@@ -428,7 +428,7 @@ function ServiceAccordionItem({
 
     setGeneratingBenefits(true);
     const { suggestBenefitsWithAI } = await import("@/features/ai/actions");
-    const res = await suggestBenefitsWithAI(benefitTitle, targetAudiences, allPainPoints);
+    const res = await suggestBenefitsWithAI(benefitTitle, targetAudiences, allPainPoints, true);
     if (res.success && res.benefits) {
       setBenefitItems(res.benefits.map((b: any, i: number) => ({ id: Date.now() + i, ...b })));
     } else {

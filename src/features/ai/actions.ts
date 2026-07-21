@@ -57,17 +57,20 @@ export async function saveAiSettings(settings: { googleAiKey: string }) {
 export async function rephraseTextWithAI(
   text: string,
   tone: "warm" | "elegant" | "punchy" | "storytelling" = "warm",
-  customInstruction: string = ""
+  customInstruction: string = "",
+  skipLimits: boolean = false
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   try {
-    const { auth } = await import("@/lib/auth");
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new Error("Unauthorized");
-    const { checkFeatureLimit } = await import("@/features/users/actions");
-    const limitCheck = await checkFeatureLimit(userId, "ai");
-    if (!limitCheck.allowed) {
-      return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+    if (!skipLimits) {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+      const { checkFeatureLimit } = await import("@/features/users/actions");
+      const limitCheck = await checkFeatureLimit(userId, "ai");
+      if (!limitCheck.allowed) {
+        return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+      }
     }
   } catch(e) {
     // If not authenticated or error, we might just fail
@@ -363,17 +366,20 @@ Return ONLY the suggested Hebrew text. Do not wrap in quotes or add comments.`;
 
 export async function suggestPainPointsWithAI(
   problemTitle: string,
-  audiences: string[]
+  audiences: string[],
+  skipLimits: boolean = false
 ): Promise<{ success: boolean; painPoints?: { title: string, description: string }[]; error?: string }> {
   try {
-    const { auth } = await import("@/lib/auth");
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new Error("Unauthorized");
-    const { checkFeatureLimit } = await import("@/features/users/actions");
-    const limitCheck = await checkFeatureLimit(userId, "ai");
-    if (!limitCheck.allowed) {
-      return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+    if (!skipLimits) {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+      const { checkFeatureLimit } = await import("@/features/users/actions");
+      const limitCheck = await checkFeatureLimit(userId, "ai");
+      if (!limitCheck.allowed) {
+        return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+      }
     }
   } catch(e) {}
 
@@ -425,17 +431,20 @@ Example:
 export async function suggestBenefitsWithAI(
   benefitTitle: string,
   audiences: string[],
-  painPointsContext: string
+  painPointsContext: string,
+  skipLimits: boolean = false
 ): Promise<{ success: boolean; benefits?: { title: string, description: string }[]; error?: string }> {
   try {
-    const { auth } = await import("@/lib/auth");
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new Error("Unauthorized");
-    const { checkFeatureLimit } = await import("@/features/users/actions");
-    const limitCheck = await checkFeatureLimit(userId, "ai");
-    if (!limitCheck.allowed) {
-      return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+    if (!skipLimits) {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+      const { checkFeatureLimit } = await import("@/features/users/actions");
+      const limitCheck = await checkFeatureLimit(userId, "ai");
+      if (!limitCheck.allowed) {
+        return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+      }
     }
   } catch(e) {}
 
@@ -490,17 +499,20 @@ Example:
 export async function suggestSingleServiceFromVisionWithAI(
   visionText: string,
   existingServices: string[],
-  availableAudiences: string[]
+  availableAudiences: string[],
+  skipLimits: boolean = false
 ): Promise<{ success: boolean; service?: any; error?: string }> {
   try {
-    const { auth } = await import("@/lib/auth");
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new Error("Unauthorized");
-    const { checkFeatureLimit } = await import("@/features/users/actions");
-    const limitCheck = await checkFeatureLimit(userId, "ai");
-    if (!limitCheck.allowed) {
-      return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+    if (!skipLimits) {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+      const { checkFeatureLimit } = await import("@/features/users/actions");
+      const limitCheck = await checkFeatureLimit(userId, "ai");
+      if (!limitCheck.allowed) {
+        return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
+      }
     }
   } catch(e) {}
 

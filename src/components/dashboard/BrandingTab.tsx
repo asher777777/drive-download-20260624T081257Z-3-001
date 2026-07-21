@@ -240,7 +240,7 @@ export function BrandingTab({
   const handleImproveWithAI = async () => {
     setAiLoading(true);
     try {
-      const result = await rephraseTextWithAI(companyVision, undefined, customInstruction);
+      const result = await rephraseTextWithAI(companyVision, undefined, customInstruction, true);
       if (result.success && result.text) {
         setCompanyVision(result.text);
       } else {
@@ -260,7 +260,7 @@ export function BrandingTab({
     }
     setAiLoading(true);
     try {
-      const result = await rephraseTextWithAI(companyVision, undefined, "תמצת את החזון הזה למשפט קצר וקולע של עד 15 מילים. החזר טקסט נקי בלבד ללא שום תגיות HTML או קוד.");
+      const result = await rephraseTextWithAI(companyVision, undefined, "תמצת את החזון הזה למשפט קצר וקולע של עד 15 מילים. החזר טקסט נקי בלבד ללא שום תגיות HTML או קוד.", true);
       if (result.success && result.text) {
         const cleanText = result.text.replace(/<[^>]*>?/gm, '').trim();
         setShortVision(cleanText);
