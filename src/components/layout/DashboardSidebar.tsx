@@ -50,6 +50,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
   // State for Quick Actions modal
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
 
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -133,9 +134,9 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
         </button>
       )}
 
-      {/* Overlay for mobile */}
+      {/* Overlay for all viewports when sidebar is open to close it easily */}
       <AnimatePresence>
-        {isMobile && isOpen && (
+        {isOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -154,7 +155,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
             exit={{ width: 0, opacity: 0, x: 50 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className={cn(
-              "fixed md:sticky top-0 right-0 z-50 h-[100dvh] bg-white border-l border-slate-200 shadow-lg md:shadow-none flex flex-col shrink-0 overflow-y-auto overflow-x-hidden",
+              "fixed top-0 right-0 z-50 h-[100dvh] bg-white border-l border-slate-200 shadow-xl flex flex-col shrink-0 overflow-y-auto overflow-x-hidden",
               className
             )}
             dir="rtl"

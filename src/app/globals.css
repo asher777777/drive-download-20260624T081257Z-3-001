@@ -159,9 +159,9 @@
   }
   
   /* Dynamic text color overrides based on branding settings */
-  h1, .h1 { color: var(--heading-1) !important; }
-  h2, .h2 { color: var(--heading-2) !important; }
-  h3, .h3 { color: var(--heading-3) !important; }
+  h1, .h1 { color: var(--heading-1); }
+  h2, .h2 { color: var(--heading-2); }
+  h3, .h3 { color: var(--heading-3); }
 }
 
 /* Logical Properties helper for Hebrew/English */
@@ -184,6 +184,19 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Global Form Icons */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(56%) sepia(82%) saturate(1637%) hue-rotate(352deg) brightness(97%) contrast(96%);
+  cursor: pointer;
+}
   
   /* Hide scrollbar utility */
   @layer utilities {

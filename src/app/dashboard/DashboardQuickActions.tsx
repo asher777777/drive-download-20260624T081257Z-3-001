@@ -42,6 +42,12 @@ export function DashboardQuickActions() {
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isServiceOpen, setIsServiceOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
+
+  useEffect(() => {
+    const handleOpenQuickActions = () => setIsQuickActionsOpen(true);
+    window.addEventListener("open-quick-actions", handleOpenQuickActions);
+    return () => window.removeEventListener("open-quick-actions", handleOpenQuickActions);
+  }, []);
   const [serviceType, setServiceType] = useState<'service' | 'landing' | 'post'>("service");
   const [serviceSlug, setServiceSlug] = useState("");
   const [servicePrompt, setServicePrompt] = useState("");

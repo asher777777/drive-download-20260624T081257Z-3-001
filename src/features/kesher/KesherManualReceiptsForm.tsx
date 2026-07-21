@@ -92,7 +92,27 @@ export function KesherManualReceiptsForm() {
       });
 
       if (res.success) {
-        setSuccess(res.message || "הקבלה הופקה בהצלחה ונשמרה בקשר!");
+        // Save to local incomes collection
+        let kesherUrl = "";
+        if (res.kesherResult?.DocUrl || res.kesherResult?.Url) {
+           kesherUrl = res.kesherResult.DocUrl || res.kesherResult.Url;
+        } else if (res.kesherResult?.Message || typeof res.kesherResult === 'string') {
+           kesherUrl = `שגיאה/הערה: ${res.kesherResult?.Message || res.kesherResult}`;
+        } else {
+           kesherUrl = "לא התקבל קישור או מידע מהשרת של קשר";
+        }
+
+        const { createIncome } = await import("@/features/incomes/actions");
+        await createIncome({
+          clientName: formData.clientName,
+          amount: Number(formData.amount),
+          paymentType: formData.paymentType,
+          receiptType: formData.receiptType,
+          date: formData.date,
+          kesherUrl: kesherUrl
+        });
+
+        setSuccess(res.message || "הקבלה הופקה בהצלחה ונשמרה במערכת!");
         setFormData({
           clientName: "", amount: "", paymentType: "", receiptType: "000", zeout: "", phone: "", email: "", details: "", date: new Date().toLocaleDateString("he-IL").replace(/\./g, '/'), checkNumber: "", bankName: "", branchNumber: "", accountNumber: "", transferRef: "",
         });
