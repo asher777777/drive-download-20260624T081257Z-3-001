@@ -16,28 +16,28 @@ export function IncomesDashboardClient({ incomes }: IncomesDashboardClientProps)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const addIncomeIcon = (
-    <div className="relative w-16 h-16 md:w-20 md:h-20 group-hover:scale-110 transition-transform duration-300">
-      <Banknote className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 md:w-14 md:h-14 text-amber-400 stroke-[1.5]" />
-      <Plus className="absolute top-2 right-2 w-5 h-5 md:w-7 md:h-7 text-green-500/80 stroke-[2]" />
+    <div className="relative w-12 h-12 md:w-16 md:h-16 group-hover:scale-110 transition-transform duration-300 mx-auto">
+      <Banknote className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-8 md:w-10 md:h-10 text-amber-400 stroke-[1.5]" />
+      <Plus className="absolute top-0 right-0 md:top-1 md:right-1 w-4 h-4 md:w-5 md:h-5 text-green-500/80 stroke-[2]" />
     </div>
   );
 
   const historyIcon = (
-    <div className="relative w-16 h-16 md:w-20 md:h-20 group-hover:scale-110 transition-transform duration-300">
-      <List className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 md:w-14 md:h-14 text-amber-400 stroke-[1.5]" />
-      <Activity className="absolute top-2 left-2 w-5 h-5 md:w-6 md:h-6 text-amber-500/80 stroke-[1.5]" />
+    <div className="relative w-12 h-12 md:w-16 md:h-16 group-hover:scale-110 transition-transform duration-300 mx-auto">
+      <List className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-8 md:w-10 md:h-10 text-amber-400 stroke-[1.5]" />
+      <Activity className="absolute top-0 left-0 md:top-1 md:left-1 w-4 h-4 md:w-5 md:h-5 text-amber-500/80 stroke-[1.5]" />
     </div>
   );
 
   const paymentIcon = (
-    <div className="relative w-16 h-16 md:w-20 md:h-20 group-hover:scale-110 transition-transform duration-300 opacity-50 cursor-not-allowed">
-      <CreditCard className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 md:w-14 md:h-14 text-amber-400 stroke-[1.5]" />
+    <div className="relative w-12 h-12 md:w-16 md:h-16 group-hover:scale-110 transition-transform duration-300 opacity-50 cursor-not-allowed mx-auto">
+      <CreditCard className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-8 md:w-10 md:h-10 text-amber-400 stroke-[1.5]" />
     </div>
   );
 
   const backIcon = (
-    <div className="relative w-16 h-16 md:w-20 md:h-20 group-hover:scale-110 transition-transform duration-300">
-      <ArrowRight className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 md:w-14 md:h-14 text-amber-400 stroke-[1.5]" />
+    <div className="relative w-12 h-12 md:w-16 md:h-16 group-hover:scale-110 transition-transform duration-300 mx-auto">
+      <ArrowRight className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-8 md:w-10 md:h-10 text-amber-400 stroke-[1.5]" />
     </div>
   );
 

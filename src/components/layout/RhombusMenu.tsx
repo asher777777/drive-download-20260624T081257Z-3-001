@@ -48,32 +48,32 @@ export function RhombusMenu({
     window.dispatchEvent(new CustomEvent("open-quick-actions"));
   };
 
-  const renderItem = (item: RhombusMenuItemProps) => {
+  const renderItem = (item: RhombusMenuItemProps, style?: React.CSSProperties) => {
     const Inner = (
       <>
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-tr from-transparent via-amber-500/10 to-transparent transition-opacity duration-500" />
         <div 
-          className="flex flex-col items-center justify-center text-center p-4 relative z-10"
+          className="flex flex-col items-center justify-center text-center p-2 relative z-10 w-full h-full"
           style={{ transform: "rotate(-45deg)" }}
         >
           {item.icon}
-          <span className="text-amber-500 font-bold tracking-wide text-sm md:text-lg mt-3">{item.label}</span>
+          <span className="text-amber-500 font-bold tracking-wide text-xs sm:text-sm md:text-base mt-1.5 md:mt-2 whitespace-nowrap">{item.label}</span>
         </div>
       </>
     );
 
-    const className = "w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 bg-[#0a0a0a] border border-amber-500/60 hover:bg-[#111] transition-colors shadow-2xl flex items-center justify-center group cursor-pointer relative overflow-hidden animate-in fade-in zoom-in duration-700 fill-mode-both";
+    const className = "absolute z-10 bg-[#0a0a0a] border border-amber-500/60 hover:bg-[#111] transition-colors shadow-2xl flex items-center justify-center group cursor-pointer overflow-hidden animate-in fade-in zoom-in duration-700 fill-mode-both";
 
     if (item.href) {
       return (
-        <Link href={item.href} className={className}>
+        <Link href={item.href} className={className} style={style}>
           {Inner}
         </Link>
       );
     }
 
     return (
-      <button onClick={item.onClick} className={className}>
+      <button onClick={item.onClick} className={className} style={style}>
         {Inner}
       </button>
     );
@@ -81,7 +81,14 @@ export function RhombusMenu({
 
   return (
     <>
-      <div className="relative w-full h-[100dvh] flex flex-col items-center justify-center overflow-hidden">
+      <div 
+        className="relative w-full h-[100dvh] flex flex-col items-center justify-center overflow-hidden"
+        style={{ 
+          '--s': 'min(calc((100vw - 13px) / 2.121), 180px)',
+          '--c': 'var(--s)',
+          '--offset': 'calc(var(--s) + 5px)'
+        } as React.CSSProperties}
+      >
         {!hideFixedButtons && (
           <>
             {/* Top Menu Button - Fixed Top Center */}
@@ -106,46 +113,72 @@ export function RhombusMenu({
           </>
         )}
 
-        <div className="z-10 flex flex-col items-center justify-center w-full max-w-5xl px-4 py-12">
-          <div className="relative mb-10 mt-10">
+        <div className="z-10 flex flex-col items-center justify-center w-full max-w-5xl px-0 py-12">
+          <div className="relative flex items-center justify-center w-full min-h-[400px]">
             <div 
-              className="grid grid-cols-3 grid-rows-3 gap-2 md:gap-3 mx-auto"
+              className="relative"
               style={{ 
+                width: '0px',
+                height: '0px',
                 transform: "rotate(45deg)",
-                width: "fit-content",
               }}
             >
-              {/* Row 1 */}
-              <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 invisible" />
-              {renderItem(topRight)}
-              <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 invisible" />
+              {/* Top Left Visually -> Unrotated Left (L) -> X = -offset, Y = 0 */}
+              {renderItem(topLeft, {
+                width: 'var(--s)', height: 'var(--s)',
+                top: '0', left: 'calc(var(--offset) * -1)',
+                transform: 'translate(-50%, -50%)'
+              })}
 
-              {/* Row 2 */}
-              {renderItem(topLeft)}
-              
-              <button 
-                onClick={() => setIsCenterModalOpen(true)}
-                className="w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 bg-[#0a0a0a] border border-amber-500/30 shadow-[0_0_80px_rgba(245,158,11,0.5)] flex items-center justify-center overflow-hidden relative z-20 cursor-pointer hover:scale-105 transition-transform duration-500 animate-in zoom-in fade-in duration-700 delay-150 fill-mode-both"
+              {/* Top Right Visually -> Unrotated Top (T) -> X = 0, Y = -offset */}
+              {renderItem(topRight, {
+                width: 'var(--s)', height: 'var(--s)',
+                top: 'calc(var(--offset) * -1)', left: '0',
+                transform: 'translate(-50%, -50%)'
+              })}
+
+              {/* Center */}
+              <div 
+                className="absolute z-20 flex items-center justify-center"
+                style={{
+                  width: 'var(--c)',
+                  height: 'var(--c)',
+                  top: '0',
+                  left: '0',
+                  transform: 'translate(-50%, -50%)',
+                }}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-900 via-amber-600 to-black opacity-90" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[conic-gradient(from_0deg,transparent,rgba(245,158,11,0.2),transparent,rgba(252,211,77,0.5),transparent)] animate-spin-slow blur-sm mix-blend-screen" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] bg-[conic-gradient(from_180deg,transparent,rgba(245,158,11,0.6),transparent,rgba(254,240,138,0.8),transparent)] animate-[spin_4s_linear_infinite_reverse] blur-md mix-blend-screen" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(252,211,77,0.8)_0%,transparent_50%)] mix-blend-overlay" />
-                
-                <div 
-                  className="relative z-10 flex flex-col items-center justify-center"
-                  style={{ transform: "rotate(-45deg)" }}
+                <button 
+                  onClick={() => setIsCenterModalOpen(true)}
+                  className="w-full h-full bg-[#0a0a0a] border border-amber-500/30 shadow-[0_0_80px_rgba(245,158,11,0.5)] flex items-center justify-center overflow-hidden relative cursor-pointer hover:scale-105 transition-transform duration-500 animate-in zoom-in fade-in duration-700 delay-150 fill-mode-both"
                 >
-                  {center.content}
-                </div>
-              </button>
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-900 via-amber-600 to-black opacity-90" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[conic-gradient(from_0deg,transparent,rgba(245,158,11,0.2),transparent,rgba(252,211,77,0.5),transparent)] animate-spin-slow blur-sm mix-blend-screen" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] bg-[conic-gradient(from_180deg,transparent,rgba(245,158,11,0.6),transparent,rgba(254,240,138,0.8),transparent)] animate-[spin_4s_linear_infinite_reverse] blur-md mix-blend-screen" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(252,211,77,0.8)_0%,transparent_50%)] mix-blend-overlay" />
+                  
+                  <div 
+                    className="relative z-10 flex flex-col items-center justify-center w-full h-full"
+                    style={{ transform: "rotate(-45deg)" }}
+                  >
+                    {center.content}
+                  </div>
+                </button>
+              </div>
 
-              {renderItem(bottomRight)}
+              {/* Bottom Right Visually -> Unrotated Right (R) -> X = offset, Y = 0 */}
+              {renderItem(bottomRight, {
+                width: 'var(--s)', height: 'var(--s)',
+                top: '0', left: 'var(--offset)',
+                transform: 'translate(-50%, -50%)'
+              })}
 
-              {/* Row 3 */}
-              <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 invisible" />
-              {renderItem(bottomLeft)}
-              <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 invisible" />
+              {/* Bottom Left Visually -> Unrotated Bottom (B) -> X = 0, Y = offset */}
+              {renderItem(bottomLeft, {
+                width: 'var(--s)', height: 'var(--s)',
+                top: 'var(--offset)', left: '0',
+                transform: 'translate(-50%, -50%)'
+              })}
             </div>
           </div>
         </div>

@@ -155,13 +155,6 @@ export function DashboardQuickActions() {
 
   return (
     <>
-      <button 
-        onClick={() => setIsQuickActionsOpen(true)}
-        className="absolute bottom-[110px] left-6 z-50 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition-transform hover:scale-105 active:scale-95"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
-
       <Modal isOpen={isQuickActionsOpen} onClose={() => setIsQuickActionsOpen(false)}>
         <Modal.Content className="max-w-md w-full rounded-[2rem] p-6 md:p-8">
           <div dir="rtl" className="w-full relative">
