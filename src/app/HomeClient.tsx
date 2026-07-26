@@ -15,6 +15,7 @@ const RichContentSection = dynamic(() => import("@/components/sections/RichConte
 const TimerSection = dynamic(() => import("@/components/sections/TimerSection").then(m => m.TimerSection), { ssr: true });
 const PricingSection = dynamic(() => import("@/components/sections/PricingSection").then(m => m.PricingSection), { ssr: true });
 const CourseBanner = dynamic(() => import("@/components/sections/CourseBanner").then(m => m.CourseBanner), { ssr: true });
+const FaqSection = dynamic(() => import("@/components/sections/FaqSection").then(m => m.FaqSection), { ssr: true });
 import { HomePageConfig } from "@/features/home/actions";
 import { GlobalSettings } from "@/features/settings/actions";
 import { Edit3 } from "lucide-react";
@@ -250,6 +251,19 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             backgroundColor={config.imageListing.backgroundColor || globalSettings.backgroundColor}
             title={config.imageListing.title}
             titleColor={config.imageListing.titleColor}
+            isEditing={false}
+          />
+        );
+      case "faq":
+        if (!config.faq || config.faq.visible === false || String(config.faq.visible) === "false") return null;
+        return (
+          <FaqSection
+            id={config.faq.anchorId || "faq"}
+            title={config.faq.title}
+            subtitle={config.faq.subtitle}
+            items={config.faq.items}
+            backgroundColor={config.faq.backgroundColor}
+            globalSettings={globalSettings}
             isEditing={false}
           />
         );

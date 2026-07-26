@@ -115,7 +115,7 @@ export async function checkFeatureLimit(userId: string, feature: "contacts" | "l
   const session = await auth();
   const role = session?.user?.role || "ADMIN";
   
-  if (role === "SUPERADMIN" || role === "ADMIN" || role === "PRO") return { allowed: true };
+  if (role === "ADMIN" || role === "PRO") return { allowed: true };
 
   // TRIAL check
   if (role === "TRIAL") {

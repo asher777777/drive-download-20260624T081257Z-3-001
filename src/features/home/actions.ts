@@ -35,6 +35,14 @@ export interface PricingPackage {
   isPopular?: boolean;
 }
 
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  icon?: string;
+  isVisible?: boolean;
+}
+
 export interface HomePageConfig {
   hero: {
     visible?: boolean;
@@ -202,14 +210,19 @@ export interface HomePageConfig {
     hoverColor?: string;
     packages?: PricingPackage[];
   };
+  faq?: {
+    visible: boolean;
+    title: string;
+    subtitle?: string;
+    items: FaqItem[];
+    anchorId?: string;
+    backgroundColor?: string;
+    hoverColor?: string;
+    titleColor?: string;
+    subtitleColor?: string;
+  };
   mobileHiddenSections?: string[];
   sectionOrder: string[];
-  header?: {
-    visible?: boolean;
-    layout?: "classic" | "center" | "left";
-    theme?: "navy" | "emerald" | "rose" | "violet" | "charcoal";
-  };
-  imagePrompt?: string;
   seo?: {
     title: string;
     description: string;
@@ -528,8 +541,32 @@ const DEFAULT_HOME_CONFIG: HomePageConfig = {
       }
     ]
   },
+  faq: {
+    visible: true,
+    title: "שאלות ותשובות נפוצות",
+    subtitle: "תשובות לכל השאלות שרציתם לשאול על השירותים והפלטפורמה שלנו",
+    anchorId: "faq",
+    backgroundColor: "transparent",
+    items: [
+      {
+        id: "1",
+        question: "איך מתחילים לעבוד עם המערכת?",
+        answer: "נרשמים בקלות, בוחרים תבנית עיצוב או מתחילים מאפס, ומעצבים את העמוד בעזרת עורך הבית הוויזואלי הנוח."
+      },
+      {
+        id: "2",
+        question: "האם ניתן לחבר דומיין מותאם אישית?",
+        answer: "בהחלט! המערכת תומכת בחיבור דומיין פרטי לכל עמוד, קמפיין או דף נחיתה שתקימו."
+      },
+      {
+        id: "3",
+        question: "איך עובד הסנכרון עם מערכת ה-CRM?",
+        answer: "כל פנייה או הרשמה דרך הטפסים בעמוד נשמרת ומוזרמת באופן אוטומטי לכרטיסיות הלידים במערכת ה-CRM."
+      }
+    ]
+  },
   mobileHiddenSections: [],
-  sectionOrder: ["hero", "mainContent", "services", "community", "pricing", "livePosts", "timer", "richContent", "landingSection"],
+  sectionOrder: ["hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "landingSection"],
 };
 
 const DEFAULT_SERVICES_LANDING_CONFIG: HomePageConfig = {

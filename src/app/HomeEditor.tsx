@@ -19,6 +19,8 @@ import { VideoGallery } from "@/components/sections/VideoGallery";
 import { VideoGalleryEditor } from "@/components/sections/VideoGalleryEditor";
 import { ImageListingSection } from "@/components/sections/ImageListingSection";
 import { ImageListingEditor } from "@/components/sections/ImageListingEditor";
+import { FaqSection } from "@/components/sections/FaqSection";
+import { FaqSectionEditor } from "@/components/sections/FaqSectionEditor";
 import { HomePageConfig, savePageConfig, getAllSitePages } from "@/features/home/actions";
 import { GlobalSettings, saveGlobalSettings } from "@/features/settings/actions";
 import { generateSeoTagsWithAI, generateSeoImageWithAI } from "@/features/ai/actions";
@@ -486,13 +488,9 @@ export function HomeEditor({
   };
 
   const handleOpenPromptModal = () => {
-    if (config.imagePrompt) {
-      setCustomImagePrompt(config.imagePrompt);
-    } else {
-      setCustomImagePrompt(`A highly engaging, professional, and visually striking cover image representing a community organization. 
+    setCustomImagePrompt(`A highly engaging, professional, and visually striking cover image representing a community organization. 
 Keywords: ${config.seo?.keywords || "community, organization, warmth, welcoming, events"}. 
 It should be photorealistic, high quality, optimistic, and welcoming. Do not write text/letters inside the image.`);
-    }
     setIsPromptModalOpen(true);
   };
 
@@ -1825,6 +1823,62 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
 
         return { previewNode: imgListingPreviewNode, contentNode: imgListingContentNode, designNode: imgListingDesignNode };
 
+      case "faq":
+        if (!config.faq) return null;
+
+        const faqDesignNode = (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
+              <label className="text-xs text-slate-400 font-medium">מזהה עוגן (ID)</label>
+              <input 
+                type="text" 
+                value={config.faq.anchorId || ""}
+                onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, anchorId: e.target.value }})}
+                className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
+                placeholder="faq"
+                dir="ltr"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-slate-400 font-medium">צבע רקע</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="color" 
+                  value={config.faq.backgroundColor || globalSettings.backgroundColor || "#0e0e10"}
+                  onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, backgroundColor: e.target.value }})}
+                  className="w-8 h-8 p-0 border-0 rounded cursor-pointer"
+                />
+                <span className="text-xs text-slate-300" dir="ltr">{config.faq.backgroundColor || "ברירת מחדל"}</span>
+              </div>
+            </div>
+          </div>
+        );
+
+        const faqContentNode = (
+          <FaqSectionEditor
+            config={config.faq}
+            onUpdate={(field, val) => setConfig({ ...config, faq: { ...config.faq!, [field]: val } })}
+            onUpdateItems={(items) => setConfig({ ...config, faq: { ...config.faq!, items } })}
+            globalSettings={globalSettings}
+          />
+        );
+
+        const faqPreviewNode = (
+          <div className="pointer-events-none opacity-90">
+            <FaqSection
+              id={config.faq.anchorId || "faq"}
+              title={config.faq.title}
+              subtitle={config.faq.subtitle}
+              items={config.faq.items}
+              backgroundColor={config.faq.backgroundColor}
+              globalSettings={globalSettings}
+              isEditing={false}
+            />
+          </div>
+        );
+
+        return { previewNode: faqPreviewNode, contentNode: faqContentNode, designNode: faqDesignNode };
+
       default:
         return null;
     }
@@ -1997,6 +2051,19 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             imagesPerRow={config.imageListing.imagesPerRow}
             form={config.imageListing.form}
             backgroundColor={config.imageListing.backgroundColor || globalSettings.backgroundColor}
+            isEditing={false}
+          />
+        );
+      case "faq":
+        if (!config.faq || config.faq.visible === false || String(config.faq.visible) === "false") return null;
+        return (
+          <FaqSection
+            id={config.faq.anchorId || "faq"}
+            title={config.faq.title}
+            subtitle={config.faq.subtitle}
+            items={config.faq.items}
+            backgroundColor={config.faq.backgroundColor}
+            globalSettings={globalSettings}
             isEditing={false}
           />
         );
@@ -2815,7 +2882,8 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                   timer: "טיימר",
                   richContent: "אודות / תוכן מעוצב",
                   landingSection: "קמפיין נחיתה / טופס",
-                  pricing: "חבילות ומחירונים"
+                  pricing: "חבילות ומחירונים",
+                  faq: "שאלות ותשובות (FAQ)"
                 };
                 
                 const isOpen = (config as any).activeEditSection === sectionId;

@@ -95,7 +95,6 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
         { name: "קבלות ידניות", href: "/dashboard/receipts", icon: FileText },
         { name: "יצירת תוכן", href: "/dashboard/services", icon: Sparkles },
         { name: "מחולל פרויקטים", href: "/dashboard/generator", icon: Wand2 },
-        { name: "שאלון מיתוג", href: "/dashboard/settings", icon: Settings },
       ]
     },
     {

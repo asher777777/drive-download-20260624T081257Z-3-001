@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronDown, ChevronUp, Bot, User, Settings as SettingsIcon } from "lucide-react";
 import { SettingsTabs } from "@/app/dashboard/settings/SettingsTabs";
-import { BrandingTab } from "@/components/dashboard/BrandingTab";
+import { OnboardingWizard } from "@/features/onboarding/OnboardingWizard";
 
 interface CenterSettingsModalProps {
   isOpen: boolean;
@@ -66,12 +66,10 @@ export function CenterSettingsModal({ isOpen, onClose }: CenterSettingsModalProp
                     exit={{ height: 0, opacity: 0 }}
                     className="flex-1 overflow-y-auto bg-[#111] border-t border-white/5"
                   >
-                    <div className="p-6 flex flex-col min-h-full">
-                      <BrandingTab 
-                        isOpen={true} 
-                        onToggle={() => {}} 
-                        isCompleted={true} 
-                      />
+                    <div className="p-6 md:p-10 flex items-center justify-center min-h-full">
+                      <div className="w-full max-w-4xl mx-auto">
+                        <OnboardingWizard />
+                      </div>
                     </div>
                   </motion.div>
                 )}
