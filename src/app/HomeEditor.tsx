@@ -354,7 +354,7 @@ export function HomeEditor({
   const [isLoadingPages, setIsLoadingPages] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
-  const allAvailableSections = ["hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing"];
+  const allAvailableSections = ["hero", "mainContent", "services", "community", "livePosts", "landingSection", "pricing", "timer", "richContent", "videoGallery", "imageListing", "faq"];
   const currentSectionOrder = Array.from(new Set([...(config.sectionOrder || []), ...allAvailableSections]));
 
   const availableAnchors = [
@@ -366,8 +366,41 @@ export function HomeEditor({
     ...(config.richContent ? [{ id: config.richContent.anchorId || "richContent", label: "תוכן מעוצב" }] : []),
     ...(config.timer ? [{ id: config.timer.anchorId || "timer", label: "אזור טיימר" }] : []),
     ...(config.landingSection ? [{ id: config.landingSection.anchorId || "landingSection", label: "דף נחיתה" }] : []),
-    ...(config.videoGallery ? [{ id: config.videoGallery.anchorId || "videoGallery", label: "גלריית וידאו" }] : [])
+    ...(config.videoGallery ? [{ id: config.videoGallery.anchorId || "videoGallery", label: "גלריית וידאו" }] : []),
+    ...(config.faq ? [{ id: config.faq.anchorId || "faq", label: "שאלות ותשובות" }] : [])
   ];
+
+  useEffect(() => {
+    if (!config.faq) {
+      setConfig(prev => ({
+        ...prev,
+        faq: {
+          visible: true,
+          title: "שאלות ותשובות נפוצות",
+          subtitle: "תשובות לכל השאלות שרציתם לשאול על השירותים והפלטפורמה שלנו",
+          anchorId: "faq",
+          backgroundColor: "transparent",
+          items: [
+            {
+              id: "1",
+              question: "איך מתחילים לעבוד עם המערכת?",
+              answer: "נרשמים בקלות, בוחרים תבנית עיצוב או מתחילים מאפס, ומעצבים את העמוד בעזרת עורך הבית הוויזואלי הנוח."
+            },
+            {
+              id: "2",
+              question: "האם ניתן לחבר דומיין מותאם אישית?",
+              answer: "בהחלט! המערכת תומכת בחיבור דומיין פרטי לכל עמוד, קמפיין או דף נחיתה שתקימו."
+            },
+            {
+              id: "3",
+              question: "איך עובד הסנכרון עם מערכת ה-CRM?",
+              answer: "כל פנייה דרך הטפסים בעמוד נשמרת ומוזרמת באופן אוטומטי לכרטיסיות הלידים במערכת ה-CRM."
+            }
+          ]
+        }
+      }));
+    }
+  }, [config.faq]);
 
   // Load site pages and restore scroll on mount
   useEffect(() => {
