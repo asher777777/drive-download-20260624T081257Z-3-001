@@ -67,6 +67,39 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
   }, [(globalSettings as any)?.branding, (config as any).branding?.logo, (config as any).branding?.primaryColor, (config as any).branding?.fontFamily]);
 
   useEffect(() => {
+    if (!config.faq) {
+      setConfig(prev => ({
+        ...prev,
+        faq: {
+          visible: true,
+          title: "שאלות ותשובות נפוצות",
+          subtitle: "תשובות לכל השאלות שרציתם לשאול על השירותים והפלטפורמה שלנו",
+          anchorId: "faq",
+          backgroundColor: "transparent",
+          items: [
+            {
+              id: "1",
+              question: "איך מתחילים לעבוד עם המערכת?",
+              answer: "נרשמים בקלות, בוחרים תבנית עיצוב או מתחילים מאפס, ומעצבים את העמוד בעזרת עורך הבית הוויזואלי הנוח."
+            },
+            {
+              id: "2",
+              question: "האם ניתן לחבר דומיין מותאם אישית?",
+              answer: "בהחלט! המערכת תומכת בחיבור דומיין פרטי לכל עמוד, קמפיין או דף נחיתה שתקימו."
+            },
+            {
+              id: "3",
+              question: "איך עובד הסנכרון עם מערכת ה-CRM?",
+              answer: "כל פנייה דרך הטפסים בעמוד נשמרת ומוזרמת באופן אוטומטי לכרטיסיות הלידים במערכת ה-CRM."
+            }
+          ]
+        },
+        sectionOrder: prev.sectionOrder ? (prev.sectionOrder.includes("faq") ? prev.sectionOrder : [...prev.sectionOrder, "faq"]) : ["hero", "mainContent", "services", "community", "pricing", "livePosts", "faq", "timer", "richContent", "landingSection"]
+      }));
+    }
+  }, [config.faq]);
+
+  useEffect(() => {
     const savedScroll = sessionStorage.getItem("home_editor_scroll");
     if (savedScroll) {
       window.scrollTo(0, parseInt(savedScroll));
