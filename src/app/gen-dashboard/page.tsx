@@ -10,7 +10,8 @@ import {
   Cog,
   Calculator,
   PieChart,
-  Menu
+  Menu,
+  Settings
 } from "lucide-react";
 import { RhombusMenu } from "@/components/layout/RhombusMenu";
 
@@ -76,7 +77,15 @@ export default function GenDashboardPage() {
           href: "/gen-clo",
         }}
         center={{
-          content: <span className="text-white font-black text-2xl md:text-4xl tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">המחולל</span>
+          content: (
+            <div className="flex flex-col items-center justify-center gap-2">
+              <span className="text-white font-black text-2xl md:text-4xl tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">המחולל</span>
+              <div className="flex items-center gap-1.5 text-amber-200/80 bg-black/20 px-3 py-1 rounded-full border border-amber-500/30">
+                <Settings className="w-4 h-4" />
+                <span className="text-sm font-medium">הגדרות ומיתוג</span>
+              </div>
+            </div>
+          )
         }}
       />
     </div>

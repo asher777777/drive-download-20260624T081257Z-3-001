@@ -306,10 +306,11 @@ export async function suggestWizardFieldWithAI(
     solution?: string;
   }
 ): Promise<{ success: boolean; text?: string; error?: string }> {
+  let userId: string | undefined;
   try {
     const { auth } = await import("@/lib/auth");
     const session = await auth();
-    const userId = session?.user?.id;
+    userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
     const { checkFeatureLimit } = await import("@/features/users/actions");
     const limitCheck = await checkFeatureLimit(userId, "ai");
@@ -334,28 +335,49 @@ export async function suggestWizardFieldWithAI(
     return { success: true, text: `׳“׳£ ׳×׳•׳›׳ ׳”׳׳™׳•׳¢׳“ ׳-${context.audience} ׳‘׳˜׳•׳ ${context.tone} ׳›׳“׳™ ׳׳¢׳•׳¨׳¨ ׳¢׳ ׳™׳™׳ ׳•׳׳¢׳•׳¨׳‘׳•׳×.` };
   }
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+    try {
+      const { getGlobalSettings } = await import("@/features/settings/actions");
+      const globalSettings = await getGlobalSettings(userId);
+      const companyContext = globalSettings ? `
+מידע על העסק שלנו (כדי שהתוכן יתאים לנו בדיוק):
+שם העסק/המותג: ${globalSettings.companyName || ""}
+תחום עיסוק/מטרה: ${globalSettings.organizationPurpose || ""}
+קהל יעד כללי: ${globalSettings.customAudiences?.join(", ") || ""}
+הצעת הערך המרכזית/סלוגן: ${globalSettings.slogan || ""}
+` : "";
 
-    let systemPrompt = "";
-    if (fieldName === 'painPoint') {
-      systemPrompt = `You are a copywriting expert. Suggest 1-2 sentences in Hebrew describing the main pain point, challenge, or core need of the target audience: "${context.audience}" for a page of type "${context.type}". The tone should be "${context.tone}".
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+
+      const typeMap: Record<string, string> = {
+        post: "פוסט או מאמר",
+        landing: "דף נחיתה (Landing Page)",
+        service: "עמוד שירות באתר",
+        event: "עמוד הרשמה לאירוע/כנס"
+      };
+      const hebrewType = typeMap[context.type] || context.type;
+
+      let systemPrompt = "";
+      if (fieldName === 'painPoint') {
+        systemPrompt = `You are a copywriting expert. Suggest 1-2 sentences in Hebrew describing the main pain point, challenge, or core need of the target audience: "${context.audience}" for a page of type "${hebrewType}". The tone should be "${context.tone}".
+${companyContext}
 Return ONLY the suggested Hebrew text. Do not wrap in quotes or add comments.`;
-    } else if (fieldName === 'solution') {
-      systemPrompt = `You are a copywriting expert. Suggest 1-2 sentences in Hebrew describing the big solution offered by our organization to solve the following pain point: "${context.painPoint}". The target audience is: "${context.audience}", and page type is "${context.type}". Tone: "${context.tone}".
+      } else if (fieldName === 'solution') {
+        systemPrompt = `You are a copywriting expert. Suggest 1-2 sentences in Hebrew describing the big solution offered by our organization to solve the following pain point: "${context.painPoint}". The target audience is: "${context.audience}", and page type is "${hebrewType}". Tone: "${context.tone}".
+${companyContext}
 Return ONLY the suggested Hebrew text. Do not wrap in quotes or add comments.`;
-    } else {
-      systemPrompt = `You are a copywriting expert. Write a focused prompt/instruction in Hebrew for an AI writer to generate a page about "${context.type}".
+      } else {
+        systemPrompt = `You are a copywriting expert. Write a focused prompt/instruction in Hebrew for an AI writer to generate a page about "${hebrewType}".
 Target Audience: "${context.audience}".
 Tone of Voice: "${context.tone}".
-Target Audience Pain Point: "${context.painPoint}".
-Offered Solution: "${context.solution}".
-Generate a paragraph of instructions detailing what the page should focus on.
+Target Audience Pain Point: "${context.painPoint || ''}".
+Offered Solution: "${context.solution || ''}".
+${companyContext}
+Generate a paragraph of instructions detailing what the page should focus on, written in clear Hebrew, keeping it warm and professional. Do NOT use technical backend terms like "Post" or "Landing", use their Hebrew equivalents like "פוסט" or "דף נחיתה".
 Return ONLY the suggested Hebrew text. Do not wrap in quotes or add comments.`;
-    }
+      }
 
-    const result = await model.generateContent(systemPrompt);
+      const result = await model.generateContent(systemPrompt);
     const text = result.response.text().trim();
     return { success: true, text };
   } catch (error) {

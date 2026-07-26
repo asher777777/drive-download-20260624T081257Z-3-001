@@ -486,9 +486,13 @@ export function HomeEditor({
   };
 
   const handleOpenPromptModal = () => {
-    setCustomImagePrompt(`A highly engaging, professional, and visually striking cover image representing a community organization. 
+    if (config.imagePrompt) {
+      setCustomImagePrompt(config.imagePrompt);
+    } else {
+      setCustomImagePrompt(`A highly engaging, professional, and visually striking cover image representing a community organization. 
 Keywords: ${config.seo?.keywords || "community, organization, warmth, welcoming, events"}. 
 It should be photorealistic, high quality, optimistic, and welcoming. Do not write text/letters inside the image.`);
+    }
     setIsPromptModalOpen(true);
   };
 

@@ -204,6 +204,12 @@ export interface HomePageConfig {
   };
   mobileHiddenSections?: string[];
   sectionOrder: string[];
+  header?: {
+    visible?: boolean;
+    layout?: "classic" | "center" | "left";
+    theme?: "navy" | "emerald" | "rose" | "violet" | "charcoal";
+  };
+  imagePrompt?: string;
   seo?: {
     title: string;
     description: string;

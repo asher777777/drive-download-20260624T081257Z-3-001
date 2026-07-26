@@ -9,6 +9,7 @@ import { IconPicker } from "@/components/ui/IconPicker";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { ServiceItem, getAllSitePages } from "@/features/home/actions";
 import { cn } from "@/lib/utils";
+import { Loader2, Wand2 } from "lucide-react";
 
 interface ServicesGridEditorProps {
   items: ServiceItem[];
@@ -25,6 +26,11 @@ export function ServicesGridEditor({ items, onUpdate }: ServicesGridEditorProps)
   const [editForm, setEditForm] = useState<Partial<ServiceItem>>({});
   const [availablePages, setAvailablePages] = useState<any[]>([]);
 
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiPageType, setAiPageType] = useState<"service" | "landing" | "post">("service");
+  const [aiGenerateImages, setAiGenerateImages] = useState(true);
+
   useEffect(() => {
     getAllSitePages().then(setAvailablePages).catch((e) => console.warn("Failed to load site pages", e));
   }, []);
@@ -40,6 +46,43 @@ export function ServicesGridEditor({ items, onUpdate }: ServicesGridEditorProps)
         icon: page.icon,
         imageSrc: page.imageSrc
       });
+    }
+  };
+
+  const handleGeneratePage = async () => {
+    if (!editForm.title) {
+      alert("נא להזין לפחות כותרת לשירות");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { generatePageWithAI } = await import("@/features/services/actions");
+      const prompt = `צור דף שמתאר את השירות הבא:\nכותרת: ${editForm.title}\nתיאור: ${editForm.description || ""}`;
+      const slug = `service-${Date.now()}`;
+      
+      const res = await generatePageWithAI(
+        prompt, 
+        slug, 
+        aiPageType, 
+        "רגיל", 
+        "לקוחות פוטנציאליים", 
+        ['hero', 'richContent', 'contact'], 
+        "", 
+        "", 
+        aiGenerateImages
+      );
+      
+      if (res.success) {
+        setEditForm({ ...editForm, url: `/${aiPageType === 'post' ? 'post' : 'service'}/${slug}` });
+        setShowAIGenerator(false);
+        alert("העמוד נוצר בהצלחה! הקישור עודכן.");
+      } else {
+        alert("שגיאה ביצירת עמוד: " + res.error);
+      }
+    } catch (err: any) {
+      alert("שגיאה בשרת: " + err.message);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -109,8 +152,55 @@ export function ServicesGridEditor({ items, onUpdate }: ServicesGridEditorProps)
             <input type="text" className="w-full border rounded-lg p-2" value={editForm.description || ""} onChange={(e) => setEditForm({...editForm, description: e.target.value})} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">קישור (URL)</label>
-            <input type="text" className="w-full border rounded-lg p-2 text-left" dir="ltr" value={editForm.url || ""} onChange={(e) => setEditForm({...editForm, url: e.target.value})} />
+            <label className="block text-sm font-medium mb-1 flex items-center justify-between">
+              <span>קישור (URL)</span>
+              <button 
+                type="button" 
+                onClick={() => setShowAIGenerator(!showAIGenerator)} 
+                className="text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1 font-bold"
+              >
+                <Wand2 className="w-3 h-3" />
+                ייצר עמוד ב-AI ✨
+              </button>
+            </label>
+            <input type="text" className="w-full border rounded-lg p-2 text-left mb-2" dir="ltr" value={editForm.url || ""} onChange={(e) => setEditForm({...editForm, url: e.target.value})} />
+            
+            {showAIGenerator && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-3 mt-2">
+                <div className="text-xs font-bold text-amber-800">יצירת עמוד בעזרת AI</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-amber-700 mb-1">סוג העמוד</label>
+                    <select 
+                      value={aiPageType}
+                      onChange={(e: any) => setAiPageType(e.target.value)}
+                      className="w-full text-xs p-1.5 rounded border border-amber-200 bg-white"
+                    >
+                      <option value="service">עמוד שירות</option>
+                      <option value="landing">דף נחיתה</option>
+                      <option value="post">פוסט/מאמר</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 pt-4">
+                    <input 
+                      type="checkbox" 
+                      id="ai-gen-images" 
+                      checked={aiGenerateImages} 
+                      onChange={(e) => setAiGenerateImages(e.target.checked)} 
+                    />
+                    <label htmlFor="ai-gen-images" className="text-xs text-amber-800 cursor-pointer">הפק תמונות ב-AI</label>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs"
+                  onClick={handleGeneratePage}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? <><Loader2 className="w-3 h-3 ml-2 animate-spin" /> מייצר עמוד...</> : "ייצר עכשיו"}
+                </Button>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">בחירת אייקון</label>
