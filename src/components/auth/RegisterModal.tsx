@@ -13,9 +13,10 @@ import { submitCRMForm } from "@/features/crm/actions";
 interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
+  redirectTo?: string;
 }
 
-export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
+export function RegisterModal({ isOpen, onClose, redirectTo = "/agentonbord" }: RegisterModalProps) {
   const router = useRouter();
   const [fullName, setFullName] = React.useState("");
   const [phone, setPhone] = React.useState("");
@@ -32,7 +33,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       // Create user and contact via CRM action
       await submitCRMForm({
         formId: "register-modal-form",
-        formTitle: "הרשמה למערכת",
+        formTitle: "הרשמה למערכת והתחלת בנייה",
         formType: "register",
         formData: {
           "שם מלא": fullName,
@@ -60,7 +61,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         setFullName("");
         setPhone("");
         onClose();
-        window.location.href = "/auth-redirect";
+        window.location.href = redirectTo;
       }
     } catch (err) {
       setError("שגיאה בהרשמה, נסה שוב");
@@ -72,7 +73,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <Modal.Content>
-        <Modal.Header title="הרשמה למערכת" description="הכנס שם משתמש וסיסמה כדי ליצור חשבון חדש" />
+        <Modal.Header title="הרשמה למערכת והתחלת בנייה" description="הכנס שם וטלפון כדי להתחיל לבנות את המותג והסייטים שלך בלייב" />
         <Modal.Close />
         
         <form onSubmit={handleRegister} className="space-y-4 mt-4" dir="rtl">
@@ -100,7 +101,7 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
           <Modal.Footer>
             <Button type="button" variant="outline" onClick={onClose} className="ml-2" disabled={loading}>ביטול</Button>
             <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "נרשם..." : "הירשם עכשיו"}
+              {loading ? "נרשם ומעביר..." : "הירשם והתחל לבנות עם מיכאל"}
             </Button>
           </Modal.Footer>
           
@@ -119,12 +120,12 @@ export function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             className="w-full gap-2 relative h-11" 
             onClick={() => {
               setLoading(true);
-              signIn("google", { callbackUrl: "/auth-redirect" });
+              signIn("google", { callbackUrl: redirectTo });
             }}
             disabled={loading}
           >
             <Image src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" width={20} height={20} />
-            הרשמה באמצעות Google 
+            הרשמה באמצעות Google והתחלת בנייה
           </Button>
         </form>
       </Modal.Content>

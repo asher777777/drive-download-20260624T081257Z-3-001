@@ -24,12 +24,13 @@ import { LiveBuilderPreview } from "./LiveBuilderPreview";
 import { 
   BuilderStateData, 
   saveBuilderProgress, 
-  submitPitchChallenge, 
+  analyzeProblemAndFindCompetitorsWithAI,
+  evaluateDifferentiatorAndGrantCoins,
   generateLogoWithAI, 
   createServicePageWithAI,
+  generateRichVisionAndInsightsWithAI,
   PersonaCard
 } from "../actions/builderActions";
-import { deductAiTextCoins } from "@/features/credits/actions";
 
 interface Message {
   id: string;
@@ -37,6 +38,7 @@ interface Message {
   text: string;
   timestamp: string;
   showPreviewBtn?: boolean;
+  isNew?: boolean;
 }
 
 interface LiveBuilderShellProps {
@@ -44,11 +46,45 @@ interface LiveBuilderShellProps {
   userName: string;
 }
 
+// Live Typewriter Effect Component
+const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(true);
+
+  useEffect(() => {
+    let index = 0;
+    setDisplayedText("");
+    setIsTyping(true);
+
+    const timer = setInterval(() => {
+      if (index < text.length) {
+        setDisplayedText((prev) => prev + text.charAt(index));
+        index++;
+      } else {
+        clearInterval(timer);
+        setIsTyping(false);
+        if (onComplete) onComplete();
+      }
+    }, 15);
+
+    return () => clearInterval(timer);
+  }, [text]);
+
+  return (
+    <span>
+      {displayedText}
+      {isTyping && <span className="inline-block w-1.5 h-3.5 bg-indigo-400 ml-1 animate-pulse" />}
+    </span>
+  );
+};
+
 export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellProps) {
   const [coins, setCoins] = useState(initialCoins);
   const [highlightCoins, setHighlightCoins] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [pitchSubStep, setPitchSubStep] = useState<"problem" | "differentiator">("problem");
   const [loading, setLoading] = useState(false);
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [siteSlug, setSiteSlug] = useState("");
 
@@ -63,29 +99,30 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     shortVision: "",
     personas: [],
     servicePages: [],
+    competitors: [],
   });
 
-  // Chat message history
+  // Warm, authentic initial messages
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       sender: "agent",
-      text: `שלום ${userName}! אני מיכאל, היועץ הדיגיטלי והקופירייטר האישי שלך ✨. אני שמח ללוות אותך בבניית המיני-סייט והמותג שלך בלייב!`,
+      text: `היי ${userName}! איזה כיף שאתה כאן 😃 אני מיכאל, ואני הולך להיות היועץ הדיגיטלי והקופירייטר האישי שלך. יחד נבנה משהו חזק שירשים את הלקוחות שלך מהרגע הראשון!`,
       timestamp: new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
     },
     {
       id: "2",
       sender: "agent",
-      text: `לפני שנתקדם, יש לי שאלה אחת קריטית עבורך: איזו בעיה הגעת לפתור בעולם? 🎯 אם אשתכנע שהבעיה שלכם אמיתית ושווה לפתור אותה – אשקיע בך ואעניק לך מיד 100 מטבעות במתנה להתחיל לשווק!`,
+      text: `לפני שנפשיל שרוולים, ספר לי קצת: איזו בעיה אמיתית העסק שלך מגיע לפתור בעולם? 🎯 אם הפתרון שלכם חזק וייחודי – אני מעניק לך 100 מטבעות במתנה להתחיל לשווק!`,
       timestamp: new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
     }
   ]);
 
   // Step inputs
   const [inputVal, setInputVal] = useState("");
+  const [differentiatorInput, setDifferentiatorInput] = useState("");
   const [sloganInput, setSloganInput] = useState("");
   const [visionQ1, setVisionQ1] = useState("");
-  const [visionQ2, setVisionQ2] = useState("");
   const [newPersonaTitle, setNewPersonaTitle] = useState("");
   const [newPersonaDesc, setNewPersonaDesc] = useState("");
   const [newServiceTitle, setNewServiceTitle] = useState("");
@@ -95,17 +132,22 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, isAgentTyping]);
 
-  const addAgentMessage = (text: string, showPreviewBtn = false) => {
-    const msg: Message = {
-      id: "msg_" + Date.now() + Math.random(),
-      sender: "agent",
-      text,
-      timestamp: new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
-      showPreviewBtn,
-    };
-    setMessages((prev) => [...prev, msg]);
+  const addAgentMessageWithTyping = (text: string, showPreviewBtn = false, delayMs = 500) => {
+    setIsAgentTyping(true);
+    setTimeout(() => {
+      setIsAgentTyping(false);
+      const msg: Message = {
+        id: "msg_" + Date.now() + Math.random(),
+        sender: "agent",
+        text,
+        timestamp: new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
+        showPreviewBtn,
+        isNew: true,
+      };
+      setMessages((prev) => [...prev, msg]);
+    }, delayMs);
   };
 
   const addUserMessage = (text: string) => {
@@ -137,8 +179,8 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     return slug || "my-site";
   };
 
-  // Step 1: Pitch Submission
-  const handlePitchSubmit = async () => {
+  // Step 1 - Stage 1: Pitch Problem Submission & AI Competitor Analysis
+  const handlePitchProblemSubmit = async () => {
     if (!inputVal.trim()) return;
     const userProblem = inputVal;
     addUserMessage(userProblem);
@@ -146,15 +188,42 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     setLoading(true);
 
     try {
-      const res = await submitPitchChallenge(userProblem);
+      const aiRes = await analyzeProblemAndFindCompetitorsWithAI(userProblem);
+      setState((prev) => ({ 
+        ...prev, 
+        pitchProblem: userProblem, 
+        competitors: aiRes.competitors || [] 
+      }));
+      
+      // Agent sends ONE SINGLE challenging message listing existing competitors & asking for differentiator
+      addAgentMessageWithTyping(aiRes.agentResponse, false, 600);
+      setPitchSubStep("differentiator");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 1 - Stage 2: Pitch Differentiator Submission & Granting 100 Coins
+  const handlePitchDifferentiatorSubmit = async () => {
+    if (!differentiatorInput.trim()) return;
+    const diff = differentiatorInput;
+    addUserMessage(diff);
+    setDifferentiatorInput("");
+    setLoading(true);
+
+    try {
+      const res = await evaluateDifferentiatorAndGrantCoins(
+        state.pitchProblem || "", 
+        diff, 
+        state.competitors
+      );
       if (res.success) {
         setCoins(res.coins);
         setHighlightCoins(true);
-        setState((prev) => ({ ...prev, pitchProblem: userProblem, currentStep: 2 }));
+        setState((prev) => ({ ...prev, differentiator: diff, currentStep: 2 }));
         
-        addAgentMessage(`איזו בעיה חשובה וקריטית! פתרון מרתק בעל אימפקט אמיתי. שוכנעתי לחלוטין! 🪙 העברתי לך כעת 100 מטבעות במתנה להתחיל לבנות ולשווק את האתר!`, true);
-        addAgentMessage(`כעת, בוא נבסס את שם העסק. יש לך כבר שם מוכן לחברה, או שתרצה שנעשה סיעור מוחות יחד ונמצא שם מנצח?`);
-        
+        // Agent sends ONE SINGLE celebratory message with coins approval & asks for Company Name!
+        addAgentMessageWithTyping(`${res.agentResponse} כעת, איך קוראים לחברה או לעסק שלך?`, true, 600);
         setCurrentStep(2);
       }
     } finally {
@@ -177,8 +246,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
       const res = await saveBuilderProgress({ companyName: name, currentStep: 3 });
       if (res.success) {
         setState((prev) => ({ ...prev, companyName: name }));
-        addAgentMessage(`שם מעולה! גזרתי עבורך נתיב אתר ייחודי: /${generatedSlug} 🌐`, true);
-        addAgentMessage(`עכשיו נבנה את החזון והסלוגן. כקופירייטר, יש לי שתי שאלות ממוקדות: מה התחושה או הקידום שכל לקוח יחווה אצלכם, ומה הסלוגן שמלווה אתכם?`);
+        addAgentMessageWithTyping(`איזה שם עוצמתי! גזרתי עבורך כתובת אתר נקייה: /${generatedSlug} 🌐 עכשיו בוא ניצוק נשמה ואופי. כקופירייטר, אבנה עבורכם חזון מותג עמוק של 200+ מילים המבליט את העליונות שלכם מול הגופים בשוק! מה הסלוגן וההרגשה שתרצו שהלקוח יחווה?`, true, 600);
         setCurrentStep(3);
       }
     } finally {
@@ -186,38 +254,45 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     }
   };
 
-  // Step 3: Vision Copywriting Brainstorming
+  // Step 3: Master Copywriting 200+ Word Vision Generation using saved Market Research & Competitors!
   const handleVisionSubmit = async () => {
     if (!visionQ1.trim()) return;
-    const rawVision = `${visionQ1}. ${visionQ2}`.trim();
-    addUserMessage(`סלוגן: ${sloganInput} | חזון: ${rawVision}`);
+    addUserMessage(`סלוגן: ${sloganInput} | כיוון חזון: ${visionQ1}`);
     setLoading(true);
 
     try {
-      // Deduct exact 1 coin for vision copywriting
-      const aiCoins = await deductAiTextCoins(rawVision, "ניסוח חזון ב-AI");
-      setCoins(aiCoins.newBalance);
+      const aiRes = await generateRichVisionAndInsightsWithAI(
+        state.companyName || "החברה",
+        sloganInput,
+        state.pitchProblem || "",
+        visionQ1,
+        state.differentiator,
+        state.competitors
+      );
 
-      const refinedVision = `אנו ב-${state.companyName} שואפים להוביל שינוי משמעותי: ${rawVision}`;
-      const shortSummary = rawVision.slice(0, 100);
+      if (aiRes.success) {
+        setCoins(aiRes.newBalance);
 
-      const res = await saveBuilderProgress({ 
-        slogan: sloganInput, 
-        companyVision: refinedVision, 
-        shortVision: shortSummary 
-      });
-
-      if (res.success) {
         setState((prev) => ({ 
           ...prev, 
           slogan: sloganInput, 
-          companyVision: refinedVision, 
-          shortVision: shortSummary 
+          companyVision: aiRes.companyVision, 
+          shortVision: aiRes.shortVision,
+          personas: aiRes.personas.length > 0 ? aiRes.personas : prev.personas,
+          servicePages: aiRes.servicePages.length > 0 ? aiRes.servicePages : prev.servicePages
         }));
 
-        addAgentMessage(`חזון עוצמתי ומנוסח לעילא! ✍️ זיקקתי אותו גם לתמצית חזון קצרה שנשמרה בכרטיס המנהל במערכת.`, true);
-        addAgentMessage(`כעת נגדיר את קהל היעד ונקודות הכאב שלהם. מהן נקודות הכאב המרכזיות שהלקוחות שלכם חווים?`);
-        setCurrentStep(4);
+        await saveBuilderProgress({
+          slogan: sloganInput,
+          companyVision: aiRes.companyVision,
+          shortVision: aiRes.shortVision,
+          personas: aiRes.personas,
+          servicePages: aiRes.servicePages,
+        });
+
+        addAgentMessageWithTyping(`ניסחתי עבורכם חזון מותג מפואר ומורחב של כ-200 מילים המבליט את היתרון התחרותי שלכם מול הארגונים בשוק! ✍️ (נוכה מטבע 1 בלבד עבור הניסוח). בנוסף, גזרתי אוטומטית את נקודות הכאב של הלקוחות ואת עמודי השירות! לחץ על כפתור העין 👁️ כדי לצפות באתר החי ב-Modal!`, true, 600);
+
+        setCurrentStep(5);
       }
     } finally {
       setLoading(false);
@@ -238,13 +313,13 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     saveBuilderProgress({ personas: updated });
 
     addUserMessage(`נקודת כאב: ${newPersonaTitle} (${newPersonaDesc})`);
-    addAgentMessage(`נוסף כרטיס כאב חדש! 🎯 האם תרצה להוסיף נקודות כאב נוספות או שנעבור לעמודי השירותים?`, true);
+    addAgentMessageWithTyping(`נוסף כרטיס כאב חדש! 🎯 הכל מעודכן בלייב!`, true, 400);
 
     setNewPersonaTitle("");
     setNewPersonaDesc("");
   };
 
-  // Step 5: Service Pages & Logo Generation (Logo is placed right before contact info!)
+  // Step 5: Service Pages & Logo Generation
   const handleAddServicePage = async () => {
     if (!newServiceTitle.trim()) return;
     setLoading(true);
@@ -257,7 +332,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         saveBuilderProgress({ servicePages: updated });
 
         addUserMessage(`עמוד שירות: ${newServiceTitle}`);
-        addAgentMessage(`עמוד השירות "${newServiceTitle}" הוקם בהצלחה! (נוכו 10 מטבעות) 🚀`, true);
+        addAgentMessageWithTyping(`עמוד השירות "${newServiceTitle}" הוקם בהצלחה! (נוכו 10 מטבעות) 🚀`, true, 400);
         setNewServiceTitle("");
       }
     } finally {
@@ -280,7 +355,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
       if (res.success && res.logoUrl) {
         setCoins(res.newBalance);
         setState((prev) => ({ ...prev, logoUrl: res.logoUrl }));
-        addAgentMessage(`הלוגו שלך חולל בהצלחה ב-AI! פלטת הצבעים חולצה והוחלה על המיני-סייט 🎨`, true);
+        addAgentMessageWithTyping(`הלוגו שלך חולל בהצלחה ב-AI! פלטת הצבעים חולצה והוחלה על המיני-סייט 🎨`, true, 500);
       }
     } finally {
       setLoading(false);
@@ -305,7 +380,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         }));
 
         addUserMessage("שמור פרטי התקשרות וסיים בנייה");
-        addAgentMessage(`ברכות חמות! המיני-סייט שלך באוויר! 🚀 כל השלבים נשמרו בכרטיס המנהל ב-CRM. מעביר אותך לדשבורד...`, true);
+        addAgentMessageWithTyping(`ברכות חמות! המיני-סייט שלך באוויר! 🚀 כל השלבים נשמרו בכרטיס המנהל ב-CRM. מעביר אותך לדשבורד...`, true, 500);
 
         setTimeout(() => {
           window.location.href = "/dashboard";
@@ -319,23 +394,30 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
   return (
     <div className="w-full min-h-screen bg-[#070b14] text-white flex flex-col items-center justify-between p-4 sm:p-6" dir="rtl">
       
-      {/* 1. TOP HEADER: Agent Identity, Slug Link & Eye Preview Button */}
+      {/* 1. TOP HEADER: Agent Identity, Live Status Indicator, Slug Link & Eye Preview Button */}
       <header className="w-full max-w-4xl bg-[#0f172a] border border-white/10 p-4 rounded-3xl shadow-xl flex items-center justify-between z-20">
         <div className="flex items-center gap-3">
-          <img 
-            src="/wabagent.webp" 
-            alt="Agent Michael" 
-            className="w-12 h-12 rounded-2xl object-cover border-2 border-indigo-500 shadow-md shrink-0" 
-          />
-          <div>
-            <h2 className="font-black text-sm sm:text-base text-white">מיכאל - יועץ דיגיטל וקופירייטר</h2>
+          <div className="relative">
+            <img 
+              src="/wabagent.webp" 
+              alt="Agent Michael" 
+              className="w-12 h-12 rounded-2xl object-cover border-2 border-indigo-500 shadow-md shrink-0" 
+            />
+            {/* Live Green Online Badge */}
+            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-[#0f172a] rounded-full" title="מחובר בלייב" />
+          </div>
+          <div className="flex flex-col text-right">
+            <h2 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5">
+              <span>מיכאל</span>
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">יועץ דיגיטל & קופירייטר</span>
+            </h2>
             {siteSlug ? (
               <span className="text-xs text-indigo-400 font-mono dir-ltr flex items-center gap-1">
                 <Globe className="w-3.5 h-3.5" />
                 /{siteSlug}
               </span>
             ) : (
-              <span className="text-xs text-indigo-400 font-semibold">בניית מותג ומיני-סייט בלייב</span>
+              <span className="text-xs text-indigo-300 font-medium">מלווה אותך בבניית המותג בלייב</span>
             )}
           </div>
         </div>
@@ -346,7 +428,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
           {/* Eye Modal Preview Button */}
           <button
             onClick={() => setIsPreviewOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 rounded-2xl text-xs sm:text-sm font-bold transition shadow-lg backdrop-blur-md"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 rounded-2xl text-xs sm:text-sm font-bold transition shadow-lg backdrop-blur-md hover:scale-105"
             title="צפה בתצוגה מקדימה"
           >
             <Eye className="w-4 h-4 text-indigo-400" />
@@ -355,7 +437,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         </div>
       </header>
 
-      {/* 2. AUTHENTIC CHAT AREA */}
+      {/* 2. AUTHENTIC CHAT AREA WITH LIVE TYPEWRITER ANIMATION */}
       <main className="w-full max-w-4xl flex-1 bg-[#0b1222] border border-white/10 rounded-3xl my-4 p-4 sm:p-6 overflow-y-auto custom-scrollbar flex flex-col space-y-4 shadow-2xl relative">
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
@@ -369,7 +451,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
               {msg.sender === "agent" ? (
                 <img src="/wabagent.webp" alt="Agent" className="w-9 h-9 rounded-xl object-cover border border-indigo-500 shrink-0" />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-xs shrink-0 shadow-lg">
                   אתה
                 </div>
               )}
@@ -379,7 +461,12 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
                   ? "bg-indigo-600 text-white rounded-tr-none" 
                   : "bg-[#162032] border border-white/10 text-slate-200 rounded-tl-none"
               }`}>
-                <p>{msg.text}</p>
+                {msg.sender === "agent" && msg.isNew ? (
+                  <TypewriterText text={msg.text} />
+                ) : (
+                  <p>{msg.text}</p>
+                )}
+
                 <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
                   <span>{msg.timestamp}</span>
 
@@ -387,9 +474,9 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
                   {msg.showPreviewBtn && (
                     <button
                       onClick={() => setIsPreviewOpen(true)}
-                      className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 transition"
+                      className="flex items-center gap-1.5 text-indigo-300 hover:text-white font-bold bg-indigo-500/20 hover:bg-indigo-500/30 px-3 py-1 rounded-xl border border-indigo-500/30 transition shadow"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5 text-indigo-400" />
                       <span>צפה בתצוגה מקדימה 👁️</span>
                     </button>
                   )}
@@ -397,6 +484,26 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
               </div>
             </motion.div>
           ))}
+
+          {/* Typing Indicator Bubble ("מיכאל מקליד... 💬") */}
+          {isAgentTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-3"
+            >
+              <img src="/wabagent.webp" alt="Agent Typing" className="w-9 h-9 rounded-xl object-cover border border-indigo-500 shrink-0" />
+              <div className="bg-[#162032] border border-white/10 p-3.5 rounded-2xl rounded-tl-none flex items-center gap-2 text-xs text-indigo-300 font-medium shadow-md">
+                <span>מיכאל מקליד</span>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
         <div ref={chatEndRef} />
       </main>
@@ -404,24 +511,46 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
       {/* 3. STRICT SINGLE ACTIVE QUESTION STEP FOOTER */}
       <footer className="w-full max-w-4xl bg-[#0f172a] border border-white/10 p-4 rounded-3xl shadow-2xl z-20">
         
-        {/* Step 1: Pitch Question */}
-        {currentStep === 1 && (
+        {/* Step 1 - Stage 1: Problem Pitch Question */}
+        {currentStep === 1 && pitchSubStep === "problem" && (
           <div className="flex items-center gap-3">
             <input
               type="text"
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handlePitchSubmit()}
-              placeholder="איזו בעיה העסק שלך מגיע לפתור בעולם?..."
+              onKeyDown={(e) => e.key === "Enter" && handlePitchProblemSubmit()}
+              placeholder="איזו בעיה אמיתית העסק שלך מגיע לפתור בעולם?..."
               className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
             />
             <button
-              onClick={handlePitchSubmit}
+              onClick={handlePitchProblemSubmit}
               disabled={loading || !inputVal.trim()}
-              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0"
+              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0 hover:scale-105"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>שלח לסוכן</span>
+              <span>שתף את מיכאל</span>
+            </button>
+          </div>
+        )}
+
+        {/* Step 1 - Stage 2: Competitive Differentiator Question */}
+        {currentStep === 1 && pitchSubStep === "differentiator" && (
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={differentiatorInput}
+              onChange={(e) => setDifferentiatorInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handlePitchDifferentiatorSubmit()}
+              placeholder="במה הפתרון שלכם ייחודי/טוב יותר מהמתחרים בשוק?..."
+              className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+            />
+            <button
+              onClick={handlePitchDifferentiatorSubmit}
+              disabled={loading || !differentiatorInput.trim()}
+              className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0 hover:scale-105"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+              <span>שכנע את מיכאל וקבל 100 מטבעות</span>
             </button>
           </div>
         )}
@@ -440,7 +569,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
             <button
               onClick={handleNameSubmit}
               disabled={loading || !inputVal.trim()}
-              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0"
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0 hover:scale-105"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>אשר שם ונתיב</span>
@@ -448,7 +577,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
           </div>
         )}
 
-        {/* Step 3: Vision & Slogan Copywriting Question */}
+        {/* Step 3: Master Copywriting Vision Question (200+ Words) */}
         {currentStep === 3 && (
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -470,10 +599,10 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
             <button
               onClick={handleVisionSubmit}
               disabled={loading || !visionQ1.trim()}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition disabled:opacity-50 hover:scale-[1.01]"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-              <span>זקק חזון ב-AI והמשך לפרסונות</span>
+              <span>זקק חזון 200+ מילים וגזור כאבים/שירותים ב-AI מול המתחרים (1 מטבע)</span>
             </button>
           </div>
         )}
@@ -516,14 +645,14 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
           </div>
         )}
 
-        {/* Step 5: Service Pages & Logo Generation (Placed right before contact info!) */}
+        {/* Step 5: Service Pages & Logo Generation */}
         {currentStep === 5 && (
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <button
                 onClick={handleGenerateLogo}
                 disabled={loading}
-                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-lg shrink-0 disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-lg shrink-0 disabled:opacity-50 hover:scale-105"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                 <span>חולל לוגו ב-AI (10 מטבעות)</span>
@@ -534,7 +663,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
                   type="text"
                   value={newServiceTitle}
                   onChange={(e) => setNewServiceTitle(e.target.value)}
-                  placeholder="שם עמוד שירות (10 מטבעות)..."
+                  placeholder="שם עמוד שירות נוסף (10 מטבעות)..."
                   className="flex-1 bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white"
                 />
                 <button
@@ -549,7 +678,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
 
             <button
               onClick={() => setCurrentStep(6)}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl transition"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl transition hover:scale-[1.01]"
             >
               המשך לפרטי התקשרות וכפתור "אנחנו כאן"
             </button>
@@ -586,7 +715,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
             <button
               onClick={handleSaveContact}
               disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-sm shadow-2xl transition flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-sm shadow-2xl transition flex items-center justify-center gap-2 hover:scale-[1.01]"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
               <span>סיים בנייה ועבור לדשבורד</span>
