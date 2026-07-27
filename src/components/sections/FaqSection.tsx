@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, HelpCircle } from "lucide-react";
+import { ChevronDown, HelpCircle, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { FaqItem } from "@/features/home/actions";
@@ -15,6 +15,12 @@ interface FaqSectionProps {
   backgroundColor?: string;
   titleColor?: string;
   subtitleColor?: string;
+  questionTextColor?: string;
+  answerTextColor?: string;
+  activeTabBgColor?: string;
+  inactiveTabBgColor?: string;
+  tabBorderColor?: string;
+  effect?: "glassmorphism" | "glow" | "lift" | "gradient-border" | "minimal";
   globalSettings?: GlobalSettings;
   isEditing?: boolean;
 }
@@ -27,6 +33,12 @@ export function FaqSection({
   backgroundColor,
   titleColor,
   subtitleColor,
+  questionTextColor,
+  answerTextColor,
+  activeTabBgColor,
+  inactiveTabBgColor,
+  tabBorderColor,
+  effect = "glassmorphism",
   globalSettings,
   isEditing = false
 }: FaqSectionProps) {
@@ -42,27 +54,68 @@ export function FaqSection({
   const resolvedTitleColor = titleColor || globalSettings?.textColorH2 || globalSettings?.textColor || "#ffffff";
   const resolvedSubtitleColor = subtitleColor || globalSettings?.textColor || "#94a3b8";
 
+  // Effect specific class generators
+  const getEffectStyles = (isOpen: boolean) => {
+    switch (effect) {
+      case "glow":
+        return cn(
+          "transition-all duration-300 border",
+          isOpen
+            ? "shadow-xl shadow-amber-500/20 ring-1 ring-amber-500/40"
+            : "hover:shadow-lg hover:shadow-amber-500/10"
+        );
+      case "lift":
+        return cn(
+          "transition-all duration-300 border transform hover:-translate-y-1 hover:shadow-xl",
+          isOpen ? "-translate-y-0.5 shadow-2xl" : ""
+        );
+      case "gradient-border":
+        return cn(
+          "transition-all duration-300 border relative",
+          isOpen ? "border-amber-400/80 shadow-lg shadow-amber-500/10" : "border-slate-800 hover:border-amber-500/40"
+        );
+      case "minimal":
+        return "transition-all duration-200 border-b border-t-0 border-x-0 rounded-none bg-transparent";
+      case "glassmorphism":
+      default:
+        return cn(
+          "backdrop-blur-xl transition-all duration-300 border shadow-lg",
+          isOpen ? "shadow-2xl shadow-amber-500/10" : "hover:bg-slate-900/60"
+        );
+    }
+  };
+
   return (
     <section 
       id={id} 
-      className="py-20 relative z-20 overflow-hidden" 
+      className="py-24 relative z-20 overflow-hidden" 
       style={{ backgroundColor: resolvedBg }}
       dir="rtl"
     >
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+      {/* Background Subtle Ambient Glow */}
+      <div 
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[140px] opacity-10 pointer-events-none"
+        style={{ backgroundColor: primaryColor }}
+      />
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10">
         
         {/* Section Header */}
-        <div className="text-center mb-12 space-y-3">
+        <div className="text-center mb-16 space-y-4">
           <div 
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-semibold mb-2"
-            style={{ color: primaryColor, borderColor: `${primaryColor}33`, backgroundColor: `${primaryColor}15` }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide border shadow-sm"
+            style={{ 
+              color: primaryColor, 
+              borderColor: `${primaryColor}33`, 
+              backgroundColor: `${primaryColor}12` 
+            }}
           >
-            <HelpCircle className="w-4 h-4" style={{ color: primaryColor }} />
+            <Sparkles className="w-4 h-4 animate-pulse" style={{ color: primaryColor }} />
             <span>שאלות ותשובות</span>
           </div>
 
           <h2 
-            className="text-2xl sm:text-4xl font-extrabold tracking-tight"
+            className="text-3xl sm:text-5xl font-black tracking-tight leading-tight"
             style={{ color: resolvedTitleColor }}
           >
             {title}
@@ -70,7 +123,7 @@ export function FaqSection({
 
           {subtitle && (
             <p 
-              className="text-sm sm:text-base max-w-2xl mx-auto opacity-80"
+              className="text-base sm:text-lg max-w-2xl mx-auto opacity-80 leading-relaxed font-normal"
               style={{ color: resolvedSubtitleColor }}
             >
               {subtitle}
@@ -80,7 +133,7 @@ export function FaqSection({
 
         {/* FAQ Accordion List */}
         {(!items || items.length === 0) ? (
-          <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-slate-700/60 bg-slate-900/40 text-slate-400 text-sm">
+          <div className="text-center py-14 px-6 rounded-3xl border border-dashed border-slate-700/60 bg-slate-900/40 text-slate-400 text-sm">
             אין שאלות להצגה באזור זה כעת.
           </div>
         ) : (
@@ -89,34 +142,48 @@ export function FaqSection({
               const isOpen = openId === item.id;
               if (item.isVisible === false) return null;
 
+              // Compute Custom Tab Background and Border Colors
+              const itemBg = isOpen 
+                ? (activeTabBgColor || "rgba(15, 23, 42, 0.85)") 
+                : (inactiveTabBgColor || "rgba(15, 23, 42, 0.4)");
+              
+              const itemBorder = tabBorderColor || (isOpen ? `${primaryColor}66` : "rgba(255, 255, 255, 0.08)");
+              const questionColor = questionTextColor || (isOpen ? primaryColor : "#ffffff");
+              const answerColor = answerTextColor || "#cbd5e1";
+
               return (
                 <div
                   key={item.id}
                   className={cn(
-                    "rounded-2xl transition-all duration-300 border overflow-hidden text-start",
-                    isOpen
-                      ? "bg-slate-900/80 border-amber-500/40 shadow-lg shadow-amber-500/5"
-                      : "bg-slate-900/40 border-slate-800 hover:border-slate-700"
+                    "rounded-2xl overflow-hidden text-start",
+                    getEffectStyles(isOpen)
                   )}
-                  style={isOpen ? { borderColor: `${primaryColor}66` } : undefined}
+                  style={{
+                    backgroundColor: itemBg,
+                    borderColor: itemBorder
+                  }}
                 >
                   <button
                     type="button"
                     onClick={() => toggleItem(item.id)}
-                    className="w-full p-5 sm:p-6 flex items-center justify-between gap-4 text-start focus:outline-none group"
+                    className="w-full p-5 sm:p-7 flex items-center justify-between gap-4 text-start focus:outline-none group cursor-pointer"
                   >
                     <span 
-                      className="text-base sm:text-lg font-bold text-white group-hover:text-amber-400 transition-colors"
-                      style={isOpen ? { color: primaryColor } : undefined}
+                      className="text-base sm:text-xl font-bold transition-colors leading-snug flex-1"
+                      style={{ color: questionColor }}
                     >
                       {item.question}
                     </span>
+
                     <span 
                       className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center bg-slate-800/80 text-slate-300 transition-transform duration-300 shrink-0",
+                        "w-9 h-9 rounded-full flex items-center justify-center transition-transform duration-300 shrink-0 border border-white/10",
                         isOpen && "rotate-180"
                       )}
-                      style={isOpen ? { backgroundColor: `${primaryColor}22`, color: primaryColor } : undefined}
+                      style={{ 
+                        backgroundColor: isOpen ? `${primaryColor}25` : "rgba(255, 255, 255, 0.05)",
+                        color: isOpen ? primaryColor : "#94a3b8" 
+                      }}
                     >
                       <ChevronDown className="w-4 h-4" />
                     </span>
@@ -129,9 +196,12 @@ export function FaqSection({
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
                       >
-                        <div className="px-5 sm:px-6 pb-5 sm:pb-6 text-sm sm:text-base text-slate-300 leading-relaxed border-t border-slate-800/60 pt-4 opacity-90">
+                        <div 
+                          className="px-5 sm:px-7 pb-6 sm:pb-7 text-sm sm:text-base leading-relaxed border-t border-white/5 pt-4 opacity-95"
+                          style={{ color: answerColor }}
+                        >
                           {item.answer}
                         </div>
                       </motion.div>
