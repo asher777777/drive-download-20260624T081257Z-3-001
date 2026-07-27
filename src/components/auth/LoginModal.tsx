@@ -12,9 +12,10 @@ import { signIn } from "next-auth/react";
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  redirectTo?: string;
 }
 
-export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+export function LoginModal({ isOpen, onClose, redirectTo = "/gen-dashboard" }: LoginModalProps) {
   const router = useRouter();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -47,7 +48,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setUsername("");
         setPassword("");
         onClose();
-        window.location.href = "/auth-redirect";
+        window.location.href = redirectTo;
       }
     } catch (err) {
       setError("שגיאה בהתחברות, נסה שוב");
@@ -59,7 +60,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <Modal.Content>
-        <Modal.Header title="התחברות למערכת" description="הכנס שם משתמש וסיסמה כדי להתחבר" />
+        <Modal.Header title="התחברות למערכת" description="הכנס שם משתמש וסיסמה כדי להתחבר לדשבורד" />
         <Modal.Close />
         
         <form onSubmit={handleLogin} className="space-y-4 mt-4" dir="rtl">
@@ -96,7 +97,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <Modal.Footer>
             <Button type="button" variant="outline" onClick={onClose} className="ml-2" disabled={loading}>ביטול</Button>
             <Button type="submit" variant="primary" disabled={loading}>
-              {loading ? "מתחבר..." : "התחבר"}
+              {loading ? "מתחבר..." : "התחבר לדשבורד"}
             </Button>
           </Modal.Footer>
           
@@ -115,7 +116,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             className="w-full gap-2 relative h-11" 
             onClick={() => {
               setLoading(true);
-              signIn("google", { callbackUrl: "/auth-redirect" });
+              signIn("google", { callbackUrl: redirectTo });
             }}
             disabled={loading}
           >

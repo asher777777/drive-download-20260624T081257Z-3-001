@@ -9,24 +9,52 @@ let adminAuth: any;
 let adminStorage: any;
 
 const createMockDb = () => {
-  const mockDoc: any = {
-    get: async () => ({ exists: false, id: "mock-id", data: () => ({}) }),
-    set: async () => ({}),
-    update: async () => ({}),
-    delete: async () => ({}),
-    collection: () => mockCollection,
+  const memoryStore = new Map<string, any>();
+
+  const getDocObj = (path: string) => {
+    return {
+      get: async () => {
+        const data = memoryStore.get(path);
+        return { exists: !!data, id: path.split("/").pop() || "mock-id", data: () => data || {} };
+      },
+      set: async (newData: any, options?: any) => {
+        const existing = options?.merge ? (memoryStore.get(path) || {}) : {};
+        memoryStore.set(path, { ...existing, ...newData });
+        return {};
+      },
+      update: async (newData: any) => {
+        const existing = memoryStore.get(path) || {};
+        memoryStore.set(path, { ...existing, ...newData });
+        return {};
+      },
+      delete: async () => {
+        memoryStore.delete(path);
+        return {};
+      },
+      collection: (colName: string) => getColObj(`${path}/${colName}`),
+    };
   };
 
-  const mockCollection: any = {
-    doc: () => mockDoc,
-    add: async () => ({ id: "mock-id" }),
-    where: () => mockCollection,
-    orderBy: () => mockCollection,
-    limit: () => mockCollection,
-    get: async () => ({ docs: [], size: 0, empty: true, forEach: () => {} }),
+  const getColObj = (path: string) => {
+    return {
+      doc: (docId?: string) => getDocObj(`${path}/${docId || "default"}`),
+      add: async (data: any) => {
+        const id = "mock_" + Date.now();
+        memoryStore.set(`${path}/${id}`, data);
+        return { id };
+      },
+      where: () => getColObj(path),
+      orderBy: () => getColObj(path),
+      limit: () => getColObj(path),
+      get: async () => ({ docs: [], size: 0, empty: true, forEach: () => {} }),
+      collection: (colName: string) => getColObj(`${path}/${colName}`),
+    };
   };
 
-  return mockCollection;
+  return {
+    collection: (colName: string) => getColObj(colName),
+    doc: (docPath: string) => getDocObj(docPath),
+  };
 };
 
 try {

@@ -16,13 +16,7 @@ export default async function AuthRedirect() {
   if (role === "SUPERADMIN") {
     redirect("/admin");
   } else {
-    // Check if the user has any services setup.
-    // If they have no services, they haven't completed onboarding.
-    const services = await getAllServices();
-    if (services && services.length > 0) {
-      redirect("/dashboard");
-    } else {
-      redirect("/onboarding");
-    }
+    // Direct new and registering users to our live agent onboarding builder path
+    redirect("/agentonbord");
   }
 }
