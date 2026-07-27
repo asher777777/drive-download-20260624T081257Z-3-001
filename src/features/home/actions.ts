@@ -222,6 +222,12 @@ export interface HomePageConfig {
     subtitleColor?: string;
     itemTextColor?: string;
     layout?: "classic" | "modern" | "grid";
+    questionTextColor?: string;
+    answerTextColor?: string;
+    activeTabBgColor?: string;
+    inactiveTabBgColor?: string;
+    tabBorderColor?: string;
+    effect?: "glassmorphism" | "glow" | "lift" | "gradient-border" | "minimal";
   };
   mobileHiddenSections?: string[];
   sectionOrder: string[];

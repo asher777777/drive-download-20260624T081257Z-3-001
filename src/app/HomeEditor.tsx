@@ -1960,6 +1960,12 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               subtitleColor={config.faq.subtitleColor}
               itemTextColor={config.faq.itemTextColor}
               layout={config.faq.layout}
+              questionTextColor={config.faq.questionTextColor}
+              answerTextColor={config.faq.answerTextColor}
+              activeTabBgColor={config.faq.activeTabBgColor}
+              inactiveTabBgColor={config.faq.inactiveTabBgColor}
+              tabBorderColor={config.faq.tabBorderColor}
+              effect={config.faq.effect}
               globalSettings={globalSettings}
               isEditing={false}
             />
@@ -2156,6 +2162,12 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             subtitleColor={config.faq.subtitleColor}
             itemTextColor={config.faq.itemTextColor}
             layout={config.faq.layout}
+            questionTextColor={config.faq.questionTextColor}
+            answerTextColor={config.faq.answerTextColor}
+            activeTabBgColor={config.faq.activeTabBgColor}
+            inactiveTabBgColor={config.faq.inactiveTabBgColor}
+            tabBorderColor={config.faq.tabBorderColor}
+            effect={config.faq.effect}
             globalSettings={globalSettings}
             isEditing={false}
           />

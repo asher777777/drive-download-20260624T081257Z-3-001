@@ -300,6 +300,12 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             subtitleColor={config.faq.subtitleColor}
             itemTextColor={config.faq.itemTextColor}
             layout={config.faq.layout}
+            questionTextColor={config.faq.questionTextColor}
+            answerTextColor={config.faq.answerTextColor}
+            activeTabBgColor={config.faq.activeTabBgColor}
+            inactiveTabBgColor={config.faq.inactiveTabBgColor}
+            tabBorderColor={config.faq.tabBorderColor}
+            effect={config.faq.effect}
             globalSettings={globalSettings}
             isEditing={false}
           />
