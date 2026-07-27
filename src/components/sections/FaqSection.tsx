@@ -15,6 +15,8 @@ interface FaqSectionProps {
   backgroundColor?: string;
   titleColor?: string;
   subtitleColor?: string;
+  itemTextColor?: string;
+  layout?: "classic" | "modern" | "grid";
   globalSettings?: GlobalSettings;
   isEditing?: boolean;
 }
@@ -27,6 +29,8 @@ export function FaqSection({
   backgroundColor,
   titleColor,
   subtitleColor,
+  itemTextColor,
+  layout = "classic",
   globalSettings,
   isEditing = false
 }: FaqSectionProps) {
@@ -41,6 +45,7 @@ export function FaqSection({
   const resolvedBg = backgroundColor || globalSettings?.backgroundColor || "transparent";
   const resolvedTitleColor = titleColor || globalSettings?.textColorH2 || globalSettings?.textColor || "#ffffff";
   const resolvedSubtitleColor = subtitleColor || globalSettings?.textColor || "#94a3b8";
+  const resolvedItemTextColor = itemTextColor || globalSettings?.textColor || "#ffffff";
 
   return (
     <section 
@@ -84,7 +89,9 @@ export function FaqSection({
             אין שאלות להצגה באזור זה כעת.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className={cn(
+            layout === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start" : "space-y-4"
+          )}>
             {items.map((item) => {
               const isOpen = openId === item.id;
               if (item.isVisible === false) return null;
@@ -96,7 +103,8 @@ export function FaqSection({
                     "rounded-2xl transition-all duration-300 border overflow-hidden text-start",
                     isOpen
                       ? "bg-slate-900/80 border-amber-500/40 shadow-lg shadow-amber-500/5"
-                      : "bg-slate-900/40 border-slate-800 hover:border-slate-700"
+                      : "bg-slate-900/40 border-slate-800 hover:border-slate-700",
+                    layout === "modern" && !isOpen && "hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 hover:bg-slate-900/60"
                   )}
                   style={isOpen ? { borderColor: `${primaryColor}66` } : undefined}
                 >
@@ -106,8 +114,8 @@ export function FaqSection({
                     className="w-full p-5 sm:p-6 flex items-center justify-between gap-4 text-start focus:outline-none group"
                   >
                     <span 
-                      className="text-base sm:text-lg font-bold text-white group-hover:text-amber-400 transition-colors"
-                      style={isOpen ? { color: primaryColor } : undefined}
+                      className="text-base sm:text-lg font-bold transition-colors group-hover:text-amber-400"
+                      style={isOpen ? { color: primaryColor } : { color: resolvedItemTextColor }}
                     >
                       {item.question}
                     </span>

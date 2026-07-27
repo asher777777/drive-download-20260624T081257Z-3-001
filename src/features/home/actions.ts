@@ -220,6 +220,8 @@ export interface HomePageConfig {
     hoverColor?: string;
     titleColor?: string;
     subtitleColor?: string;
+    itemTextColor?: string;
+    layout?: "classic" | "modern" | "grid";
   };
   mobileHiddenSections?: string[];
   sectionOrder: string[];
@@ -652,6 +654,7 @@ function mergeWithDefaultConfig(data: any): HomePageConfig {
     videoGallery: { ...DEFAULT_HOME_CONFIG.videoGallery, ...data.videoGallery },
     timer: { ...DEFAULT_HOME_CONFIG.timer, ...data.timer },
     pricing: { ...DEFAULT_HOME_CONFIG.pricing, ...data.pricing },
+    faq: { ...DEFAULT_HOME_CONFIG.faq, ...data.faq },
     mobileHiddenSections: data.mobileHiddenSections || DEFAULT_HOME_CONFIG.mobileHiddenSections || [],
     sectionOrder,
     seo: data.seo,

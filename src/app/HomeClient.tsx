@@ -296,6 +296,10 @@ export function HomeClient({ initialConfig, initialGlobalSettings, pageId, colle
             subtitle={config.faq.subtitle}
             items={config.faq.items}
             backgroundColor={config.faq.backgroundColor}
+            titleColor={config.faq.titleColor}
+            subtitleColor={config.faq.subtitleColor}
+            itemTextColor={config.faq.itemTextColor}
+            layout={config.faq.layout}
             globalSettings={globalSettings}
             isEditing={false}
           />

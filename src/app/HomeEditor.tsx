@@ -1872,16 +1872,68 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
                 dir="ltr"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-slate-400 font-medium">צבע רקע</label>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="color" 
-                  value={config.faq.backgroundColor || globalSettings.backgroundColor || "#0e0e10"}
-                  onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, backgroundColor: e.target.value }})}
-                  className="w-8 h-8 p-0 border-0 rounded cursor-pointer"
-                />
-                <span className="text-xs text-slate-300" dir="ltr">{config.faq.backgroundColor || "ברירת מחדל"}</span>
+            
+            <div className="flex flex-col gap-2 border-b border-white/10 pb-4">
+              <label className="text-xs text-slate-400 font-medium">פריסה עיצובית</label>
+              <select 
+                value={config.faq.layout || "classic"}
+                onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, layout: e.target.value as any }})}
+                className="w-full text-sm border border-slate-700 bg-[#1e293b] text-white rounded-lg p-2"
+              >
+                <option value="classic">קלאסי (Classic)</option>
+                <option value="modern">מודרני - אפקט ריחוף (Modern)</option>
+                <option value="grid">גריד - 2 עמודות (Grid)</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 font-medium">צבע רקע</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={config.faq.backgroundColor && config.faq.backgroundColor !== "transparent" ? config.faq.backgroundColor : (globalSettings.backgroundColor || "#0e0e10")}
+                    onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, backgroundColor: e.target.value }})}
+                    className="w-8 h-8 p-0 border-0 rounded cursor-pointer"
+                  />
+                  <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, faq: { ...config.faq!, backgroundColor: "transparent" }})}>נקה</button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 font-medium">צבע כותרת</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={config.faq.titleColor || globalSettings.textColorH2 || globalSettings.textColor || "#ffffff"}
+                    onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, titleColor: e.target.value }})}
+                    className="w-8 h-8 p-0 border-0 rounded cursor-pointer bg-transparent"
+                  />
+                  <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, faq: { ...config.faq!, titleColor: "" }})}>נקה</button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 font-medium">צבע תיאור</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={config.faq.subtitleColor || globalSettings.textColor || "#94a3b8"}
+                    onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, subtitleColor: e.target.value }})}
+                    className="w-8 h-8 p-0 border-0 rounded cursor-pointer bg-transparent"
+                  />
+                  <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, faq: { ...config.faq!, subtitleColor: "" }})}>נקה</button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 font-medium">טקסט שאלות</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={config.faq.itemTextColor || globalSettings.textColor || "#ffffff"}
+                    onChange={(e) => setConfig({ ...config, faq: { ...config.faq!, itemTextColor: e.target.value }})}
+                    className="w-8 h-8 p-0 border-0 rounded cursor-pointer bg-transparent"
+                  />
+                  <button className="text-[10px] text-slate-400 hover:text-red-400" onClick={() => setConfig({ ...config, faq: { ...config.faq!, itemTextColor: "" }})}>נקה</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1904,6 +1956,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
               subtitle={config.faq.subtitle}
               items={config.faq.items}
               backgroundColor={config.faq.backgroundColor}
+              titleColor={config.faq.titleColor}
+              subtitleColor={config.faq.subtitleColor}
+              itemTextColor={config.faq.itemTextColor}
+              layout={config.faq.layout}
               globalSettings={globalSettings}
               isEditing={false}
             />
@@ -2096,6 +2152,10 @@ It should be photorealistic, high quality, optimistic, and welcoming. Do not wri
             subtitle={config.faq.subtitle}
             items={config.faq.items}
             backgroundColor={config.faq.backgroundColor}
+            titleColor={config.faq.titleColor}
+            subtitleColor={config.faq.subtitleColor}
+            itemTextColor={config.faq.itemTextColor}
+            layout={config.faq.layout}
             globalSettings={globalSettings}
             isEditing={false}
           />
