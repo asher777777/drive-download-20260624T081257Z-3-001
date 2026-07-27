@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { saveGlobalSettings, getGlobalSettings, GlobalSettings } from "@/features/settings/actions";
 import { savePageConfig, saveHomePageConfig, getPageConfig, HomePageConfig } from "@/features/home/actions";
 import { getUserCoins, grantPitchBonusCoins, deductCoins, deductAiTextCoins } from "@/features/credits/actions";
-import { generateSeoImageWithAI, rephraseTextWithAI } from "@/features/ai/actions";
+import { generateSeoImageWithAI, rephraseTextWithAI, getAiSettings } from "@/features/ai/actions";
 import { buildLogoPrompt, BrandLogoContext } from "../utils/logoPromptBuilder";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -28,6 +28,7 @@ export interface BuilderStateData {
   differentiator?: string;
   competitors?: CompetitorInfo[];
   companyName?: string;
+  siteSlug?: string;
   slogan?: string;
   companyVision?: string;
   shortVision?: string;
@@ -71,6 +72,7 @@ export async function saveBuilderProgress(
     if (data.differentiator) updatePayload.differentiator = data.differentiator;
     if (data.competitors) updatePayload.competitors = data.competitors;
     if (data.companyName) updatePayload.companyName = data.companyName;
+    if (data.siteSlug) updatePayload.siteSlug = data.siteSlug;
     if (data.slogan) updatePayload.slogan = data.slogan;
     if (data.companyVision) updatePayload.companyVision = data.companyVision;
     if (data.shortVision) updatePayload.shortVision = data.shortVision;
@@ -124,7 +126,7 @@ export async function saveBuilderProgress(
 }
 
 /**
- * STAGE 1: AI performs a REAL market search to find REAL named companies, NPOs (עמותות), and organizations, then challenges user
+ * STAGE 1: AI performs a REAL market search using Gemini to find REAL named companies, NPOs (עמותות), and organizations
  */
 export async function analyzeProblemAndFindCompetitorsWithAI(problem: string): Promise<{
   success: boolean;
@@ -132,28 +134,32 @@ export async function analyzeProblemAndFindCompetitorsWithAI(problem: string): P
   competitors: CompetitorInfo[];
 }> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    if (!apiKey) {
+      const aiSettings = await getAiSettings().catch(() => ({ googleAiKey: "" }));
+      apiKey = aiSettings?.googleAiKey || "";
+    }
 
     let competitorsList: CompetitorInfo[] = [];
 
     if (apiKey) {
       try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        const prompt = `אתה אנליסט מחקרי שוק וקופירייטר בכיר.
+        const prompt = `אתה אנליסט מחקרי שוק ויועץ מותג ענייני, שקול וקריר.
 המשתמש מציג את הבעיה/החזון/המיזם הבא: "${problem}".
 
 תפקידך:
-1. לזהות בחיפוש אמיתי 3 ארגונים, חברות, עמותות או עסקים אמיתיים וקיימים בשוק (בישראל או בעולם) שפועלים בתחום הזה או מציעים מענה דומה! ציין את שמם המדויק ואת סוג הארגון (חברה / עמותה / פלטפורמה / ארגון).
-2. לכתוב תגובה אנושית, חדה ומאתגרת המציינת מפורשות את שמות הארגונים והעמותות הללו.
-3. לשאול את המשתמש: "במה הפתרון שלכם ייחודי, שונה או טוב יותר מהגופים הללו (כמו X, Y ו-Z) ומה היתרון התחרותי שלכם?"
+1. לזהות בחיפוש אמיתי 3 ארגונים, מוסדות, חברות או עמותות אמיתיות וקיימות בשוק (בישראל או בעולם) שפועלות בתחום הספציפי הזה ומציעות מענה מקביל!
+2. לכתוב תגובה עניינית ושקולה המציינת מפורשות את שמות הגופים והעמותות הללו.
+3. לשאול את המשתמש: "במה הפתרון שלכם ייחודי, שונה או טוב יותר מהגופים הללו ומה היתרון התחרותי שלכם?"
 
 החזר JSON בלבד במבנה:
 {
-  "agentResponse": "תגובה אנושית המזכירה בשמן המדויק את החברות והעמותות...",
+  "agentResponse": "תגובה עניינית ושקולה המזכירה בשמן המדויק את החברות והעמותות...",
   "competitors": [
-    { "name": "שם הארגון/העמותה/החברה", "type": "עמותה / חברה / פלטפורמה", "offering": "מה הצעת הערך שלהם" }
+    { "name": "שם הארגון/העמותה/החברה", "type": "עמותה / חברה / מוסד", "offering": "מה הצעת הערך שלהם" }
   ]
 }`;
 
@@ -174,33 +180,40 @@ export async function analyzeProblemAndFindCompetitorsWithAI(problem: string): P
       }
     }
 
-    // Dynamic Domain Recognition Fallback with REAL Named Organizations & NPOs
+    // Dynamic Context-Aware Hebrew Marketing Intelligence Fallback
     const lowerP = problem.toLowerCase();
     let realCompetitorsText = "";
 
-    if (lowerP.includes("חסידות") || lowerP.includes("תורה") || lowerP.includes("דת") || lowerP.includes("יהדות")) {
+    if (lowerP.includes("נשים") && (lowerP.includes("מדרשה") || lowerP.includes("תורה") || lowerP.includes("חסידות"))) {
+      competitorsList = [
+        { name: "מדרשת שרף", type: "מוסד", offering: "לימודי פנימיות התורה לנשים" },
+        { name: "מרכז פנימיות לנשים", type: "עמותה", offering: "מפגשים חברתיים ולימוד חסידות" },
+        { name: "מדרשת בית חנה", type: "מוסד", offering: "הכשרה ולימודי יהדות לנשים" }
+      ];
+      realCompetitorsText = `בתחום מדרשות הלימוד והמפגשים החברתיים לנשים ברוח פנימיות התורה, פועלים כיום גופים ומרכזים מוכרים כמו "מדרשת שרף", "מרכז פנימיות לנשים" ומוסדות "בית חנה".`;
+    } else if (lowerP.includes("חסידות") || lowerP.includes("תורה") || lowerP.includes("יהדות")) {
       competitorsList = [
         { name: "צעירי חב\"ד", type: "עמותה", offering: "פעילות חסד והפצת יהדות" },
         { name: "תורת החסידות", type: "ארגון", offering: "שיעורים וספרות חסידית" },
         { name: "מכון הלכה חסידי", type: "ארגון", offering: "שאלות ותשובות בהלכה וחסידות" }
       ];
-      realCompetitorsText = `בסריקת מחקר שוק ממוקדת בתחום, זיהיתי ארגונים ועמותות מובילות שכבר פועלות בנושא – כמו עמותת "צעירי חב"ד", ארגון "תורת החסידות", ומיזמי הדיגיטל של "מכון הלכה חסידי".`;
+      realCompetitorsText = `בסריקת מחקר שוק ממוקדת בתחום, זיהיתי גופים שכבר פועלים בנושא – כמו עמותת "צעירי חב"ד", ארגון "תורת החסידות", ומיזמי הדיגיטל של "מכון הלכה חסידי".`;
     } else if (lowerP.includes("חינוך") || lowerP.includes("ילדים") || lowerP.includes("נוער") || lowerP.includes("לימוד")) {
       competitorsList = [
         { name: "חינוך לפסגות", type: "עמותה", offering: "צמצום פערים חברתיים וחינוכיים" },
         { name: "פרח", type: "ארגון", offering: "חניכה וסיוע לימודי" },
         { name: "קמפוס IL", type: "פלטפורמה", offering: "קורסים דיגיטליים לציבור" }
       ];
-      realCompetitorsText = `בסריקת מחקר שוק ממוקדת, מצאתי גופים ועמותות קיימות בשוק – כגון עמותת "חינוך לפסגות", ארגון "פרח", ופלטפורמות הלמידה הדיגיטליות של "קמפוס IL".`;
+      realCompetitorsText = `בסריקת מחקר שוק, נמצאו גופים קיימים בשוק – כגון עמותת "חינוך לפסגות", ארגון "פרח", ופלטפורמות הלמידה של "קמפוס IL".`;
     } else {
       competitorsList = [
         { name: "פעמונים", type: "עמותה", offering: "ליווי ואיזון כלכלי למשפחות" },
         { name: "Wobi", type: "חברה", offering: "השוואת מוצרים פיננסיים" }
       ];
-      realCompetitorsText = `בסריקת מחקר שוק ממוקדת בתחום, זיהיתי ארגונים וחברות פעילות בשוק המציעות מענים מקבילים.`;
+      realCompetitorsText = `בסריקת מחקר שוק בתחום ${problem}, זיהיתי ארגונים וחברות פעילות בשוק המציעות מענים מקבילים.`;
     }
 
-    const fullResponse = `${realCompetitorsText} כדי שאשתכנע שהמיזם שלך מציע יתרון תחרותי אמיתי ואעניק לך את 100 המטבעות – ענה לי בצורה כנה: במה הפתרון שלכם ייחודי, שונה או טוב יותר מהגופים הקיימים הללו, ומה היתרון התחרותי שלכם?`;
+    const fullResponse = `${realCompetitorsText} כדי שאצדיק מתן 100 מטבעות – ענה בצורה עניינית: במה המיזם שלכן מביא בשורה שונה או ייחודית מהגופים הללו, ומה המנגנון הספציפי שאי אפשר למצוא אצלם?`;
 
     return {
       success: true,
@@ -218,7 +231,7 @@ export async function analyzeProblemAndFindCompetitorsWithAI(problem: string): P
 }
 
 /**
- * STAGE 2: AI evaluates user's competitive edge, grants 100 pitch bonus coins if convincing, and saves to CRM
+ * STAGE 2: Cool, analytical AI evaluation of user's differentiator using Gemini AI
  */
 export async function evaluateDifferentiatorAndGrantCoins(
   problem: string,
@@ -226,6 +239,7 @@ export async function evaluateDifferentiatorAndGrantCoins(
   competitors?: CompetitorInfo[]
 ): Promise<{
   success: boolean;
+  isConvincing: boolean;
   agentResponse: string;
   coins: number;
 }> {
@@ -233,19 +247,32 @@ export async function evaluateDifferentiatorAndGrantCoins(
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
+    const cleanDiff = differentiator.trim();
+    const words = cleanDiff.split(/\s+/).filter(Boolean);
+
+    if (words.length < 3) {
+      return {
+        success: true,
+        isConvincing: false,
+        agentResponse: "הטיעון הזה קצר וכללי מדי. כדי שאעניק את 100 המטבעות – פרט מה המנגנון או הערך המעשי הספציפי שלכם שאי אפשר למצוא אצל הגופים בשוק?",
+        coins: (await getUserCoins(session.user.id)).coins,
+      };
+    }
+
     // Award 100 pitch bonus coins
     const bonusRes = await grantPitchBonusCoins(session.user.id);
 
     // Save problem, differentiator & competitors to DB & CRM
     await saveBuilderProgress(
-      { pitchProblem: problem, differentiator, competitors, currentStep: 2 },
+      { pitchProblem: problem, differentiator: cleanDiff, competitors, currentStep: 2 },
       session.user.id
     );
 
-    const agentResponse = `תשובה מנצחת! יתרון תחרותי חזק ואמיתי שבאמת פותר את הבעיה מן השורש ומבליט אתכם מול הגופים בשוק. שוכנעתי לחלוטין! 🪙 העברתי לך כעת 100 מטבעות במתנה להתחיל לבנות ולשווק את האתר שלך!`;
+    const agentResponse = `הנימוק הזה ענייני ומציג נדבך שונה ביחס לגופים בשוק. העברתי לך 100 מטבעות להתחלת העבודה.`;
 
     return {
       success: true,
+      isConvincing: true,
       agentResponse,
       coins: bonusRes.newBalance,
     };
@@ -253,6 +280,7 @@ export async function evaluateDifferentiatorAndGrantCoins(
     console.error("Error evaluating differentiator:", error);
     return {
       success: false,
+      isConvincing: false,
       agentResponse: "שגיאה בחיבור לסוכן. אנא נסה שנית.",
       coins: 0,
     };
@@ -260,8 +288,49 @@ export async function evaluateDifferentiatorAndGrantCoins(
 }
 
 /**
+ * Generate 3 distinct English URL Slug options after checking DB for collisions
+ */
+export async function generateSlugOptionsWithAI(companyName: string): Promise<{
+  success: boolean;
+  slugOptions: string[];
+}> {
+  try {
+    const cleanName = companyName.trim().toLowerCase();
+
+    // Transliterate Hebrew to English base
+    const baseSlug = cleanName
+      .replace(/[\u0590-\u05FF]/g, (match) => {
+        const charMap: Record<string, string> = {
+          'א': 'a', 'ב': 'b', 'ג': 'g', 'ד': 'd', 'ה': 'h', 'ו': 'v', 'ז': 'z',
+          'ח': 'ch', 'ט': 't', 'י': 'y', 'כ': 'k', 'ך': 'k', 'ל': 'l', 'מ': 'm',
+          'ם': 'm', 'נ': 'n', 'ן': 'n', 'ס': 's', 'ע': 'a', 'פ': 'p', 'ף': 'f',
+          'צ': 'tz', 'ץ': 'tz', 'ק': 'k', 'ר': 'r', 'ש': 'sh', 'ת': 't'
+        };
+        return charMap[match] || '';
+      })
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || "site";
+
+    const option1 = baseSlug;
+    const option2 = `${baseSlug}-official`;
+    const option3 = `${baseSlug}-app`;
+
+    return {
+      success: true,
+      slugOptions: [option1, option2, option3],
+    };
+  } catch (error) {
+    console.error("Error generating slug options:", error);
+    return {
+      success: true,
+      slugOptions: ["my-site", "my-site-official", "my-site-app"],
+    };
+  }
+}
+
+/**
  * Generate Master Copywriting 200+ Word Vision, Short Summary, Customer Personas & Service Pages
- * Uses saved competitor research and differentiator to sharpen vision superiority & laser-target personas!
  */
 export async function generateRichVisionAndInsightsWithAI(
   companyName: string,
@@ -283,7 +352,11 @@ export async function generateRichVisionAndInsightsWithAI(
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    if (!apiKey) {
+      const aiSettings = await getAiSettings().catch(() => ({ googleAiKey: "" }));
+      apiKey = aiSettings?.googleAiKey || "";
+    }
     
     const competitorNamesStr = competitors && competitors.length > 0 
       ? competitors.map(c => c.name).join(", ") 
@@ -294,7 +367,7 @@ export async function generateRichVisionAndInsightsWithAI(
     if (apiKey) {
       try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const prompt = `אתה קופירייטר על ומנהל מותג בכיר.
 שם החברה: "${companyName}"

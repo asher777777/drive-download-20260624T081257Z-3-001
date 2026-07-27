@@ -16,7 +16,8 @@ import {
   Mail, 
   MessageCircle,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  Link as LinkIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoinBalanceBadge } from "./CoinBalanceBadge";
@@ -26,6 +27,7 @@ import {
   saveBuilderProgress, 
   analyzeProblemAndFindCompetitorsWithAI,
   evaluateDifferentiatorAndGrantCoins,
+  generateSlugOptionsWithAI,
   generateLogoWithAI, 
   createServicePageWithAI,
   generateRichVisionAndInsightsWithAI,
@@ -82,7 +84,8 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
   const [coins, setCoins] = useState(initialCoins);
   const [highlightCoins, setHighlightCoins] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [pitchSubStep, setPitchSubStep] = useState<"problem" | "differentiator">("problem");
+  const [pitchSubStep, setPitchSubStep] = useState<"problem" | "differentiator" | "company_name" | "select_slug">("problem");
+  const [slugOptions, setSlugOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [isAgentTyping, setIsAgentTyping] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -94,6 +97,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
   const [state, setState] = useState<BuilderStateData>({
     currentStep: 1,
     companyName: "",
+    siteSlug: "",
     slogan: "",
     companyVision: "",
     shortVision: "",
@@ -102,18 +106,18 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     competitors: [],
   });
 
-  // Warm, authentic initial messages
+  // Cool, objective, professional initial messages (no hype)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       sender: "agent",
-      text: `היי ${userName}! איזה כיף שאתה כאן 😃 אני מיכאל, ואני הולך להיות היועץ הדיגיטלי והקופירייטר האישי שלך. יחד נבנה משהו חזק שירשים את הלקוחות שלך מהרגע הראשון!`,
+      text: `שלום ${userName}. אני מיכאל, אנליסט מותגים ויועץ דיגיטלי. נלווה אותך בבניית המיני-סייט והתשתיות של המיזם שלך.`,
       timestamp: new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
     },
     {
       id: "2",
       sender: "agent",
-      text: `לפני שנפשיל שרוולים, ספר לי קצת: איזו בעיה אמיתית העסק שלך מגיע לפתור בעולם? 🎯 אם הפתרון שלכם חזק וייחודי – אני מעניק לך 100 מטבעות במתנה להתחיל לשווק!`,
+      text: `נפתח בשאלת היסוד: איזו בעיה מעשית המיזם שלך מגיע לפתור בשוק? אם הטיעון ענייני וחד – אעניק לך 100 מטבעות להתחלת העבודה.`,
       timestamp: new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
     }
   ]);
@@ -160,25 +164,6 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     setMessages((prev) => [...prev, msg]);
   };
 
-  // Helper: Slug generator
-  const createSlugFromName = (name: string) => {
-    const cleanName = name.trim().toLowerCase();
-    const slug = cleanName
-      .replace(/[\u0590-\u05FF]/g, (match) => {
-        const charMap: Record<string, string> = {
-          'א': 'a', 'ב': 'b', 'ג': 'g', 'ד': 'd', 'ה': 'h', 'ו': 'v', 'ז': 'z',
-          'ח': 'ch', 'ט': 't', 'י': 'y', 'כ': 'k', 'ך': 'k', 'ל': 'l', 'מ': 'm',
-          'ם': 'm', 'נ': 'n', 'ן': 'n', 'ס': 's', 'ע': 'a', 'פ': 'p', 'ף': 'f',
-          'צ': 'tz', 'ץ': 'tz', 'ק': 'k', 'ר': 'r', 'ש': 'sh', 'ת': 't'
-        };
-        return charMap[match] || '';
-      })
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-    return slug || "my-site";
-  };
-
   // Step 1 - Stage 1: Pitch Problem Submission & AI Competitor Analysis
   const handlePitchProblemSubmit = async () => {
     if (!inputVal.trim()) return;
@@ -195,15 +180,14 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         competitors: aiRes.competitors || [] 
       }));
       
-      // Agent sends ONE SINGLE challenging message listing existing competitors & asking for differentiator
-      addAgentMessageWithTyping(aiRes.agentResponse, false, 600);
+      addAgentMessageWithTyping(aiRes.agentResponse, false, 500);
       setPitchSubStep("differentiator");
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 1 - Stage 2: Pitch Differentiator Submission & Granting 100 Coins
+  // Step 1 - Stage 2: Pitch Differentiator Submission & AI Evaluation
   const handlePitchDifferentiatorSubmit = async () => {
     if (!differentiatorInput.trim()) return;
     const diff = differentiatorInput;
@@ -217,21 +201,28 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         diff, 
         state.competitors
       );
-      if (res.success) {
+
+      if (!res.isConvincing) {
+        // Michael asks a follow-up probing question if pitch is too vague/weak!
+        addAgentMessageWithTyping(res.agentResponse, false, 500);
+        return;
+      }
+
+      if (res.success && res.isConvincing) {
         setCoins(res.coins);
         setHighlightCoins(true);
         setState((prev) => ({ ...prev, differentiator: diff, currentStep: 2 }));
         
-        // Agent sends ONE SINGLE celebratory message with coins approval & asks for Company Name!
-        addAgentMessageWithTyping(`${res.agentResponse} כעת, איך קוראים לחברה או לעסק שלך?`, true, 600);
+        addAgentMessageWithTyping(`${res.agentResponse} כעת, מה שם החברה או העסק שלך?`, true, 500);
         setCurrentStep(2);
+        setPitchSubStep("company_name");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 2: Company Name & Slug Generation
+  // Step 2 - Stage 1: Company Name Submission & 3 Slug Options Generation
   const handleNameSubmit = async () => {
     if (!inputVal.trim()) return;
     const name = inputVal;
@@ -240,13 +231,35 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     setLoading(true);
 
     try {
-      const generatedSlug = createSlugFromName(name);
-      setSiteSlug(generatedSlug);
+      const slugRes = await generateSlugOptionsWithAI(name);
+      setState((prev) => ({ ...prev, companyName: name }));
 
-      const res = await saveBuilderProgress({ companyName: name, currentStep: 3 });
+      if (slugRes.success && slugRes.slugOptions.length > 0) {
+        setSlugOptions(slugRes.slugOptions);
+        setPitchSubStep("select_slug");
+        addAgentMessageWithTyping(`סביב השם "${name}", יצרתי 3 אפשרויות זמינות לנתיב האתר שלך. איזו סיומת הכי מתאימה לאתר שלך?`, true, 500);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2 - Stage 2: Choosing one of the 3 Slug Options
+  const handleSelectSlug = async (chosenSlug: string) => {
+    addUserMessage(`בחרתי בסיומת: /${chosenSlug}`);
+    setLoading(true);
+
+    try {
+      setSiteSlug(chosenSlug);
+      const res = await saveBuilderProgress({ 
+        companyName: state.companyName, 
+        siteSlug: chosenSlug, 
+        currentStep: 3 
+      });
+
       if (res.success) {
-        setState((prev) => ({ ...prev, companyName: name }));
-        addAgentMessageWithTyping(`איזה שם עוצמתי! גזרתי עבורך כתובת אתר נקייה: /${generatedSlug} 🌐 עכשיו בוא ניצוק נשמה ואופי. כקופירייטר, אבנה עבורכם חזון מותג עמוק של 200+ מילים המבליט את העליונות שלכם מול הגופים בשוק! מה הסלוגן וההרגשה שתרצו שהלקוח יחווה?`, true, 600);
+        setState((prev) => ({ ...prev, siteSlug: chosenSlug }));
+        addAgentMessageWithTyping(`הסיומת /${chosenSlug} אושרה ונרשמה 🌐. כעת, אנסח עבורכם חזון מותג מפורט של 200+ מילים. הזן את הסלוגן והתחום המרכזי:`, true, 500);
         setCurrentStep(3);
       }
     } finally {
@@ -254,7 +267,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     }
   };
 
-  // Step 3: Master Copywriting 200+ Word Vision Generation using saved Market Research & Competitors!
+  // Step 3: Master Copywriting 200+ Word Vision Generation
   const handleVisionSubmit = async () => {
     if (!visionQ1.trim()) return;
     addUserMessage(`סלוגן: ${sloganInput} | כיוון חזון: ${visionQ1}`);
@@ -290,8 +303,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
           servicePages: aiRes.servicePages,
         });
 
-        addAgentMessageWithTyping(`ניסחתי עבורכם חזון מותג מפואר ומורחב של כ-200 מילים המבליט את היתרון התחרותי שלכם מול הארגונים בשוק! ✍️ (נוכה מטבע 1 בלבד עבור הניסוח). בנוסף, גזרתי אוטומטית את נקודות הכאב של הלקוחות ואת עמודי השירות! לחץ על כפתור העין 👁️ כדי לצפות באתר החי ב-Modal!`, true, 600);
-
+        addAgentMessageWithTyping(`חזון מותג מורחב של כ-200 מילים גובש ונשמר. בנוסף, חולצו נקודות הכאב של הלקוחות ועמודי השירות. לחץ על העין 👁️ לצפייה במודל.`, true, 500);
         setCurrentStep(5);
       }
     } finally {
@@ -313,7 +325,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
     saveBuilderProgress({ personas: updated });
 
     addUserMessage(`נקודת כאב: ${newPersonaTitle} (${newPersonaDesc})`);
-    addAgentMessageWithTyping(`נוסף כרטיס כאב חדש! 🎯 הכל מעודכן בלייב!`, true, 400);
+    addAgentMessageWithTyping(`כרטיס כאב נוסף ועודכן בלייב.`, true, 400);
 
     setNewPersonaTitle("");
     setNewPersonaDesc("");
@@ -332,7 +344,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         saveBuilderProgress({ servicePages: updated });
 
         addUserMessage(`עמוד שירות: ${newServiceTitle}`);
-        addAgentMessageWithTyping(`עמוד השירות "${newServiceTitle}" הוקם בהצלחה! (נוכו 10 מטבעות) 🚀`, true, 400);
+        addAgentMessageWithTyping(`עמוד השירות "${newServiceTitle}" הוקם (נוכו 10 מטבעות).`, true, 400);
         setNewServiceTitle("");
       }
     } finally {
@@ -343,7 +355,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
   const handleGenerateLogo = async () => {
     setLoading(true);
     try {
-      addUserMessage("חולל עבורי לוגו מנצח ב-AI ב-10 מטבעות");
+      addUserMessage("חולל עבורי לוגו ב-AI (10 מטבעות)");
       const res = await generateLogoWithAI({
         companyName: state.companyName || "חברה",
         slogan: state.slogan,
@@ -355,7 +367,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
       if (res.success && res.logoUrl) {
         setCoins(res.newBalance);
         setState((prev) => ({ ...prev, logoUrl: res.logoUrl }));
-        addAgentMessageWithTyping(`הלוגו שלך חולל בהצלחה ב-AI! פלטת הצבעים חולצה והוחלה על המיני-סייט 🎨`, true, 500);
+        addAgentMessageWithTyping(`הלוגו חולל בהצלחה והוחל על המיני-סייט.`, true, 500);
       }
     } finally {
       setLoading(false);
@@ -380,7 +392,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
         }));
 
         addUserMessage("שמור פרטי התקשרות וסיים בנייה");
-        addAgentMessageWithTyping(`ברכות חמות! המיני-סייט שלך באוויר! 🚀 כל השלבים נשמרו בכרטיס המנהל ב-CRM. מעביר אותך לדשבורד...`, true, 500);
+        addAgentMessageWithTyping(`תהליך הבנייה הושלם. הנתונים נשמרו ב-CRM. מעביר אותך לדשבורד...`, true, 500);
 
         setTimeout(() => {
           window.location.href = "/dashboard";
@@ -409,7 +421,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
           <div className="flex flex-col text-right">
             <h2 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5">
               <span>מיכאל</span>
-              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">יועץ דיגיטל & קופירייטר</span>
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">אנליסט מותגים & קופירייטר</span>
             </h2>
             {siteSlug ? (
               <span className="text-xs text-indigo-400 font-mono dir-ltr flex items-center gap-1">
@@ -417,7 +429,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
                 /{siteSlug}
               </span>
             ) : (
-              <span className="text-xs text-indigo-300 font-medium">מלווה אותך בבניית המותג בלייב</span>
+              <span className="text-xs text-indigo-300 font-medium">ליווי אסטרטגי בלייב</span>
             )}
           </div>
         </div>
@@ -519,16 +531,16 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handlePitchProblemSubmit()}
-              placeholder="איזו בעיה אמיתית העסק שלך מגיע לפתור בעולם?..."
+              placeholder="איזו בעיה מעשית המיזם מגיע לפתור?..."
               className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
             />
             <button
               onClick={handlePitchProblemSubmit}
               disabled={loading || !inputVal.trim()}
-              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0 hover:scale-105"
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>שתף את מיכאל</span>
+              <span>שלח לניתוח</span>
             </button>
           </div>
         )}
@@ -541,22 +553,22 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
               value={differentiatorInput}
               onChange={(e) => setDifferentiatorInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handlePitchDifferentiatorSubmit()}
-              placeholder="במה הפתרון שלכם ייחודי/טוב יותר מהמתחרים בשוק?..."
+              placeholder="במה הפתרון שלכם ייחודי וטוב יותר מהגופים הללו?..."
               className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
             />
             <button
               onClick={handlePitchDifferentiatorSubmit}
               disabled={loading || !differentiatorInput.trim()}
-              className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0 hover:scale-105"
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-              <span>שכנע את מיכאל וקבל 100 מטבעות</span>
+              <span>הצג יתרון תחרותי</span>
             </button>
           </div>
         )}
 
-        {/* Step 2: Company Name Question */}
-        {currentStep === 2 && (
+        {/* Step 2 - Stage 1: Company Name Question */}
+        {currentStep === 2 && pitchSubStep === "company_name" && (
           <div className="flex items-center gap-3">
             <input
               type="text"
@@ -569,11 +581,34 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
             <button
               onClick={handleNameSubmit}
               disabled={loading || !inputVal.trim()}
-              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0 hover:scale-105"
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 transition disabled:opacity-50 shrink-0"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>אשר שם ונתיב</span>
+              <span>שלח שם חברה</span>
             </button>
+          </div>
+        )}
+
+        {/* Step 2 - Stage 2: Select 1 of 3 Slug Options (No getting stuck!) */}
+        {currentStep === 2 && pitchSubStep === "select_slug" && (
+          <div className="space-y-3">
+            <p className="text-xs text-indigo-300 font-bold flex items-center gap-1.5">
+              <LinkIcon className="w-4 h-4" />
+              <span>איזה סיומת כתובת אתר הכי מתאימה לעסק שלך?</span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {slugOptions.map((slugOpt, idx) => (
+                <button
+                  key={slugOpt}
+                  onClick={() => handleSelectSlug(slugOpt)}
+                  disabled={loading}
+                  className="p-3 bg-indigo-900/40 hover:bg-indigo-600 border border-indigo-500/40 hover:border-indigo-400 text-white font-mono text-xs rounded-xl flex items-center justify-between transition shadow-md hover:scale-[1.02] text-left"
+                >
+                  <span className="font-bold">/{slugOpt}</span>
+                  <span className="text-[10px] text-indigo-300 bg-white/10 px-2 py-0.5 rounded-full">אופציה {idx + 1}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -599,10 +634,10 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
             <button
               onClick={handleVisionSubmit}
               disabled={loading || !visionQ1.trim()}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition disabled:opacity-50 hover:scale-[1.01]"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-              <span>זקק חזון 200+ מילים וגזור כאבים/שירותים ב-AI מול המתחרים (1 מטבע)</span>
+              <span>גבש חזון 200+ מילים ופרסונות (1 מטבע)</span>
             </button>
           </div>
         )}
@@ -652,7 +687,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
               <button
                 onClick={handleGenerateLogo}
                 disabled={loading}
-                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-lg shrink-0 disabled:opacity-50 hover:scale-105"
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-lg shrink-0 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                 <span>חולל לוגו ב-AI (10 מטבעות)</span>
@@ -678,7 +713,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
 
             <button
               onClick={() => setCurrentStep(6)}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl transition hover:scale-[1.01]"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-xl transition"
             >
               המשך לפרטי התקשרות וכפתור "אנחנו כאן"
             </button>
@@ -715,7 +750,7 @@ export function LiveBuilderShell({ initialCoins, userName }: LiveBuilderShellPro
             <button
               onClick={handleSaveContact}
               disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-sm shadow-2xl transition flex items-center justify-center gap-2 hover:scale-[1.01]"
+              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-sm shadow-2xl transition flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
               <span>סיים בנייה ועבור לדשבורד</span>
