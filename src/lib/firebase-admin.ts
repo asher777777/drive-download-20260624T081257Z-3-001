@@ -24,9 +24,13 @@ const createMockDb = () => {
     orderBy: () => mockCollection,
     limit: () => mockCollection,
     get: async () => ({ docs: [], size: 0, empty: true, forEach: () => {} }),
+    collection: () => mockCollection,
   };
 
-  return mockCollection;
+  return {
+    collection: () => mockCollection,
+    doc: () => mockDoc,
+  };
 };
 
 try {

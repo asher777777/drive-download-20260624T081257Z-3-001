@@ -4,7 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { saveGlobalSettings, getGlobalSettings, GlobalSettings } from "@/features/settings/actions";
-import { savePageConfig, getPageConfig, HomePageConfig } from "@/features/home/actions";
+import { savePageConfig, saveHomePageConfig, getPageConfig, HomePageConfig } from "@/features/home/actions";
 import { getUserCoins, grantPitchBonusCoins, deductCoins, deductAiTextCoins } from "@/features/credits/actions";
 import { generateSeoImageWithAI, rephraseTextWithAI } from "@/features/ai/actions";
 import { buildLogoPrompt, BrandLogoContext } from "../utils/logoPromptBuilder";
@@ -92,7 +92,7 @@ export async function saveBuilderProgress(
       await saveGlobalSettings(settingsUpdate);
     }
 
-    // 3. Sync to HomePageConfig if name/problem/vision updated
+    // 3. Sync to HomePageConfig if name/problem/slogan updated
     if (data.companyName || data.pitchProblem || data.slogan) {
       const currentConfig = await getPageConfig("pages", "home");
       if (currentConfig) {
@@ -102,7 +102,7 @@ export async function saveBuilderProgress(
           subtitle: data.slogan || currentConfig.hero.subtitle,
           description: data.pitchProblem || currentConfig.hero.description,
         };
-        await savePageConfig({ ...currentConfig, hero: updatedHero }, "pages", "home");
+        await savePageConfig("pages", "home", { ...currentConfig, hero: updatedHero });
       }
     }
 
