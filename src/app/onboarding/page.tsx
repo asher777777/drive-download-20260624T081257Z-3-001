@@ -1,7 +1,8 @@
 import { getAllServices } from "@/features/services/actions";
 import { auth } from "@/lib/auth";
 import { getGlobalSettings } from "@/features/settings/actions";
-import { OnboardingClient } from "./OnboardingClient";
+import { ExecutiveInterview } from "./ExecutiveInterview";
+// import { OnboardingClient } from "./OnboardingClient"; // Keeping old import commented out just in case
 
 async function getUserId(): Promise<string> {
   const session = await auth();
@@ -20,14 +21,6 @@ export default async function OnboardingPage() {
   const globalSettings = await getGlobalSettings(ownerId);
 
   return (
-    <div className="w-full relative min-h-full pt-0 md:pt-8" dir="rtl">
-      <div className="max-w-4xl mx-auto">
-        <OnboardingClient
-          initialSettings={globalSettings}
-          initialServices={services}
-          userName={userName}
-        />
-      </div>
-    </div>
+    <ExecutiveInterview userName={userName} />
   );
 }

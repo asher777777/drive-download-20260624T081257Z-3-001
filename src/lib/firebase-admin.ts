@@ -48,6 +48,7 @@ const createMockDb = () => {
       limit: () => getColObj(path),
       get: async () => ({ docs: [], size: 0, empty: true, forEach: () => {} }),
       collection: (colName: string) => getColObj(`${path}/${colName}`),
+      count: () => ({ get: async () => ({ data: () => ({ count: 0 }) }) }),
     };
   };
 
