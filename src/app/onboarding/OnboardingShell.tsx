@@ -41,14 +41,7 @@ export function OnboardingShell({
           </div>
         )}
 
-        {/* Top Header - No links, just logo */}
-        <header className="h-[100px] shrink-0 bg-[#0f172a] text-white flex items-center justify-between px-4 z-50 relative">
-          {userLogoUrl && (
-            <div className="flex items-center gap-2">
-              <img src={userLogoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg" />
-            </div>
-          )}
-        </header>
+
 
         {/* Main Content Area (The Canvas) */}
         <main className={cn(
