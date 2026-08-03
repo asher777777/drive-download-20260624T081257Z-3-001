@@ -11,22 +11,40 @@ import { RegisterModal } from "@/components/auth/RegisterModal";
 import { Modal } from "@/components/ui/Modal";
 import { CRMFormRenderer } from "@/features/crm/components/CRMFormRenderer";
 import type { FormConfig } from "@/features/crm/components/CRMFormBuilder";
-
-import { Sparkles } from "lucide-react";
+import { Sparkles, Settings } from "lucide-react";
 
 const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor").then(m => m.RichTextEditor), { ssr: false });
-const HeroEditor = dynamic(() => import("./HeroEditor").then(m => m.HeroEditor), { ssr: false });
+
+/**
+ * ⚠️ מפתח יקר שימו לב! ⚠️
+ * רכיב זה מיועד אך ורק לשימוש בתוך הבילדר (WFD).
+ * הוא עותק נפרד מרכיב ה-Hero המקורי במטרה לאפשר גמישות ועריכה ויזואלית מלאה.
+ * אין לשנות את רכיב ה-Hero המקורי עבור צרכי הבילדר!
+ */
 
 const isVideoUrl = (url: string) => {
   if (!url) return false;
+  if (url.includes("drive.google.com")) return true;
   return !!url.match(/\.(mp4|webm|mov|quicktime)($|\?)/i);
+};
+
+const getDriveId = (url: string) => {
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
 };
 
 const MediaBackground = ({ src, className, priority, sizes }: any) => {
   if (isVideoUrl(src)) {
+    let videoSrc = src;
+    if (src.includes("drive.google.com")) {
+      const driveId = getDriveId(src);
+      if (driveId) {
+        videoSrc = `https://drive.google.com/uc?export=download&id=${driveId}`;
+      }
+    }
     return (
       <video
-        src={src}
+        src={videoSrc}
         autoPlay
         loop
         muted
@@ -57,7 +75,10 @@ interface HeroProps {
   flexDirection?: "row" | "row-reverse" | "col" | "col-reverse";
   form?: FormConfig;
   formMode?: "visible" | "modal";
-  onUpdateHero?: (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "form" | "formMode", value: any) => void;
+  formTitle?: string;
+  formSubtitle?: string;
+  formButtonText?: string;
+  onUpdateHero?: (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "form" | "formMode" | "titleColor" | "descriptionColor" | "formTitle" | "formSubtitle" | "formButtonText", value: any) => void;
   priority?: boolean;
   pageContext?: string;
 }
@@ -73,7 +94,9 @@ const EditableText = ({
   className,
   style,
   richText = false,
-  context
+  context,
+  onColorChange,
+  colorField
 }: any) => {
   const mergedStyle = style?.color ? {
     ...style,
@@ -87,10 +110,23 @@ const EditableText = ({
     return <Tag className={className} style={mergedStyle} dangerouslySetInnerHTML={{ __html: value }} />;
   }
   
+  const ColorPicker = () => onColorChange && colorField ? (
+    <div className="absolute top-2 right-2 z-[90] flex items-center bg-black/50 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+      <input
+        type="color"
+        value={style?.color || "#ffffff"}
+        onChange={(e) => onColorChange(colorField, e.target.value)}
+        className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+        title="בחר צבע"
+      />
+    </div>
+  ) : null;
+
   if (richText) {
     return (
-      <div className={cn(className, "relative")} style={mergedStyle}>
+      <div className={cn(className, "relative group")} style={mergedStyle}>
         <AITextHelper value={value} onChange={onChange} context={context} isRichText={true} className="left-2 top-2 z-[90]" />
+        <ColorPicker />
         <RichTextEditor value={value} onChange={onChange} />
       </div>
     );
@@ -98,28 +134,36 @@ const EditableText = ({
 
   if (Tag === "textarea" || Tag === "p") {
     return (
-      <div className="relative w-full">
+      <div className="relative group">
+        <AITextHelper value={value} onChange={onChange} context={context} isRichText={false} className="left-2 top-2 z-[90]" />
+        <ColorPicker />
         <textarea
-          value={value}
+          value={value?.replace(/<[^>]*>?/gm, '') || ''}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(className, "bg-black/20 border border-white/30 rounded-lg p-2 pl-24 outline-none focus:bg-black/40 transition-colors w-full resize-none")}
+          className={cn(className, "w-full bg-transparent border border-white/20 rounded-md p-2 hover:border-white/40 focus:border-indigo-500 focus:outline-none transition-colors resize-none overflow-hidden")}
           style={mergedStyle}
           rows={3}
         />
-        <AITextHelper value={value} onChange={onChange} context={context} className="absolute left-2 top-2 z-[90]" />
       </div>
     );
   }
-  
+
   return (
-    <div className="relative inline-block w-full group">
-      <AITextHelper value={value} onChange={onChange} context={context} className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Tag className={className} style={mergedStyle} dangerouslySetInnerHTML={{ __html: value }} />
+    <div className="relative group inline-block w-full">
+      <AITextHelper value={value} onChange={onChange} context={context} isRichText={false} className="left-2 -top-12 z-[90]" />
+      <ColorPicker />
+      <input
+        type="text"
+        value={value?.replace(/<[^>]*>?/gm, '') || ''}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(className, "w-full bg-transparent border-b border-transparent hover:border-white/40 focus:border-indigo-500 focus:outline-none transition-colors")}
+        style={mergedStyle}
+      />
     </div>
   );
 };
 
-export const Hero = ({ 
+export const WfdHero = ({ 
   id,
   title = "מוזמנים ומוזמנות <br /><span class=\"text-secondary\">להרגיש בבית</span>", 
   subtitle = "ברוכים הבאים לבית שלנו", 
@@ -138,14 +182,18 @@ export const Hero = ({
   flexDirection = "row",
   formMode = "visible",
   form,
+  formTitle = "השאירו פרטים",
+  formSubtitle = "ונחזור אליכם בהקדם",
+  formButtonText = "השארת פרטים",
   onUpdateHero,
   priority,
   pageContext
 }: HeroProps) => {
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [editingButton, setEditingButton] = useState<"primary" | "secondary" | null>(null);
 
-  const handleUpdate = (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "form" | "formMode", val: any) => {
+  const handleUpdate = (field: "title" | "subtitle" | "description" | "imageSrc" | "buttonsVisible" | "primaryButton" | "secondaryButton" | "heroStyle" | "flexDirection" | "form" | "formMode" | "titleColor" | "descriptionColor" | "formTitle" | "formSubtitle" | "formButtonText", val: any) => {
     if (onUpdateHero) onUpdateHero(field, val);
   };
 
@@ -153,51 +201,71 @@ export const Hero = ({
 
   const HeroActions = ({ className }: { className?: string }) => {
     return (
-      <div className={cn("flex flex-wrap gap-4", className)}>
-        {(primaryButton?.link?.trim() && primaryButton?.visible !== false) ? (
-          (primaryButton.link?.trim().toLowerCase() === "#register" || primaryButton.text?.includes("צור קהילה") || primaryButton.text?.includes("הרשמה")) ? (
-            <SquishyButton onClick={() => setIsRegisterModalOpen(true)} className={cn("bg-white text-primary hover:bg-white/90 shadow-xl w-full sm:w-auto", buttonsVisible === false && "opacity-50 grayscale")}>
-              <ShieldCheck className="ml-2 h-5 w-5" />
-              {primaryButton.text}
-            </SquishyButton>
-          ) : (
-            <Link href={primaryButton.link}>
-              <SquishyButton className={cn("bg-white text-primary hover:bg-white/90 shadow-xl w-full sm:w-auto", buttonsVisible === false && "opacity-50 grayscale")}>
-                <ShieldCheck className="ml-2 h-5 w-5" />
-                {primaryButton.text}
-              </SquishyButton>
-            </Link>
-          )
-        ) : null}
-        {(secondaryButton?.link?.trim() && secondaryButton?.visible !== false) ? (
-          (secondaryButton.link?.trim().toLowerCase() === "#register" || secondaryButton.text?.includes("צור קהילה") || secondaryButton.text?.includes("הרשמה")) ? (
-            <SquishyButton onClick={() => setIsRegisterModalOpen(true)} className={cn("bg-primary/50 backdrop-blur-md border border-white/20 text-white hover:bg-primary/70 shadow-xl w-full sm:w-auto", buttonsVisible === false && "opacity-50 grayscale")}>
-              <Calendar className="ml-2 h-5 w-5" />
-              {secondaryButton.text}
-            </SquishyButton>
-          ) : (
-            <Link href={secondaryButton.link}>
-              <SquishyButton className={cn("bg-primary/50 backdrop-blur-md border border-white/20 text-white hover:bg-primary/70 shadow-xl w-full sm:w-auto", buttonsVisible === false && "opacity-50 grayscale")}>
-                <Calendar className="ml-2 h-5 w-5" />
-                {secondaryButton.text}
-              </SquishyButton>
-            </Link>
-          )
-        ) : null}
+      <div className={cn("flex flex-wrap gap-4 relative", className)}>
+        {/* Primary Button */}
+        <div className="relative group/btn">
+          {(primaryButton?.link?.trim() && primaryButton?.visible !== false) || isEditing ? (
+            <div className="flex items-center gap-2">
+              <div className={cn("transition-opacity", primaryButton?.visible === false ? "opacity-50 grayscale" : "")}>
+                {(primaryButton?.link?.trim().toLowerCase() === "#register" || primaryButton?.text?.includes("צור קהילה") || primaryButton?.text?.includes("הרשמה")) ? (
+                  <SquishyButton onClick={() => setIsRegisterModalOpen(true)} className="bg-white text-primary hover:bg-white/90 shadow-xl w-full sm:w-auto">
+                    <ShieldCheck className="ml-2 h-5 w-5" />
+                    {primaryButton?.text || "לחץ כאן"}
+                  </SquishyButton>
+                ) : (
+                  <Link href={primaryButton?.link || "#"}>
+                    <SquishyButton className="bg-white text-primary hover:bg-white/90 shadow-xl w-full sm:w-auto">
+                      <ShieldCheck className="ml-2 h-5 w-5" />
+                      {primaryButton?.text || "לחץ כאן"}
+                    </SquishyButton>
+                  </Link>
+                )}
+              </div>
+              {isEditing && (
+                <button 
+                  onClick={() => setEditingButton(editingButton === "primary" ? null : "primary")}
+                  className="p-2 bg-black/50 hover:bg-black/80 text-white rounded-full transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Secondary Button */}
+        <div className="relative group/btn">
+          {(secondaryButton?.link?.trim() && secondaryButton?.visible !== false) || isEditing ? (
+            <div className="flex items-center gap-2">
+              <div className={cn("transition-opacity", secondaryButton?.visible === false ? "opacity-50 grayscale" : "")}>
+                {(secondaryButton?.link?.trim().toLowerCase() === "#register" || secondaryButton?.text?.includes("צור קהילה") || secondaryButton?.text?.includes("הרשמה")) ? (
+                  <SquishyButton onClick={() => setIsRegisterModalOpen(true)} className="bg-primary/50 backdrop-blur-md border border-white/20 text-white hover:bg-primary/70 shadow-xl w-full sm:w-auto">
+                    <Calendar className="ml-2 h-5 w-5" />
+                    {secondaryButton?.text || "לחץ כאן"}
+                  </SquishyButton>
+                ) : (
+                  <Link href={secondaryButton?.link || "#"}>
+                    <SquishyButton className="bg-primary/50 backdrop-blur-md border border-white/20 text-white hover:bg-primary/70 shadow-xl w-full sm:w-auto">
+                      <Calendar className="ml-2 h-5 w-5" />
+                      {secondaryButton?.text || "לחץ כאן"}
+                    </SquishyButton>
+                  </Link>
+                )}
+              </div>
+              {isEditing && (
+                <button 
+                  onClick={() => setEditingButton(editingButton === "secondary" ? null : "secondary")}
+                  className="p-2 bg-black/50 hover:bg-black/80 text-white rounded-full transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   };
-
-  const ImageEditorOverlay = isEditing ? (
-    <HeroEditor
-      imageSrc={imageSrc}
-      buttonsVisible={buttonsVisible}
-      primaryButton={primaryButton}
-      secondaryButton={secondaryButton}
-      availableAnchors={availableAnchors}
-      onUpdateHero={handleUpdate}
-    />
-  ) : null;
 
   const renderLayout = () => {
     if (heroStyle === "content") {
@@ -207,9 +275,9 @@ export const Hero = ({
             {/* Content side */}
             <div className="w-full md:w-1/2 flex flex-col justify-center px-8 md:px-16 py-12 md:py-24 z-20">
               <div className="max-w-xl text-right mx-auto w-full">
-                <EditableText tag="h2" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} context={pageContext} className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 leading-tight text-foreground" style={titleColor ? { color: titleColor } : undefined} />
+                <EditableText tag="h2" value={title} onChange={(v: string) => handleUpdate("title", v)} onColorChange={handleUpdate} colorField="titleColor" isEditing={isEditing} context={pageContext} className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 leading-tight text-foreground" style={titleColor ? { color: titleColor } : undefined} />
                 <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} context={pageContext} className="text-xl md:text-2xl font-medium mb-8 text-foreground" style={{ opacity: 0.8 }} />
-                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} context={pageContext} richText={true} className="text-lg text-foreground mb-12" style={{ opacity: 0.8, ...(descriptionColor ? { color: descriptionColor } : {}) }} />
+                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} onColorChange={handleUpdate} colorField="descriptionColor" isEditing={isEditing} context={pageContext} richText={true} className="text-lg text-foreground mb-12" style={{ opacity: 0.8, ...(descriptionColor ? { color: descriptionColor } : {}) }} />
                 <div className="hidden md:block">
                   <HeroActions />
                 </div>
@@ -235,7 +303,7 @@ export const Hero = ({
     }
 
     if (heroStyle === "landing") {
-      const activeTheme = { bg: "bg-background", text: "text-foreground", accent: "text-secondary", iconBg: "bg-secondary/10", iconText: "text-secondary", btnColor: "bg-primary hover:bg-primary/90 text-primary-foreground" };
+      const activeTheme = { bg: "bg-background", text: "text-foreground", accent: "text-secondary", iconBg: "bg-secondary/10", iconText: "text-secondary", btnColor: "bg-primary hover:bg-primary/90", btnText: "text-primary-foreground" };
       return (
         <section className={`relative pt-24 pb-36 overflow-hidden ${activeTheme.bg} ${activeTheme.text} min-h-[65vh] flex items-center`}>
           <div className="absolute inset-0 z-0">
@@ -251,15 +319,15 @@ export const Hero = ({
                 <div className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
                   <EditableText tag="p" value={subtitle} onChange={(v: string) => handleUpdate("subtitle", v)} isEditing={isEditing} context={pageContext} className={`text-sm font-medium ${activeTheme.accent}`} />
                 </div>
-                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} isEditing={isEditing} context={pageContext} className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] text-white" style={titleColor ? { color: titleColor } : undefined} />
-                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} isEditing={isEditing} context={pageContext} richText={true} className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-2xl" style={descriptionColor ? { color: descriptionColor } : undefined} />
+                <EditableText tag="h1" value={title} onChange={(v: string) => handleUpdate("title", v)} onColorChange={handleUpdate} colorField="titleColor" isEditing={isEditing} context={pageContext} className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] text-white" style={titleColor ? { color: titleColor } : undefined} />
+                <EditableText tag="div" value={description} onChange={(v: string) => handleUpdate("description", v)} onColorChange={handleUpdate} colorField="descriptionColor" isEditing={isEditing} context={pageContext} richText={true} className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-2xl" style={descriptionColor ? { color: descriptionColor } : undefined} />
                 <HeroActions />
                 {formMode === "modal" && form && (
                   <Modal isOpen={isRegisterModalOpen} onClose={() => setIsRegisterModalOpen(false)}>
                     <Modal.Content className="max-w-xl p-0 bg-[#111111] overflow-hidden border border-white/10 rounded-[2rem] shadow-2xl">
                       <Modal.Close className="text-white hover:text-amber-500 z-50 absolute top-4 left-4" />
                       <div className="p-6 sm:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar relative">
-                        <CRMFormRenderer config={form} formId={id || "hero"} formTitle={title} />
+                        <CRMFormRenderer config={form} formId={id || "hero"} formTitle={formTitle} />
                       </div>
                     </Modal.Content>
                   </Modal>
@@ -268,19 +336,20 @@ export const Hero = ({
 
               {/* Form / Actions */}
               <div className="w-full lg:w-5/12">
-                <div className="relative group perspective-1000">
-                  <div className={`absolute inset-0 bg-gradient-to-tr from-${activeTheme.btnColor.split(" ")[0].replace("bg-", "")}/20 to-transparent blur-2xl rounded-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500`} />
+                <div className="relative">
                   <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl">
-                    {formMode === "visible" && form ? (
-                      <CRMFormRenderer config={form} formId={id || "hero"} formTitle={title} />
+                    {formMode === "visible" && form && form.fields && form.fields.length > 0 ? (
+                      <CRMFormRenderer config={form} formId={id || "hero"} formTitle={formTitle} />
                     ) : (
                       <div className="text-center py-8">
-                        <div className={`w-16 h-16 rounded-full ${activeTheme.iconBg} flex items-center justify-center mx-auto mb-6`}>
-                          <Sparkles className={`w-8 h-8 ${activeTheme.iconText}`} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-white mb-4">מוכנים להתחיל?</h3>
-                        <p className="text-slate-300 mb-8">הצטרפו אלינו והתחילו את המסע שלכם</p>
-                        <HeroActions className="justify-center" />
+                        <EditableText tag="h3" value={formTitle} onChange={(v: string) => handleUpdate("formTitle", v)} isEditing={isEditing} context={pageContext} className="text-3xl font-bold text-white mb-3" />
+                        <EditableText tag="p" value={formSubtitle} onChange={(v: string) => handleUpdate("formSubtitle", v)} isEditing={isEditing} context={pageContext} className="text-lg text-slate-300 mb-8" />
+                        <button 
+                          onClick={() => setIsRegisterModalOpen(true)}
+                          className={`w-full ${activeTheme.btnColor} ${activeTheme.btnText} font-bold py-4 px-8 rounded-xl shadow-xl transition-all transform hover:scale-[1.02] active:scale-95`}
+                        >
+                          <EditableText tag="span" value={formButtonText} onChange={(v: string) => handleUpdate("formButtonText", v)} isEditing={isEditing} context={pageContext} />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -474,11 +543,59 @@ export const Hero = ({
     return null;
   };
 
+  const activeBtnData = editingButton === "primary" ? primaryButton : editingButton === "secondary" ? secondaryButton : null;
+
   return (
     <div id={id} className="relative w-full">
       {renderLayout()}
-      {ImageEditorOverlay}
       <RegisterModal isOpen={isRegisterModalOpen} onClose={() => setIsRegisterModalOpen(false)} />
+      
+      {/* Button Editor Modal */}
+      {isEditing && editingButton && (
+        <Modal isOpen={true} onClose={() => setEditingButton(null)}>
+          <Modal.Content className="max-w-md p-0 bg-[#0e0e10] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+            <Modal.Close className="text-white hover:text-indigo-400 z-50 absolute top-4 left-4" />
+            <div className="p-6">
+              <h4 className="text-white text-lg font-bold mb-6">הגדרות כפתור</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-slate-400 mb-2 block">טקסט</label>
+                  <input 
+                    type="text" 
+                    value={activeBtnData?.text || ""} 
+                    onChange={e => handleUpdate(editingButton === "primary" ? "primaryButton" : "secondaryButton", { ...activeBtnData, text: e.target.value })}
+                    className="w-full bg-[#181818] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-400 mb-2 block">קישור</label>
+                  <input 
+                    type="text" 
+                    dir="ltr"
+                    value={activeBtnData?.link || ""} 
+                    onChange={e => handleUpdate(editingButton === "primary" ? "primaryButton" : "secondaryButton", { ...activeBtnData, link: e.target.value })}
+                    className="w-full bg-[#181818] border border-white/10 rounded-lg p-3 text-sm text-white text-left focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-3 mt-4 bg-[#181818] p-3 rounded-lg border border-white/10">
+                  <input 
+                    type="checkbox" 
+                    checked={activeBtnData?.visible !== false}
+                    onChange={e => handleUpdate(editingButton === "primary" ? "primaryButton" : "secondaryButton", { ...activeBtnData, visible: e.target.checked })}
+                    className="w-4 h-4 rounded border-white/20 bg-[#0f172a] accent-indigo-500"
+                  />
+                  <label className="text-sm text-slate-300">הצג כפתור זה בקנבס</label>
+                </div>
+              </div>
+              <div className="mt-8">
+                <button onClick={() => setEditingButton(null)} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-colors">
+                  סיום
+                </button>
+              </div>
+            </div>
+          </Modal.Content>
+        </Modal>
+      )}
     </div>
   );
 };

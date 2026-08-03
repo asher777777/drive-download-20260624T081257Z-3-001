@@ -58,7 +58,8 @@ export async function rephraseTextWithAI(
   text: string,
   tone: "warm" | "elegant" | "punchy" | "storytelling" = "warm",
   customInstruction: string = "",
-  skipLimits: boolean = false
+  skipLimits: boolean = false,
+  isRichText: boolean = false
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   try {
     if (!skipLimits) {
@@ -72,15 +73,12 @@ export async function rephraseTextWithAI(
         return { success: false, error: "LIMIT_REACHED:" + ('message' in limitCheck ? limitCheck.message : "") };
       }
     }
-  } catch(e) {
-    // If not authenticated or error, we might just fail
-  }
+  } catch(e) {}
 
   if (!text || !text.trim()) {
-    return { success: false, error: "׳׳ ׳ ׳©׳׳— ׳˜׳§׳¡׳˜ ׳׳ ׳™׳¡׳•׳—" };
+    return { success: false, error: "לא נשלח טקסט" };
   }
 
-  // Try to get API key from env, then from Firebase settings
   let apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
   if (!apiKey) {
     const aiSettings = await getAiSettings();
@@ -88,74 +86,50 @@ export async function rephraseTextWithAI(
   }
 
   if (!apiKey) {
-    console.warn("GEMINI_API_KEY is not set. Using smart Hebrew copywriting fallback.");
-    
-    // Provide a beautiful copywriting fallback
-    let fallbackText = text;
-    if (text.includes("׳§׳₪׳”")) {
-      fallbackText = "׳©׳•׳×׳₪׳•׳× ׳—׳׳” ׳•׳׳׳™׳¨׳”: ׳§׳—׳• ׳—׳׳§ ׳‘׳׳—׳–׳§׳× ׳₪׳™׳ ׳× ׳”׳§׳₪׳” ׳©׳ ׳‘׳™׳× ׳”׳›׳ ׳¡׳× ׳׳–׳›׳•׳× ׳׳× ׳”׳׳×׳₪׳׳׳™׳ ׳•׳”׳׳•׳׳“׳™׳. ׳×׳¨׳•׳׳” ׳§׳˜׳ ׳” ׳©׳ ׳—׳¡׳“ - ׳–׳›׳•׳× ׳’׳“׳•׳׳” ׳׳¢׳™׳׳•׳™ ׳ ׳©׳׳”, ׳׳”׳¦׳׳—׳” ׳׳• ׳׳‘׳¨׳›׳” ׳‘׳‘׳™׳×.";
-    } else if (text.includes("׳§׳”׳™׳׳”")) {
-      fallbackText = "׳‘׳™׳× ׳—׳ ׳׳›׳ ׳׳—׳“: ׳׳ ׳• ׳׳–׳׳™׳ ׳™׳ ׳׳×׳›׳ ׳׳”׳™׳•׳× ׳—׳׳§ ׳׳”׳§׳”׳™׳׳” ׳©׳׳ ׳•. ׳׳¨׳›׳– ׳©׳ ׳—׳™׳‘׳•׳¨, ׳¢׳¨׳‘׳•׳× ׳”׳“׳“׳™׳× ׳•׳₪׳¢׳™׳׳•׳× ׳§׳”׳™׳׳×׳™׳× ׳¢׳ ׳₪׳” ׳׳›׳ ׳”׳’׳™׳׳׳™׳.";
-    } else if (text.includes("׳©׳™׳¨׳•׳×׳™׳") || text.includes("׳×׳₪׳™׳׳™׳")) {
-      fallbackText = "׳©׳™׳¨׳•׳×׳™׳ ׳׳§׳¦׳•׳¢׳™׳™׳: ׳™׳™׳¢׳•׳¥, ׳׳™׳•׳•׳™, ׳”׳¨׳¦׳׳•׳× ׳׳¨׳×׳§׳•׳×, ׳¡׳™׳•׳¢ ׳•׳”׳›׳•׳•׳ ׳”. ׳׳ ׳—׳ ׳• ׳›׳׳ ׳‘׳©׳‘׳™׳׳›׳ ׳׳›׳ ׳“׳‘׳¨ ׳•׳¢׳ ׳™׳™׳.";
-    } else {
-      const toneLabels: Record<string, string> = {
-        warm: "׳—׳ ׳•׳׳§׳¨׳‘",
-        elegant: "׳¨׳©׳׳™ ׳•׳׳›׳•׳‘׳“",
-        punchy: "׳§׳¦׳¨ ׳•׳§׳•׳׳¢",
-        storytelling: "׳¨׳•׳—׳ ׳™ ׳•׳׳¨׳’׳©"
-      };
-      fallbackText = `[׳¡׳’׳ ׳•׳: ${toneLabels[tone] || "׳—׳"}] ${text} ${customInstruction ? `(׳׳•׳×׳׳ ׳׳™׳©׳™׳×: ${customInstruction})` : ""}`;
-    }
-    
-    return { success: true, text: fallbackText };
+    return { success: false, error: "לא נמצא מפתח API" };
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-3.1-pro-preview model as specified by the user
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
     
     const toneGuidelines: Record<string, string> = {
-      warm: "׳¡׳’׳ ׳•׳ ׳§׳”׳™׳׳×׳™, ׳—׳, ׳׳¡׳‘׳™׳¨ ׳₪׳ ׳™׳, ׳׳—׳‘׳§ ׳•׳׳§׳¨׳‘ ׳׳‘׳‘׳•׳×. ׳”׳©׳×׳׳© ׳‘׳׳™׳׳™׳ ׳©׳™׳•׳¦׳¨׳•׳× ׳×׳—׳•׳©׳× ׳©׳™׳™׳›׳•׳×, ׳—׳׳™׳׳•׳× ׳•׳׳©׳₪׳—׳×׳™׳•׳× (׳׳׳©׳: '׳׳¨׳’׳™׳©׳™׳ ׳‘׳‘׳™׳×', '׳›׳•׳׳ ׳׳•׳–׳׳ ׳™׳', '׳‘׳׳”׳‘׳” ׳•׳‘׳©׳׳—׳”').",
-      elegant: "׳¡׳’׳ ׳•׳ ׳™׳•׳§׳¨׳×׳™, ׳¨׳©׳׳™, ׳׳›׳•׳‘׳“ ׳•׳‘׳¢׳ ׳¢׳‘׳¨׳™׳× ׳’׳‘׳•׳”׳” ׳•׳×׳§׳™׳ ׳” ׳‘׳׳™׳•׳—׳“. ׳׳×׳׳™׳ ׳׳׳›׳×׳‘׳™׳ ׳¨׳©׳׳™׳™׳, ׳×׳¨׳•׳׳•׳× ׳’׳“׳•׳׳•׳×, ׳׳• ׳”׳¡׳‘׳¨׳™׳ ׳”׳׳›׳×׳™׳™׳ ׳׳›׳•׳‘׳“׳™׳.",
-      punchy: "׳¡׳’׳ ׳•׳ ׳§׳¦׳¨, ׳§׳•׳׳¢, ׳—׳“, ׳§׳¦׳‘׳™ ׳•׳׳ ׳™׳¢ ׳׳₪׳¢׳•׳׳” (׳§׳•׳₪׳™ ׳©׳™׳•׳•׳§׳™ ׳׳׳•׳§׳“). ׳׳¦׳•׳™׳ ׳׳›׳•׳×׳¨׳•׳× ׳׳• ׳׳›׳₪׳×׳•׳¨׳™׳. ׳”׳—׳¡׳¨ ׳׳™׳׳™׳ ׳׳™׳•׳×׳¨׳•׳× ׳•׳”׳×׳׳§׳“ ׳‘׳׳¡׳¨ ׳”׳׳¨׳›׳–׳™.",
-      storytelling: "׳¡׳’׳ ׳•׳ ׳¡׳™׳₪׳•׳¨׳™, ׳׳¨׳’׳©, ׳¨׳•׳—׳ ׳™ ׳•׳׳¢׳•׳¨׳¨ ׳”׳©׳¨׳׳” ׳”׳ ׳•׳’׳¢ ׳‘׳ ׳™׳׳™ ׳”׳ ׳©׳׳”. ׳”׳©׳×׳׳© ׳‘׳“׳™׳׳•׳™׳™׳ ׳©׳ ׳׳•׳¨, ׳׳¡׳•׳¨׳×, ׳—׳™׳‘׳•׳¨ ׳₪׳ ׳™׳׳™ ׳•׳©׳׳©׳׳× ׳”׳“׳•׳¨׳•׳× ׳”׳™׳”׳•׳“׳™׳×."
+      warm: "סגנון חם, מסביר פנים ומקרב לבבות.",
+      elegant: "סגנון יוקרתי, רשמי, מכובד.",
+      punchy: "סגנון קצר, קולע ומניע לפעולה.",
+      storytelling: "סגנון סיפורי, מרגש ורוחני."
     };
 
-    const systemPrompt = `׳׳×׳” ׳§׳•׳₪׳™׳¨׳™׳™׳˜׳¨ ׳©׳™׳•׳•׳§׳™ ׳׳•׳׳—׳”.
-׳׳˜׳¨׳”: ׳¢׳¨׳™׳›׳” ׳•׳©׳“׳¨׳•׳’ ׳§׳•׳₪׳™׳¨׳™׳™׳˜׳™׳ ׳’ ׳©׳ ׳˜׳§׳¡׳˜ ׳”׳׳™׳•׳¢׳“ ׳׳׳×׳¨ ׳”׳׳™׳ ׳˜׳¨׳ ׳˜ ׳©׳ ׳”׳׳¨׳’׳•׳.
-׳˜׳§׳¡׳˜ ׳׳§׳•׳¨׳™ ׳׳ ׳™׳¡׳•׳— ׳׳—׳“׳©:
+    const formatInstructions = isRichText
+      ? `1. פלט: החזר אך ורק קוד HTML נקי! הטקסט חייב להיות מעוצב באמצעות תגיות HTML עשירות (כגון <h2>, <h3>, <p>, <strong>, <ul>, <li>, <em>).
+2. עיצוב: אל תשתמש ב-Markdown (כגון כוכביות או סולמות). השתמש רק ב-HTML.
+3. אל תוסיף הקדמות, פשוט החזר את ה-HTML נטו שניתן להזריק ישירות לעורך טקסט.`
+      : `1. פלט: החזר אך ורק טקסט פשוט (Plain Text) נקי לחלוטין מתגיות HTML או מסימוני Markdown. רק את המילים.
+2. אורך ומבנה: מכיוון שזו כותרת או כותרת משנית, עליה להיות קצרה, מדויקת (עד 15 מילים), ללא פסקאות ארוכות או רשימות.
+3. אל תוסיף שום מילות הקדמה או סיום. החזר רק את התוצאה הסופית המדויקת.`;
+
+    const systemPrompt = `אתה קופירייטר שיווקי מומחה.
+מטרה: עריכה ושדרוג קופירייטינג של טקסט המיועד לאתר האינטרנט.
+טקסט מקורי:
 "${text}"
 
-׳¡׳’׳ ׳•׳ ׳›׳×׳™׳‘׳” ׳׳‘׳•׳§׳© (׳˜׳•׳):
+סגנון כתיבה מבוקש (טון):
 ${toneGuidelines[tone] || toneGuidelines.warm}
 
-${customInstruction ? `׳“׳’׳©׳™׳ ׳׳™׳•׳—׳“׳™׳ ׳©׳ ׳”׳׳©׳×׳׳© (׳—׳•׳‘׳” ׳׳™׳™׳©׳ ׳׳•׳×׳ ׳‘׳׳׳•׳׳):\n- ${customInstruction}` : ""}
+${customInstruction ? `דגשים מיוחדים (חובה ליישם):
+- ${customInstruction}` : ""}
 
-׳”׳ ׳—׳™׳•׳× ׳§׳¨׳™׳˜׳™׳•׳× ׳׳¢׳‘׳•׳“׳”:
-1. ׳₪׳׳˜: ׳”׳—׳–׳¨ ׳׳ ׳•׳¨׳§ ׳§׳•׳“ HTML ׳ ׳§׳™! ׳”׳˜׳§׳¡׳˜ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳׳¢׳•׳¦׳‘ ׳‘׳׳׳¦׳¢׳•׳× ׳×׳’׳™׳•׳× HTML ׳¢׳©׳™׳¨׳•׳× (׳›׳’׳•׳ <h2>, <h3>, <p>, <strong>, <ul>, <li>, <em>).
-2. ׳¢׳™׳¦׳•׳‘: ׳׳ ׳×׳©׳׳© ׳‘-Markdown (׳›׳’׳•׳ ׳›׳•׳›׳‘׳™׳•׳× ׳׳• ׳¡׳•׳׳׳•׳×). ׳”׳©׳×׳׳© ׳¨׳§ ׳‘-HTML.
-3. ׳׳ ׳×׳•׳¡׳™׳£ ׳”׳§׳“׳׳•׳× ׳›׳׳• "׳׳”׳׳ ׳”׳§׳•׳“", ׳׳ ׳×׳¢׳˜׳•׳£ ׳‘׳¡׳™׳׳•׳ ׳™ markdown (׳›׳׳• \`\`\`html), ׳₪׳©׳•׳˜ ׳”׳—׳–׳¨ ׳׳× ׳”-HTML ׳ ׳˜׳• ׳©׳ ׳™׳×׳ ׳׳”׳–׳¨׳™׳§ ׳™׳©׳™׳¨׳•׳× ׳׳¢׳•׳¨׳ ׳˜׳§׳¡׳˜.
-4. ׳¢׳‘׳¨׳™׳×: ׳›׳×׳•׳‘ ׳‘׳¢׳‘׳¨׳™׳× ׳§׳•׳׳—׳×, ׳˜׳‘׳¢׳™׳× ׳׳—׳׳•׳˜׳™׳ ׳•׳™׳₪׳”. ׳”׳™׳׳ ׳¢ ׳׳‘׳™׳˜׳•׳™׳™׳ ׳׳™׳•׳©׳ ׳™׳.
-5. ׳¨׳•׳— ׳”׳׳§׳•׳: ׳”׳×׳׳ ׳׳¨׳•׳— ׳”׳§׳”׳™׳׳” - ׳׳¡׳‘׳™׳¨ ׳₪׳ ׳™׳, ׳©׳׳—, ׳₪׳×׳•׳— ׳׳›׳•׳׳ ׳‘׳׳”׳‘׳” ׳•׳׳׳™׳¨ ׳₪׳ ׳™׳.
-`;
+הנחיות קריטיות לעבודה:
+${formatInstructions}
+4. עברית: כתוב בעברית קולחת וטבעית.
+5. רוח המקום: התאם לרוח הקהילה - מסביר פנים ופתוח לכולם.`;
 
-    console.log("=== AI REPHRASE REQUEST ===");
-    console.log("Original Text:", text);
-    console.log("Tone:", tone);
-    console.log("Custom Instruction:", customInstruction);
-    
     const result = await model.generateContent(systemPrompt);
     const responseText = result.response.text().trim().replace(/^"|"$/g, '');
     
-    console.log("=== AI REPHRASE RESPONSE ===");
-    console.log("Rephrased Text:", responseText);
-    
     return { success: true, text: responseText };
   } catch (error) {
-    console.error("AI Rephrase Error:", error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 }
 

@@ -238,6 +238,7 @@ export interface HomePageConfig {
     image?: string;
   };
   pageSettings?: any;
+  builderVersion?: string;
 }
 
 const DEFAULT_FORM_CONFIG: FormConfig = {

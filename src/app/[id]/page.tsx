@@ -19,7 +19,10 @@ import { staticLandingPages } from "@/data/landing-pages";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   try {
-    const docSnap = await adminDb.collection("landing").doc(id).get();
+    let docSnap = await adminDb.collection("landing").doc(id).get();
+    if (!docSnap.exists) {
+      docSnap = await adminDb.collection("pages").doc(id).get();
+    }
     if (docSnap.exists) {
       const data = docSnap.data();
       return {
@@ -43,18 +46,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function LandingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LandingPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const isPreview = resolvedSearchParams.preview === "true";
   
   let pageConfig: any = null;
 
   try {
-    const docSnap = await adminDb.collection("landing").doc(id).get();
+    let docSnap = await adminDb.collection("landing").doc(id).get();
+    if (!docSnap.exists) {
+      docSnap = await adminDb.collection("pages").doc(id).get();
+    }
     if (docSnap.exists) {
       pageConfig = docSnap.data();
     }
   } catch (error) {
-    console.warn("Could not fetch landing page from DB:", error);
+    console.warn("Could not fetch page from DB:", error);
   }
 
   if (!pageConfig) {
@@ -117,7 +125,15 @@ export default async function LandingPage({ params }: { params: Promise<{ id: st
 
   const { auth } = await import("@/lib/auth");
   const session = await auth();
-  const canEdit = session?.user?.role === "SUPERADMIN" || session?.user?.id === "1" || session?.user?.id === pageConfig?.ownerId;
+  
+  // If this page was created by the new builder (v2), we use the clean V2 viewer
+  if (pageConfig?.builderVersion === "v2") {
+    const { V2PageClient } = await import("./V2PageClient");
+    return <V2PageClient pageData={pageConfig} />;
+  }
+
+  // If preview mode is on, force canEdit to false so the old editor doesn't wrap the page
+  const canEdit = !isPreview && (session?.user?.role === "SUPERADMIN" || session?.user?.id === "1" || session?.user?.id === pageConfig?.ownerId);
 
   return <HomeClient initialConfig={mappedConfig as any} initialGlobalSettings={globalSettings} pageId={id} collectionName="landing" canEdit={canEdit} />;
 }
