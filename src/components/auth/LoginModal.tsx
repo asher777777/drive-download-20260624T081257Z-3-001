@@ -8,6 +8,7 @@ import Image from "next/image";
 
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { normalizePhone } from "@/lib/utils";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -30,8 +31,11 @@ export function LoginModal({ isOpen, onClose, redirectTo = "/gen-dashboard" }: L
     setError("");
 
     try {
+      const isPhone = /^[\d\-\+\(\)\s]+$/.test(username);
+      const finalUsername = isPhone ? normalizePhone(username) : username;
+
       const result = await signIn("credentials", {
-        username,
+        username: finalUsername,
         password,
         redirect: false,
       });

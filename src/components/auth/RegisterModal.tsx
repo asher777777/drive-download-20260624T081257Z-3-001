@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { submitCRMForm } from "@/features/crm/actions";
+import { normalizePhone } from "@/lib/utils";
 
 interface RegisterModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export function RegisterModal({ isOpen, onClose, redirectTo = "/agentonbord" }: 
 
     try {
       // Create user and contact via CRM action
-      await submitCRMForm({
+      const crmResponse = await submitCRMForm({
         formId: "register-modal-form",
         formTitle: "הרשמה למערכת והתחלת בנייה",
         formType: "register",
@@ -48,15 +49,22 @@ export function RegisterModal({ isOpen, onClose, redirectTo = "/agentonbord" }: 
         }
       });
 
+      if (crmResponse && crmResponse.success === false) {
+        setError("שגיאה בהרשמה: " + crmResponse.error);
+        setLoading(false);
+        return;
+      }
+
       // Log in with phone as both username and password
+      const normPhone = normalizePhone(phone);
       const result = await signIn("credentials", {
-        username: phone,
-        password: phone,
+        username: normPhone,
+        password: normPhone,
         redirect: false
       });
 
       if (result?.error) {
-        setError("שגיאה בהתחברות, בדוק את הפרטים ונסה שוב");
+        setError("שגיאה בהתחברות: " + result.error);
       } else if (result?.ok) {
         setFullName("");
         setPhone("");
