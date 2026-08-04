@@ -9,6 +9,7 @@ import { getUserCoins, grantPitchBonusCoins, deductCoins, deductAiTextCoins } fr
 import { generateSeoImageWithAI, rephraseTextWithAI, getAiSettings } from "@/features/ai/actions";
 import { buildLogoPrompt, BrandLogoContext } from "../utils/logoPromptBuilder";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { logAiInteraction } from "@/features/crm/actions";
 
 export interface PersonaCard {
   id: string;
@@ -588,11 +589,9 @@ Problem Solved: ${context.businessProblem || ""}`;
       response = await ai.interactions.create({
         model: "gemini-3.6-flash",
         input: userMsg,
-        config: {
-          systemInstruction: sysInstruction,
-          responseMimeType: "application/json",
-          ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
-        }
+        system_instruction: sysInstruction,
+        response_mime_type: "application/json",
+        ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
       });
     } catch (e: any) {
       if (e.message?.includes("interactions.create is not a function") || e.message?.includes("Cannot read properties of undefined (reading 'create')") || e.message?.includes("Unknown parameter")) {
@@ -626,6 +625,20 @@ Problem Solved: ${context.businessProblem || ""}`;
     const seed = previousSeed || Math.floor(Math.random() * 99999999);
     const encodedPrompt = encodeURIComponent(parsed.prompt);
     const logoUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`;
+
+    // 4. Log AI interaction to CRM
+    const usage = response.usageMetadata || (response.response?.usageMetadata);
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    
+    // Non-blocking log
+    logAiInteraction(
+      session.user.id,
+      inputTokens,
+      outputTokens,
+      `יצירת לוגו: ${userMsg.substring(0, 50)}...`,
+      logoUrl
+    ).catch(console.error);
 
     return {
       success: true,

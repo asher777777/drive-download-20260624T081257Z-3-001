@@ -1504,3 +1504,51 @@ export async function deleteCalendarEvent(eventId: string) {
   }
 }
 
+/**
+ * Log an AI interaction (tokens, summary, cost, image) to the user's CRM contact card
+ */
+export async function logAiInteraction(userId: string, inputTokens: number, outputTokens: number, summary: string, imageUrl?: string) {
+  try {
+    if (!userId) return { success: false, error: "Missing userId" };
+
+    // Search for the CRM contact that corresponds to this system userId
+    const contactsRef = adminDb.collection("contacts");
+    const snapshot = await contactsRef.where("systemUserId", "==", userId).limit(1).get();
+    
+    if (snapshot.empty) {
+      return { success: false, error: "Contact not found for this user" };
+    }
+
+    const docRef = snapshot.docs[0].ref;
+    const data = snapshot.docs[0].data();
+
+    // Calculate cost based on Gemini 3.6 Flash pricing
+    // Input: $1.50 per 1M, Output: $7.50 per 1M
+    const cost = (inputTokens / 1_000_000) * 1.50 + (outputTokens / 1_000_000) * 7.50;
+
+    const newInteraction = {
+      date: new Date().toISOString(),
+      summary,
+      inputTokens,
+      outputTokens,
+      cost,
+      imageUrl: imageUrl || null
+    };
+
+    const currentInteractions = Array.isArray(data.ai_interactions) ? data.ai_interactions : [];
+    
+    await docRef.update({
+      ai_total_input_tokens: FieldValue.increment(inputTokens),
+      ai_total_output_tokens: FieldValue.increment(outputTokens),
+      ai_total_cost: FieldValue.increment(cost),
+      ai_interactions: [newInteraction, ...currentInteractions].slice(0, 50), // keep last 50
+      updatedAt: new Date().toISOString()
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error logging AI interaction:", error);
+    return { success: false, error: error.message };
+  }
+}
+

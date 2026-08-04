@@ -118,7 +118,18 @@ export interface Contact {
     transferRef?: string;
   };
 
-
+  // AI Usage & Stats
+  ai_total_input_tokens?: number;
+  ai_total_output_tokens?: number;
+  ai_total_cost?: number; // USD
+  ai_interactions?: {
+    date: string;
+    summary: string;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+    imageUrl?: string;
+  }[];
 
   // Timestamps
   createdAt?: string;

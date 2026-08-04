@@ -9,8 +9,9 @@ import { createContact, updateContact, getCustomFields, checkIsSuperAdmin, getCo
 import { syncContactMessages } from "@/features/whatsapp/actions";
 import { uploadMediaFile } from "@/features/media/actions";
 import { impersonateUser } from "@/features/users/impersonate";
-import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder } from "lucide-react";
+import { ChevronUp, ChevronDown, Calendar, Tag, Building, Clock, CreditCard, User, Users, Plus, Trash2, MessageCircle, Phone, Mail, Edit, RefreshCw, Settings, Loader2, UploadCloud, Folder, Zap } from "lucide-react";
 import { InteractionsList } from "@/components/ui/InteractionsList";
+import { getUserCoins, adminUpdateUserCoins } from "@/features/credits/actions";
 
 const getInitials = (name: string, fm?: string) => {
   const first = name ? name.trim().charAt(0) : "";
@@ -46,7 +47,7 @@ interface ContactModalProps {
   onSuccess: () => void;
 }
 
-type TabType = "details" | "camp" | "tags" | "company" | "events" | "timeline" | "payments" | "userDetails";
+type TabType = "details" | "camp" | "tags" | "company" | "events" | "timeline" | "payments" | "userDetails" | "aistats";
 
 const EditableLabel = ({ label, fieldId, isCustom, onSave, canEdit = true }: { label: string, fieldId: string, isCustom: boolean, onSave: (id: string, newLabel: string, isCustom: boolean) => Promise<void>, canEdit?: boolean }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -1186,6 +1187,31 @@ export function ContactModal({ isOpen, onClose, contact, onSuccess }: ContactMod
           )}
           </div>
 
+          {/* Tab Content: AI Stats */}
+          {contact?.isUser && contact?.systemUserId && (
+            <div className="w-full flex flex-col bg-[#181818] rounded-xl overflow-hidden border border-white/5 shadow-xl mb-4">
+              <button
+                type="button"
+                id="tab-aistats"
+                onClick={() => handleTabClick("aistats")}
+                className={`w-full p-4 hover:bg-[#202020] flex items-center justify-between font-bold text-white text-sm cursor-pointer transition-colors sticky top-0 z-20 bg-[#181818] ${activeTab === "aistats" ? "ring-1 ring-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] z-10 relative" : "border-b border-white/5"}`}
+              >
+                <span className="flex items-center gap-3 text-white">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  שימוש בבינה מלאכותית
+                </span>
+                {activeTab === "aistats" ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+              </button>
+              {activeTab === "aistats" && isEdit && (
+                <AiStatsView 
+                  contact={contact} 
+                  systemUserId={contact.systemUserId} 
+                  onCoinsUpdate={() => onSuccess()} 
+                />
+              )}
+            </div>
+          )}
+
           {/* Custom Tabs */}
           {customTabsConfig.map(tab => {
              let IconCmp = Plus;
@@ -1465,4 +1491,130 @@ function AddFieldModal({ isOpen, onClose, onSave, isAdding }: any) {
       </div>
     </div>
   )
+}
+
+function AiStatsView({ contact, systemUserId, onCoinsUpdate }: { contact: Contact, systemUserId: string, onCoinsUpdate: () => void }) {
+  const [coins, setCoins] = useState<number | null>(null);
+  const [editingCoins, setEditingCoins] = useState(false);
+  const [newCoinsVal, setNewCoinsVal] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getUserCoins(systemUserId).then(res => {
+      setCoins(res.coins);
+      setNewCoinsVal(res.coins.toString());
+      setLoading(false);
+    });
+  }, [systemUserId]);
+
+  const handleSaveCoins = async () => {
+    const val = parseInt(newCoinsVal);
+    if (isNaN(val)) return;
+    setLoading(true);
+    const res = await adminUpdateUserCoins(systemUserId, val);
+    if (res.success) {
+      setCoins(val);
+      setEditingCoins(false);
+      onCoinsUpdate();
+    } else {
+      alert("שגיאה בעדכון מטבעות");
+    }
+    setLoading(false);
+  };
+
+  const interactions = contact.ai_interactions || [];
+
+  return (
+    <div className="p-6 bg-[#111] animate-in fade-in duration-200 text-right" dir="rtl">
+      <div className="space-y-6">
+        
+        {/* Coins Management */}
+        <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-2xl flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-black text-amber-500 mb-1">יתרת מטבעות (Coins)</h4>
+            <p className="text-xs text-slate-400">המטבעות משמשים ליצירת תוכן באמצעות AI.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {loading ? (
+              <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+            ) : editingCoins ? (
+              <div className="flex items-center gap-2">
+                <Input type="number" value={newCoinsVal} onChange={(e) => setNewCoinsVal(e.target.value)} className="w-24 h-8 text-center text-sm font-bold bg-[#181818] border-amber-500/50" />
+                <Button size="sm" onClick={handleSaveCoins} className="h-8 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold">שמור</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditingCoins(false); setNewCoinsVal(coins?.toString() || "0"); }} className="h-8 px-2 text-slate-400">בטל</Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-black text-white">{coins !== null ? coins : "..."}</span>
+                <Button size="sm" onClick={() => setEditingCoins(true)} className="h-8 px-3 bg-[#222] hover:bg-[#333] border border-white/10 text-xs font-bold text-slate-300">
+                  <Edit className="w-3.5 h-3.5 ml-1.5" /> ערוך
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stats Panel */}
+        <h4 className="text-sm font-black text-slate-400 uppercase tracking-wider">סיכום שימוש ב-API</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-[#181818] border border-white/5 rounded-2xl flex flex-col justify-center">
+            <span className="text-[11px] font-bold text-slate-400">סך טוקני קלט (שאלות)</span>
+            <span className="text-xl font-black text-indigo-400 mt-1">{contact.ai_total_input_tokens?.toLocaleString() || 0}</span>
+          </div>
+          <div className="p-4 bg-[#181818] border border-white/5 rounded-2xl flex flex-col justify-center">
+            <span className="text-[11px] font-bold text-slate-400">סך טוקני פלט (תשובות)</span>
+            <span className="text-xl font-black text-emerald-400 mt-1">{contact.ai_total_output_tokens?.toLocaleString() || 0}</span>
+          </div>
+          <div className="p-4 bg-[#181818] border border-amber-500/20 rounded-2xl flex flex-col justify-center shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+            <span className="text-[11px] font-bold text-amber-500">עלות מצטברת (USD)</span>
+            <span className="text-2xl font-black text-amber-500 mt-1">${(contact.ai_total_cost || 0).toFixed(4)}</span>
+            <span className="text-[9px] text-amber-500/60 mt-1">לפי מחירון Gemini 3.6 Flash</span>
+          </div>
+        </div>
+
+        {/* Interactions List */}
+        <div className="space-y-3 pt-4 border-t border-white/5">
+          <h5 className="text-xs font-bold text-slate-300">היסטוריית אינטראקציות אחרונות</h5>
+          {interactions.length === 0 ? (
+            <div className="p-6 text-center border border-white/5 rounded-2xl text-slate-500 text-xs bg-[#181818]">
+              לא נמצאו שיחות או בקשות AI עבור איש קשר זה.
+            </div>
+          ) : (
+            <div className="border border-white/5 rounded-2xl overflow-hidden bg-[#181818] max-h-[300px] overflow-y-auto no-scrollbar">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-[#222] border-b border-white/5 font-bold text-amber-500 sticky top-0 z-10">
+                  <tr>
+                    <th className="p-3">תאריך</th>
+                    <th className="p-3">פעולה</th>
+                    <th className="p-3 text-center">טוקנים (קלט / פלט)</th>
+                    <th className="p-3 text-left">עלות</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-slate-300">
+                  {interactions.map((interaction, idx) => (
+                    <tr key={idx} className="hover:bg-[#222] transition-colors">
+                      <td className="p-3 whitespace-nowrap">{new Date(interaction.date).toLocaleString("he-IL")}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          {interaction.imageUrl && (
+                            <img src={interaction.imageUrl} alt="AI Result" className="w-8 h-8 rounded-md object-cover border border-white/10 shrink-0" />
+                          )}
+                          <span className="line-clamp-2" title={interaction.summary}>{interaction.summary}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-center text-[10px] font-mono">
+                        <span className="text-indigo-400">{interaction.inputTokens}</span> / <span className="text-emerald-400">{interaction.outputTokens}</span>
+                      </td>
+                      <td className="p-3 text-left font-bold text-amber-500">${interaction.cost.toFixed(5)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
 }

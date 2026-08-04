@@ -174,3 +174,43 @@ export async function deductAiTextCoins(
     newBalance: res.newBalance,
   };
 }
+
+/**
+ * Admin action to explicitly set a user's coin balance
+ */
+export async function adminUpdateUserCoins(userId: string, newBalance: number, reason: string = "עדכון מנהל מערכת"): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  try {
+    const session = await auth();
+    if (session?.user?.role !== "SUPERADMIN") throw new Error("Unauthorized: Superadmin only");
+
+    if (!userId) throw new Error("User ID is required");
+    if (typeof newBalance !== "number" || isNaN(newBalance)) throw new Error("Invalid balance");
+
+    const userRef = adminDb.collection("users").doc(userId);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+       throw new Error("User not found");
+    }
+
+    await userRef.set({
+      coins: newBalance,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    // Record transaction
+    await userRef.collection("credit_transactions").add({
+      amount: newBalance - (userDoc.data()?.coins || 0),
+      reason,
+      timestamp: new Date().toISOString(),
+      balanceAfter: newBalance,
+    });
+
+    revalidatePath("/admin/users");
+    return { success: true, newBalance };
+  } catch (error: any) {
+    console.error("Error updating user coins:", error);
+    return { success: false, error: error.message || "Failed to update coins" };
+  }
+}
+
