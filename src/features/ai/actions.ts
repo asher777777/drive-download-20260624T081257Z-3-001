@@ -234,36 +234,10 @@ export async function generateSeoImageWithAI(
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: promptStr }]
-            }
-          ]
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      console.error("Gemini Image API Error Data:", errData);
-      throw new Error(`Gemini Image response error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const b64Image = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!b64Image) {
-      throw new Error("No image data received from Gemini");
-    }
-
-    return { success: true, imageUrl: `data:image/jpeg;base64,${b64Image}` };
+    const encodedPrompt = encodeURIComponent(promptStr);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
+    
+    return { success: true, imageUrl };
   } catch (error) {
     console.error("AI SEO Image Generation Error:", error);
     return { success: false, error: (error as Error).message };

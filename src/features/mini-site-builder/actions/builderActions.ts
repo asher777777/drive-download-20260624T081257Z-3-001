@@ -44,6 +44,8 @@ export interface BuilderStateData {
   contactInstagram?: string;
   contactTikTok?: string;
   currentStep: number;
+  messages?: any[];
+  pitchSubStep?: string;
 }
 
 /**
@@ -82,6 +84,8 @@ export async function saveBuilderProgress(
     if (data.contactPhone) updatePayload.contactPhone = data.contactPhone;
     if (data.contactEmail) updatePayload.contactEmail = data.contactEmail;
     if (data.contactWhatsApp) updatePayload.contactWhatsApp = data.contactWhatsApp;
+    if (data.messages) updatePayload.onboardingMessages = data.messages;
+    if (data.pitchSubStep) updatePayload.pitchSubStep = data.pitchSubStep;
 
     await userRef.set(updatePayload, { merge: true });
 
@@ -102,19 +106,7 @@ export async function saveBuilderProgress(
       await saveGlobalSettings(settingsUpdate);
     }
 
-    // 3. Sync to HomePageConfig if name/problem/slogan updated
-    if (data.companyName || data.pitchProblem || data.slogan) {
-      const currentConfig = await getPageConfig("pages", "home");
-      if (currentConfig) {
-        const updatedHero = {
-          ...currentConfig.hero,
-          title: data.companyName || currentConfig.hero.title,
-          subtitle: data.slogan || currentConfig.hero.subtitle,
-          description: data.pitchProblem || currentConfig.hero.description,
-        };
-        await savePageConfig("pages", "home", { ...currentConfig, hero: updatedHero });
-      }
-    }
+
 
     const coinsData = await getUserCoins(targetUserId);
     revalidatePath("/agentonbord");
@@ -122,6 +114,45 @@ export async function saveBuilderProgress(
   } catch (error) {
     console.error("Error saving builder progress:", error);
     return { success: false, coins: 0 };
+  }
+}
+
+/**
+ * Fetch current builder step & data from DB (User profile & Admin CRM Contact Card)
+ */
+export async function getBuilderProgress(userId?: string): Promise<BuilderStateData | null> {
+  try {
+    let targetUserId = userId;
+    if (!targetUserId) {
+      const session = await auth();
+      if (!session?.user?.id) return null;
+      targetUserId = session.user.id;
+    }
+
+    const docSnap = await adminDb.collection("users").doc(targetUserId).get();
+    if (!docSnap.exists) return null;
+
+    const data = docSnap.data() as any;
+    
+    return {
+      currentStep: data.agentOnboardingStep ?? 1,
+      pitchProblem: data.pitchProblem,
+      differentiator: data.differentiator,
+      competitors: data.competitors,
+      companyName: data.companyName,
+      siteSlug: data.siteSlug,
+      slogan: data.slogan,
+      companyVision: data.companyVision,
+      shortVision: data.shortVision,
+      personas: data.personas,
+      servicePages: data.servicePages,
+      logoUrl: data.logoUrl,
+      messages: data.onboardingMessages,
+      pitchSubStep: data.pitchSubStep,
+    };
+  } catch (error) {
+    console.error("Error getting builder progress:", error);
+    return null;
   }
 }
 
@@ -481,6 +512,45 @@ export async function generateLogoWithAI(context: BrandLogoContext): Promise<{
   } catch (error: any) {
     console.error("Error generating AI logo:", error);
     return { success: false, newBalance: 0, error: error.message || "Failed to generate logo" };
+  }
+}
+
+/**
+ * Generate Multiple AI Logos (e.g., 3 options)
+ */
+export async function generateMultipleLogosWithAI(
+  context: BrandLogoContext,
+  count: number = 3
+): Promise<{ success: boolean; logoUrls?: string[]; newBalance: number; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    // 1. Deduct 10 coins
+    const deductRes = await deductCoins(10, `יצירת ${count} סמלי לוגו ב-AI`, session.user.id);
+    if (!deductRes.success) {
+      return { success: false, newBalance: deductRes.newBalance, error: deductRes.error };
+    }
+
+    // 2. Build base prompt
+    const prompt = buildLogoPrompt(context);
+    const encodedPrompt = encodeURIComponent(prompt);
+
+    // 3. Generate unique URLs using random seeds
+    const urls: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const seed = Math.floor(Math.random() * 99999999);
+      urls.push(`https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`);
+    }
+
+    return {
+      success: true,
+      logoUrls: urls,
+      newBalance: deductRes.newBalance,
+    };
+  } catch (error: any) {
+    console.error("Error generating multiple AI logos:", error);
+    return { success: false, newBalance: 0, error: error.message || "Failed to generate logos" };
   }
 }
 
