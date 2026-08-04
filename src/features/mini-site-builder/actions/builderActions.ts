@@ -516,41 +516,132 @@ export async function generateLogoWithAI(context: BrandLogoContext): Promise<{
 }
 
 /**
- * Generate Multiple AI Logos (e.g., 3 options)
+ * Generate Single AI Logo with Feedback
  */
-export async function generateMultipleLogosWithAI(
+export async function generateSingleLogoWithFeedback(
   context: BrandLogoContext,
-  count: number = 3
-): Promise<{ success: boolean; logoUrls?: string[]; newBalance: number; error?: string }> {
+  previousInteractionId?: string,
+  userFeedback?: string,
+  previousSeed?: number
+): Promise<{ success: boolean; logoUrl?: string; prompt?: string; explanation?: string; seed?: number; interactionId?: string; newBalance: number; error?: string }> {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    // 1. Deduct 10 coins
-    const deductRes = await deductCoins(10, `יצירת ${count} סמלי לוגו ב-AI`, session.user.id);
-    if (!deductRes.success) {
-      return { success: false, newBalance: deductRes.newBalance, error: deductRes.error };
+    let newBalance = 0;
+    // Only deduct coins if this is the first generation (no previous interaction ID)
+    if (!previousInteractionId) {
+      const deductRes = await deductCoins(10, `יצירת סמל לוגו ב-AI`, session.user.id);
+      if (!deductRes.success) {
+        return { success: false, newBalance: deductRes.newBalance, error: deductRes.error };
+      }
+      newBalance = deductRes.newBalance;
+    } else {
+      // Free revision, just get the current balance
+      newBalance = (await getUserCoins(session.user.id)).coins;
     }
 
-    // 2. Build base prompt
-    const prompt = buildLogoPrompt(context);
-    const encodedPrompt = encodeURIComponent(prompt);
-
-    // 3. Generate unique URLs using random seeds
-    const urls: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const seed = Math.floor(Math.random() * 99999999);
-      urls.push(`https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`);
+    let apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    
+    if (!apiKey) {
+      try {
+        const userDoc = await adminDb.collection("users").doc(session.user.id).get();
+        const userData = userDoc.data();
+        
+        if (userData?.useAdminGoogleAi) {
+          const globalDoc = await adminDb.collection("configs").doc("global").get();
+          apiKey = globalDoc.data()?.googleAiKey || "";
+        } else if (userData?.googleAiKey) {
+          apiKey = userData.googleAiKey;
+        } else {
+          const docSnap = await adminDb.collection("users").doc(session.user.id).collection("settings").doc("ai").get();
+          apiKey = docSnap.data()?.googleAiKey || "";
+        }
+      } catch (e) {
+        console.error("Error fetching AI key inline:", e);
+      }
     }
+
+    if (!apiKey) throw new Error("לא מוגדר מפתח API של Gemini במערכת (Settings -> AI). אנא הגדר מפתח כדי להמשיך.");
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey });
+
+    let sysInstruction = `You are an expert branding designer.
+Your task is to output a JSON object with exactly two string fields:
+1. "prompt": A highly optimized, English visual prompt for an AI image generator (like Midjourney/Pollinations). The prompt must describe a minimalist, flat vector, branding icon/logo, no text, clean background.
+2. "explanation": A persuasive Hebrew explanation (2-3 sentences) explaining why this logo perfectly matches the brand's vision and goals.
+`;
+    
+    let userMsg = `Company Name: ${context.companyName}
+Slogan: ${context.slogan || ""}
+Vision: ${context.companyVision || ""}
+Problem Solved: ${context.businessProblem || ""}`;
+
+    if (previousInteractionId && userFeedback) {
+      sysInstruction += `\nThe user wants to REVISE the previous logo. Modify the previous prompt to reflect the user's feedback while keeping the core identity intact. Update the Hebrew explanation to explain the changes.`;
+      userMsg = `User Feedback/Changes Requested: ${userFeedback}`;
+    }
+
+    let response;
+    try {
+      response = await ai.interactions.create({
+        model: "gemini-3.6-flash",
+        input: userMsg,
+        config: {
+          systemInstruction: sysInstruction,
+          responseMimeType: "application/json",
+          ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
+        }
+      });
+    } catch (e: any) {
+      if (e.message?.includes("interactions.create is not a function") || e.message?.includes("Cannot read properties of undefined (reading 'create')") || e.message?.includes("Unknown parameter")) {
+        // Fallback to generateContent
+        response = await ai.models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: userMsg,
+          config: {
+            systemInstruction: sysInstruction,
+            responseMimeType: "application/json",
+          }
+        });
+      } else {
+        throw e;
+      }
+    }
+
+    const resText = response.text || (response.response?.text && response.response.text()) || "";
+    const interactionId = response.id || response.interactionId || previousInteractionId || "";
+    
+    let parsed: { prompt: string; explanation: string };
+    try {
+      parsed = JSON.parse(resText);
+    } catch (e) {
+      // Try to clean markdown code blocks
+      const cleaned = resText.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    }
+
+    // 3. Generate Image using Pollinations
+    const seed = previousSeed || Math.floor(Math.random() * 99999999);
+    const encodedPrompt = encodeURIComponent(parsed.prompt);
+    const logoUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`;
 
     return {
       success: true,
-      logoUrls: urls,
-      newBalance: deductRes.newBalance,
+      logoUrl,
+      prompt: parsed.prompt,
+      explanation: parsed.explanation,
+      seed,
+      interactionId,
+      newBalance,
     };
   } catch (error: any) {
-    console.error("Error generating multiple AI logos:", error);
-    return { success: false, newBalance: 0, error: error.message || "Failed to generate logos" };
+    console.error("Error generating single AI logo:", error);
+    try {
+      require("fs").appendFileSync("error_log.txt", "\\n" + new Date().toISOString() + " Error generating single AI logo: " + (error.stack || error.message || JSON.stringify(error)));
+    } catch(e){}
+    return { success: false, newBalance: 0, error: error.stack ? error.stack.substring(0, 100) : (error.message || "Failed to generate logo") };
   }
 }
 

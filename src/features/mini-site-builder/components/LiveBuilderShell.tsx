@@ -32,7 +32,7 @@ import {
   createServicePageWithAI,
   generateRichVisionAndInsightsWithAI,
   PersonaCard,
-  generateMultipleLogosWithAI
+  generateSingleLogoWithFeedback
 } from "../actions/builderActions";
 import { uploadMediaFile } from "@/features/media/actions";
 
@@ -95,8 +95,13 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
   const [siteSlug, setSiteSlug] = useState(initialState?.siteSlug || "");
 
   // New Logo Flow States
-  const [logoFlowState, setLogoFlowState] = useState<"ask_has_logo" | "ask_generate" | "generating" | "choosing" | "done">("ask_has_logo");
-  const [generatedLogos, setGeneratedLogos] = useState<string[]>([]);
+  const [logoFlowState, setLogoFlowState] = useState<"ask_has_logo" | "ask_generate" | "generating" | "review" | "done">("ask_has_logo");
+  const [logoExplanation, setLogoExplanation] = useState<string>("");
+  const [logoPrompt, setLogoPrompt] = useState<string>("");
+  const [logoInteractionId, setLogoInteractionId] = useState<string>("");
+  const [logoSeed, setLogoSeed] = useState<number | undefined>(undefined);
+  const [logoRevisionsLeft, setLogoRevisionsLeft] = useState(3);
+  const [logoRevisionFeedback, setLogoRevisionFeedback] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -377,40 +382,54 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
     }
   };
 
-  const handleGenerateLogosGrid = async () => {
+  const handleGenerateSingleLogo = async (isRevision: boolean = false) => {
+    if (isRevision && !logoRevisionFeedback.trim()) return;
+    
     setLoading(true);
     setLogoFlowState("generating");
     try {
-      addUserMessage("כן, אשמח מאוד לייצר 3 סמלים ב-10 מטבעות.");
-      const res = await generateMultipleLogosWithAI({
-        companyName: state.companyName || "חברה",
-        slogan: state.slogan,
-        businessProblem: state.pitchProblem,
-        companyVision: state.companyVision,
-        services: state.servicePages?.map(s => s.title),
-      }, 3);
-
-      if (res.success && res.logoUrls) {
-        setCoins(res.newBalance);
-        setGeneratedLogos(res.logoUrls);
-        setLogoFlowState("choosing");
-        addAgentMessageWithTyping(`נהדר, יצרתי 3 סמלים. לחץ על זה שהכי אהבת:`, true, 500);
+      if (isRevision) {
+        addUserMessage(`אבקש לתקן את הסמל: ${logoRevisionFeedback}`);
       } else {
-        setLogoFlowState("ask_generate");
+        addUserMessage("כן, אשמח מאוד לייצר סמל ב-10 מטבעות.");
+      }
+
+      const res = await generateSingleLogoWithFeedback(
+        {
+          companyName: state.companyName || "חברה",
+          slogan: state.slogan,
+          businessProblem: state.pitchProblem,
+          companyVision: state.companyVision,
+          services: state.servicePages?.map(s => s.title),
+        },
+        isRevision ? logoInteractionId : undefined,
+        isRevision ? logoRevisionFeedback : undefined,
+        isRevision ? logoSeed : undefined
+      );
+
+      if (res.success && res.logoUrl) {
+        setCoins(res.newBalance);
+        setState((prev) => ({ ...prev, logoUrl: res.logoUrl }));
+        setLogoPrompt(res.prompt || "");
+        setLogoExplanation(res.explanation || "");
+        if (res.interactionId) setLogoInteractionId(res.interactionId);
+        setLogoSeed(res.seed);
+        setLogoFlowState("review");
+        setLogoRevisionFeedback("");
+        if (isRevision) {
+          setLogoRevisionsLeft(prev => Math.max(0, prev - 1));
+          addAgentMessageWithTyping(`ביצעתי את התיקונים שביקשת! הנה הסמל החדש (נשארו ${logoRevisionsLeft - 1} תיקונים)`, true, 500);
+        } else {
+          addAgentMessageWithTyping(`הסמל מוכן! הנה הסבר קצר על הבחירה העיצובית:`, true, 500);
+        }
+      } else {
+        setLogoFlowState(isRevision ? "review" : "ask_generate");
         addUserMessage(`[שגיאה בחולל הלוגו: ${res.error || "תקלה לא ידועה"}]`);
-        addAgentMessageWithTyping(`מצטער, הייתה בעיה ביצירת הסמלים. נסה שוב.`, false, 500);
+        addAgentMessageWithTyping(`מצטער, הייתה בעיה ביצירת הסמל. נסה שוב.`, false, 500);
       }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelectGridLogo = async (url: string) => {
-    setState(prev => ({ ...prev, logoUrl: url }));
-    saveBuilderProgress({ logoUrl: url });
-    addUserMessage("בחרתי את הסמל הזה.");
-    addAgentMessageWithTyping("בחירה מצוינת! הסמל עודכן. אפשר להמשיך.", true, 400);
-    setLogoFlowState("done");
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -774,7 +793,7 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
                   onClick={() => {
                     addUserMessage("לא, אין לי סמל");
                     setLogoFlowState("ask_generate");
-                    addAgentMessageWithTyping("התרצה שנייצר לך 3 דוגמאות ללוגו במחיר של 10 מטבעות?", true, 500);
+                    addAgentMessageWithTyping("התרצה שנייצר לך סמל לוגו מקצועי ב-AI (כולל הסבר שיווקי) במחיר של 10 מטבעות?", true, 500);
                   }}
                   disabled={loading}
                   className="flex-1 py-3 bg-indigo-900/60 hover:bg-indigo-800 text-white font-bold rounded-xl text-sm transition"
@@ -788,7 +807,7 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
             {logoFlowState === "ask_generate" && (
               <div className="flex gap-2">
                 <button
-                  onClick={handleGenerateLogosGrid}
+                  onClick={() => handleGenerateSingleLogo(false)}
                   disabled={loading}
                   className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition shadow-lg disabled:opacity-50"
                 >
@@ -813,35 +832,67 @@ export function LiveBuilderShell({ initialCoins, userName, initialState }: LiveB
             {logoFlowState === "generating" && (
               <div className="py-6 text-center text-indigo-300">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-indigo-500" />
-                <p className="text-sm font-bold animate-pulse">ה-AI יוצר עבורך 3 סמלים מיוחדים...</p>
+                <p className="text-sm font-bold animate-pulse">ה-AI מגבש את החזון שלך לכדי סמל...</p>
               </div>
             )}
 
-            {/* State: choosing */}
-            {logoFlowState === "choosing" && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2 bg-black/40 p-3 rounded-2xl border border-white/10">
-                  {generatedLogos.map((url, idx) => (
-                    <div 
-                      key={idx}
-                      onClick={() => handleSelectGridLogo(url)}
-                      className="relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-indigo-500 transition shadow-lg group"
-                    >
-                      <img src={url} alt={`Option ${idx + 1}`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                        <span className="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">בחר מזה</span>
-                      </div>
+            {/* State: review */}
+            {logoFlowState === "review" && (
+              <div className="space-y-4">
+                <div className="bg-black/40 p-4 rounded-2xl border border-indigo-500/30 text-center">
+                  <div className="relative aspect-square w-48 h-48 mx-auto rounded-xl overflow-hidden mb-4 shadow-lg border-2 border-indigo-500">
+                    {state.logoUrl ? (
+                      <img src={state.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-800 animate-pulse" />
+                    )}
+                  </div>
+                  {logoExplanation && (
+                    <div className="text-right bg-indigo-900/30 p-3 rounded-xl border border-indigo-500/20 mb-4">
+                      <p className="text-xs text-indigo-200 leading-relaxed font-medium" dir="rtl">{logoExplanation}</p>
                     </div>
-                  ))}
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      addUserMessage("אני מאשר את הסמל, בוא נמשיך.");
+                      setLogoFlowState("done");
+                      setCurrentStep(6);
+                    }}
+                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-sm transition shadow-lg mb-4"
+                  >
+                    אני מאשר את הסמל, המשך לשלב הבא
+                  </button>
                 </div>
-                <button
-                  onClick={handleGenerateLogosGrid}
-                  disabled={loading}
-                  className="w-full py-3 border border-indigo-500/50 hover:bg-indigo-900/40 text-indigo-300 font-bold rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                  <span>אף אחד לא מצא חן בעיני, חולל עוד 3 ב-10 מטבעות</span>
-                </button>
+
+                {logoRevisionsLeft > 0 ? (
+                  <div className="pt-2 border-t border-white/10 space-y-2">
+                    <p className="text-xs text-indigo-300 text-right">
+                      מעדיף כיוון אחר? כתוב מה תרצה לשנות (נותרו {logoRevisionsLeft} תיקונים):
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={logoRevisionFeedback}
+                        onChange={(e) => setLogoRevisionFeedback(e.target.value)}
+                        placeholder="לדוגמה: הוסף אלמנט מעגלי, שנה לצבעים חמים..."
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white"
+                      />
+                      <button
+                        onClick={() => handleGenerateSingleLogo(true)}
+                        disabled={loading || !logoRevisionFeedback.trim()}
+                        className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shrink-0 disabled:opacity-50 flex items-center gap-1"
+                      >
+                        <Wand2 className="w-3 h-3" />
+                        עדכן
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-pink-400 text-center font-bold">
+                    ניצלת את כל 3 סבבי התיקונים.
+                  </p>
+                )}
               </div>
             )}
 
