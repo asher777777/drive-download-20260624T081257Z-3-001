@@ -95,7 +95,7 @@ export async function generateSmartGoals(input: { text?: string; fileBase64?: st
     const result = await model.generateContent({
       contents: [{ role: "user", parts: contents.map(c => typeof c === 'string' ? { text: c } : c) }],
       generationConfig: {
-        responseMimeType: "application/json"
+        // responseMimeType: "application/json"
       }
     });
 
@@ -172,7 +172,7 @@ ${historicalProjectsContext}
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        responseMimeType: "application/json"
+        // responseMimeType: "application/json"
       }
     });
 
@@ -243,7 +243,7 @@ export async function generateProjectWbs(input: { title: string; smartGoals: Sma
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        responseMimeType: "application/json"
+        // responseMimeType: "application/json"
       }
     });
 
@@ -305,7 +305,7 @@ ${JSON.stringify(tasks, null, 2)}
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        responseMimeType: "application/json"
+        // responseMimeType: "application/json"
       }
     });
 
@@ -457,7 +457,7 @@ ${JSON.stringify(tasks.map(t => ({ title: t.title, cost: t.cost, durationDays: t
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        responseMimeType: "application/json"
+        // responseMimeType: "application/json"
       }
     });
 
@@ -556,7 +556,7 @@ ${JSON.stringify(contactsList.map(c => ({ id: c.id, name: c.conta_name, job_titl
 
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
+        generationConfig: { /* responseMimeType: "application/json" */ }
       });
 
       const responseText = result.response.text();

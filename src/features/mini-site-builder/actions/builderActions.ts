@@ -590,7 +590,7 @@ Problem Solved: ${context.businessProblem || ""}`;
         model: "gemini-3.6-flash",
         input: userMsg,
         system_instruction: sysInstruction,
-        response_mime_type: "application/json",
+        // response_mime_type removed to prevent responseFormat API error
         ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
       });
     } catch (e: any) {
@@ -601,7 +601,7 @@ Problem Solved: ${context.businessProblem || ""}`;
           contents: userMsg,
           config: {
             systemInstruction: sysInstruction,
-            responseMimeType: "application/json",
+            // responseMimeType removed to prevent responseFormat API error
           }
         });
       } else {
@@ -609,16 +609,36 @@ Problem Solved: ${context.businessProblem || ""}`;
       }
     }
 
-    const resText = response.text || (response.response?.text && response.response.text()) || "";
+    let resText = "";
+    if (typeof response.output_text === 'string') {
+      resText = response.output_text;
+    } else if (typeof response.text === 'function') {
+      resText = response.text();
+    } else if (typeof response.text === 'string') {
+      resText = response.text;
+    } else if (response.response && typeof response.response.text === 'function') {
+      resText = response.response.text();
+    } else if (response.response && typeof response.response.text === 'string') {
+      resText = response.response.text;
+    } else if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+      resText = response.candidates[0].content.parts[0].text;
+    }
+    
+    if (typeof resText !== 'string') {
+      resText = String(resText);
+    }
+    
     const interactionId = response.id || response.interactionId || previousInteractionId || "";
     
     let parsed: { prompt: string; explanation: string };
     try {
-      parsed = JSON.parse(resText);
-    } catch (e) {
-      // Try to clean markdown code blocks
-      const cleaned = resText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const jsonMatch = resText.match(/\{[\s\S]*\}/);
+      const cleaned = jsonMatch ? jsonMatch[0] : resText.replace(/```json/g, '').replace(/```/g, '').trim();
       parsed = JSON.parse(cleaned);
+    } catch (e) {
+      console.error("Failed to parse AI JSON:", resText);
+      require("fs").appendFileSync("error_log.txt", "\n[DEBUG] RES_TEXT WAS: " + JSON.stringify(resText) + "\n");
+      throw new Error("המודל החזיר תשובה שאינה בפורמט צפוי. נסה שוב.");
     }
 
     // 3. Generate Image using Pollinations
@@ -627,9 +647,9 @@ Problem Solved: ${context.businessProblem || ""}`;
     const logoUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`;
 
     // 4. Log AI interaction to CRM
-    const usage = response.usageMetadata || (response.response?.usageMetadata);
-    const inputTokens = usage?.promptTokenCount || 0;
-    const outputTokens = usage?.candidatesTokenCount || 0;
+    const usage = response.usageMetadata || response.response?.usageMetadata || response.usage || response.total_usage || response.response?.usage || {};
+    const inputTokens = usage.promptTokenCount || usage.inputTokens || usage.input_tokens || usage.promptTokens || usage.total_input_tokens || 0;
+    const outputTokens = usage.candidatesTokenCount || usage.outputTokens || usage.output_tokens || usage.completionTokens || usage.total_output_tokens || 0;
     
     // Non-blocking log
     logAiInteraction(
