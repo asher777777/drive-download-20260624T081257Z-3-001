@@ -53,20 +53,24 @@ export default async function MosaicDashboardPage() {
            </div>
         </div>
 
-        {/* Row 3: 3 Buttons */}
+        {/* Row 3: Buttons */}
         <div className="flex w-full bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 p-4 md:p-6 rounded-[2rem] shadow-xl">
-          <div className="grid grid-cols-3 gap-4 w-full">
-            <Link href="/dashboard/automations" className="flex flex-col items-center justify-center gap-3 p-5 bg-[#1e293b]/50 border border-slate-700/50 rounded-3xl hover:bg-slate-800 transition-all hover:border-indigo-500/50 group">
-              <Zap className="w-7 h-7 text-slate-300 group-hover:text-white transition-colors" />
-              <span className="text-base font-bold text-slate-200">אוטומציה</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+            <Link href="/dashboard/automations" className="flex flex-col items-center justify-center gap-3 p-4 bg-[#1e293b]/50 border border-slate-700/50 rounded-3xl hover:bg-slate-800 transition-all hover:border-indigo-500/50 group">
+              <Zap className="w-6 h-6 text-slate-300 group-hover:text-white transition-colors" />
+              <span className="text-sm font-bold text-slate-200">אוטומציה</span>
             </Link>
-            <Link href="/dashboard/campaigns" className="flex flex-col items-center justify-center gap-3 p-5 bg-[#1e293b]/50 border border-slate-700/50 rounded-3xl hover:bg-slate-800 transition-all hover:border-indigo-500/50 group">
-              <Mail className="w-7 h-7 text-slate-300 group-hover:text-white transition-colors" />
-              <span className="text-base font-bold text-slate-200">קמפיינים</span>
+            <Link href="/dashboard/campaigns" className="flex flex-col items-center justify-center gap-3 p-4 bg-[#1e293b]/50 border border-slate-700/50 rounded-3xl hover:bg-slate-800 transition-all hover:border-indigo-500/50 group">
+              <Mail className="w-6 h-6 text-slate-300 group-hover:text-white transition-colors" />
+              <span className="text-sm font-bold text-slate-200">קמפיינים</span>
             </Link>
-            <Link href="/dashboard/settings" className="flex flex-col items-center justify-center gap-3 p-5 bg-[#1e293b]/50 border border-slate-700/50 rounded-3xl hover:bg-slate-800 transition-all hover:border-indigo-500/50 group">
-              <Settings className="w-7 h-7 text-slate-300 group-hover:text-white transition-colors" />
-              <span className="text-base font-bold text-slate-200">הגדרות</span>
+            <Link href="/dashboard/settings" className="flex flex-col items-center justify-center gap-3 p-4 bg-[#1e293b]/50 border border-slate-700/50 rounded-3xl hover:bg-slate-800 transition-all hover:border-indigo-500/50 group">
+              <Settings className="w-6 h-6 text-slate-300 group-hover:text-white transition-colors" />
+              <span className="text-sm font-bold text-slate-200">הגדרות</span>
+            </Link>
+            <Link href="/system-map" className="flex flex-col items-center justify-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-3xl hover:bg-amber-500/20 transition-all hover:border-amber-500/60 group">
+              <Sparkles className="w-6 h-6 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-bold text-amber-300">מפת מערכת</span>
             </Link>
           </div>
         </div>

@@ -3,14 +3,16 @@ import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
-
-// The user mistakenly put an OAuth token (starts with AQ.) in GEMINI_API_KEY, which causes "insufficient scopes" errors. 
-// We fallback to the Firebase API key which is valid for Gemini if the API is enabled on the GCP project.
+import fs from "fs";
+import path from "path";
 let geminiKey = process.env.GEMINI_API_KEY;
-if (!geminiKey || geminiKey.startsWith("AQ.")) {
-  geminiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+const aiConfig: any = {};
+if (geminiKey?.startsWith("AQ.")) {
+  aiConfig.httpOptions = { headers: { Authorization: `Bearer ${geminiKey}` } };
+} else {
+  aiConfig.apiKey = geminiKey || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 }
-const ai = new GoogleGenAI({ apiKey: geminiKey });
+const ai = new GoogleGenAI(aiConfig);
 
 // Initialize Google Cloud TTS Client
 let ttsClient: TextToSpeechClient | null = null;
@@ -279,6 +281,7 @@ export async function POST(req: Request) {
     const sessionRef = adminDb.collection("dotty_interviews").doc(dbSessionId);
     let overrideUserText = userText;
     let forceUIComponent = "";
+    let suppressText = false;
     const allRequired = ["introVideo", "promoVideo", "idleVideo", "speakingVideo", "profilePicture", "bodyPicture"];
     const assetHebrewNames: Record<string, string> = {
       introVideo: "סרטון היכרות",
@@ -327,9 +330,40 @@ export async function POST(req: Request) {
            const totalProds = prodsSnap.size;
            const totalRems = remsSnap.size;
 
-           overrideUserText = `SYSTEM INFO: Page loaded. Admin just entered the office. You just scanned the entire database. 
-Stats: ${totalEmps} Total Employees (${missingAssets} missing media assets), ${totalProds} Products, ${totalRems} Reminders, 12 Active Users, 0 Open Bugs.
-Greet the admin organically as their Chief Agent Architect (under 12 words), present the analytics, and output EXACTLY: [UI_COMPONENT:{"type":"AnalyticsCard","data":{"employees":${totalEmps},"missingAssets":${missingAssets},"products":${totalProds},"reminders":${totalRems},"users":12,"bugs":0}}]`;
+           let systemMetrics = { totalFiles: 0, totalAppRoutes: 0, totalFeatures: 0 };
+           try {
+               const { SYSTEM_METRICS } = require("../../system-map/systemMapData");
+               systemMetrics = SYSTEM_METRICS;
+           } catch (e) {}
+
+           let primaryInsight = { 
+               icon: "Activity", 
+               title: "סטטוס ארכיטקטורה", 
+               text: `המערכת מורכבת מ-${totalEmps} סוכנים, ${systemMetrics.totalFiles} קבצי קוד, ו-${systemMetrics.totalAppRoutes} נתיבים ראשיים.` 
+           };
+           let nextInsights = "";
+           let agentInstruction = "";
+           
+           if (missingAssets > 0) {
+               primaryInsight = {
+                   icon: "AlertCircle",
+                   title: "פעולה נדרשת", text: `${missingAssets} סוכנים ממתינים להשלמת נכסי מדיה!`
+               };
+               nextInsights = `1. The system has ${totalEmps} total agents and ${systemMetrics.totalFiles} codebase files.`;
+               agentInstruction = "The first insight card about missing assets is already displayed. Ask the admin if they want to handle the missing media assets now or review the codebase architecture. Keep it under 15 words.";
+           } else {
+               nextInsights = `1. The system has ${totalProds} active products.\n2. The system has ${systemMetrics.totalFiles} files and ${systemMetrics.totalAppRoutes} routes.\n3. The system has 12 active users.`;
+               agentInstruction = "The first insight card about the architecture and agents is already displayed. Ask the admin what they want to focus on today (codebase or agents). Keep it under 12 words.";
+           }
+
+           overrideUserText = `SYSTEM INFO: Page loaded. Admin just entered the office.
+You have the following additional system insights available to show the admin later:
+${nextInsights}
+INSTRUCTIONS: ${agentInstruction}
+DO NOT output any UI components in your text. You will use 'show_insight_card' tool later if the admin asks for more stats.`;
+           
+           forceUIComponent = `[UI_COMPONENT:${JSON.stringify({ type: "InsightCard", data: primaryInsight })}]`;
+           suppressText = false;
        } else if (userRole === "MANAGER") {
            overrideUserText = `SYSTEM INFO: Page loaded. Manager just logged in. Greet them organically (under 8 words).`;
        } else {
@@ -412,6 +446,19 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
 
     // Meta Tools Definition (available to both specific agents and global Dotty/Betty)
     const metaTools: Record<string, any> = {
+      show_insight_card: {
+        name: "show_insight_card",
+        description: "Show a single insight card to the admin. Use this when presenting stats one by one.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            title: { type: "STRING" },
+            text: { type: "STRING" },
+            icon: { type: "STRING", description: "Users, AlertCircle, Activity, Bug, or Info" }
+          },
+          required: ["title", "text", "icon"]
+        }
+      },
       scan_website: {
         name: "scan_website",
         description:
@@ -431,6 +478,16 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
         name: "save_agreed_answer",
         description: "Save a specific, pre-agreed answer to a specific question as dictated by your boss. This acts as a fast semantic cache.",
         parameters: { type: "OBJECT", properties: { question: { type: "STRING" }, answer: { type: "STRING" } }, required: ["question", "answer"] },
+      },
+      read_file: {
+        name: "read_file",
+        description: "Read the contents of a file from the server's local file system. Use this to inspect the source code of the project (e.g. src/app/system-map/systemMapData.ts).",
+        parameters: { type: "OBJECT", properties: { filepath: { type: "STRING" } }, required: ["filepath"] },
+      },
+      write_file: {
+        name: "write_file",
+        description: "Write or overwrite a file on the server's local file system. Use this to update the source code.",
+        parameters: { type: "OBJECT", properties: { filepath: { type: "STRING" }, content: { type: "STRING" } }, required: ["filepath", "content"] },
       },
       define_agent_capability: {
         name: "define_agent_capability",
@@ -529,6 +586,31 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
           },
         },
       },
+      request_media_upload: {
+        name: "request_media_upload",
+        description: "Request the user to upload a file (image, pdf, video) to the system. Call this when a system function parameter explicitly requires a file upload.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            assetType: { type: "STRING", description: "The internal key/type for this file, e.g., 'invoice_document', 'profile_picture'" },
+            title: { type: "STRING", description: "A user-facing title for the upload box, e.g., 'העלאת חשבונית'" }
+          },
+          required: ["assetType", "title"]
+        }
+      },
+      execute_system_function: {
+        name: "execute_system_function",
+        description: "Executes a dynamic backend function from the system map. ONLY call this after you have collected ALL required parameters for the function from the user, one by one.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            functionName: { type: "STRING", description: "The name of the function to execute (e.g. 'createInvoice')" },
+            actionFile: { type: "STRING", description: "The path to the file where the function is located (from the system map)" },
+            params: { type: "STRING", description: "A JSON string representation of the parameters object collected from the user to pass to the function" }
+          },
+          required: ["functionName", "actionFile", "params"]
+        }
+      },
     };
 
     let systemInstruction = "";
@@ -582,8 +664,25 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
         const assignedTools: string[] = currentAgentData.tools || [];
 
         if (userRole === "MASTER_ADMIN") {
+          let systemMapContext = "";
+          try {
+             const { APP_ROUTES, API_ROUTES, SYSTEM_METRICS, FEATURE_MODULES } = require("../../system-map/systemMapData");
+             systemMapContext = `\n\n--- CURRENT SYSTEM MAP ---\n` +
+             `Metrics: ${JSON.stringify(SYSTEM_METRICS)}\n` +
+             `App Routes: ${JSON.stringify(APP_ROUTES.map((r: any) => ({ path: r.path, components: r.components, file: r.file })))}\n` +
+             `API Routes: ${JSON.stringify(API_ROUTES.map((r: any) => ({ endpoint: r.endpoint, method: r.method, file: r.file })))}\n` +
+             `Features: ${JSON.stringify(FEATURE_MODULES.map((r: any) => ({ name: r.name, folder: r.folder })))}\n` +
+             `--------------------------\n`;
+          } catch (e) {
+             console.error("Could not load systemMapData", e);
+          }
+
           systemInstruction = `You are ${currentAgentData.name}, the ${currentAgentData.role}. You are currently in TRAINING MODE with your creator/system-admin. Your creator is setting up your specific knowledge base, persona, and technical tools. Introduce yourself politely and ask what you need to learn today. When you configure a new tool for yourself (using define_agent_capability, save_knowledge, etc.), you MUST ask the admin if they want to allow the MANAGER (client) and/or END_USER to use these tools as well. 
           When using the generate_image tool, it will return an image URL. You MUST output EXACTLY this string in your reply to show the image: [UI_COMPONENT:{"type":"ImageCard","data":{"url":"<THE_URL_RETURNED_BY_TOOL>","prompt":"<YOUR_PROMPT>"}}]
+          
+          DYNAMIC FUNCTION EXECUTION: If the user asks to execute an action (like create an invoice, add a contact, etc), check the [SYSTEM LOCAL SEARCH RESULTS] below to find the function signature. If any arguments are missing, DO NOT ask for them all at once. Ask the user for them ONE BY ONE. If a parameter implies a file or document (like invoice_file, pdf, image), use the request_media_upload tool to get it. ONCE you have collected ALL required parameters, use the execute_system_function tool.
+
+          To understand the architecture and files of this project in detail, you can use read_file on src/app/system-map/systemMapData.ts. However, here is a high-level overview of the system:${systemMapContext}
           KEEP RESPONSES SHORT.`;
           customDeclarations.push(
             metaTools.scan_website,
@@ -593,7 +692,11 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             metaTools.update_agent_voice,
             metaTools.generate_image,
             metaTools.build_form,
-            metaTools.pull_customer_conversations
+            metaTools.pull_customer_conversations,
+            metaTools.request_media_upload,
+            metaTools.execute_system_function,
+            metaTools.read_file,
+            metaTools.write_file
           );
         } else if (userRole === "MANAGER") {
           systemInstruction = `You are ${currentAgentData.name}, the ${currentAgentData.role}. You are currently talking to your MANAGER (the business owner who hired you). Your goal is to help your manager run their business, answer their questions, and assist them using your assigned tools: ${assignedTools.join(", ")}. Do NOT ask to be trained, you are already hired. KEEP RESPONSES SHORT.`;
@@ -752,6 +855,51 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
       }
     }
 
+    if (!semanticCacheHit && userRole === "MASTER_ADMIN" && overrideUserText && !overrideUserText.startsWith("[")) {
+      try {
+        const { APP_ROUTES, API_ROUTES, FEATURE_MODULES, CORE_LIBS } = require("../../system-map/systemMapData");
+        const queryTerms = overrideUserText.toLowerCase().split(/[\s?.,!]+/).filter((w: string) => w.length > 2);
+        
+        if (queryTerms.length > 0) {
+          const matchedItems: any[] = [];
+          const searchIn = (items: any[], type: string) => {
+            if (!items) return;
+            for (const item of items) {
+              const searchableStr = JSON.stringify(item).toLowerCase();
+              const score = queryTerms.filter((term: string) => searchableStr.includes(term)).length;
+              if (score > 0) {
+                matchedItems.push({ type, score, data: item });
+              }
+            }
+          };
+
+          searchIn(APP_ROUTES, "AppRoute");
+          searchIn(API_ROUTES, "API");
+          searchIn(FEATURE_MODULES, "FeatureModule");
+          searchIn(CORE_LIBS, "Library");
+
+          if (matchedItems.length > 0) {
+            matchedItems.sort((a, b) => b.score - a.score);
+            const topMatches = matchedItems.slice(0, 3);
+            
+            let searchContext = "\n\n[SYSTEM LOCAL SEARCH RESULTS - Use these to answer the user or write code if relevant]:\n";
+            topMatches.forEach(m => {
+              searchContext += `- ${m.type} Match: ${m.data.title || m.data.name || m.data.endpoint || m.data.path} | Path: ${m.data.file || m.data.folder || m.data.path}\n`;
+              if (m.data.description) searchContext += `  Description: ${m.data.description}\n`;
+              if (m.data.components) searchContext += `  Components: ${m.data.components.join(", ")}\n`;
+              if (m.data.functions) {
+                  searchContext += `  Functions: ${m.data.functions.map((f:any) => typeof f === 'string' ? f : f.name).join(", ")}\n`;
+              }
+            });
+            
+            overrideUserText += searchContext;
+          }
+        }
+      } catch (err) {
+        console.error("Local RAG search error:", err);
+      }
+    }
+
     const messages: any[] = [];
     let requestPayload: any = null;
 
@@ -775,14 +923,23 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
       
       messages.push({ role: "user", parts: [{ text: overrideUserText || "Hello" }] });
 
+      let interactionsTools: any[] = [];
+      if (toolsConfig && toolsConfig.length > 0 && toolsConfig[0].functionDeclarations) {
+        interactionsTools = toolsConfig[0].functionDeclarations.map((decl: any) => ({
+          type: "function",
+          ...decl,
+        }));
+      } else if (toolsConfig && toolsConfig.length > 0) {
+        interactionsTools = toolsConfig;
+      }
+
       requestPayload = {
         model: "gemini-3.5-flash",
-        contents: messages,
-        config: {
-          systemInstruction,
-          ...(toolsConfig && toolsConfig.length > 0 ? { tools: toolsConfig } : {}),
-        },
+        input: overrideUserText || "Hello",
+        system_instruction: systemInstruction,
+        ...(interactionsTools.length > 0 ? { tools: interactionsTools } : {}),
       };
+      
       if (resolvedInteractionId) {
         requestPayload.previous_interaction_id = resolvedInteractionId;
       }
@@ -1067,6 +1224,7 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             if (url) {
                const isVideo = url.startsWith("data:video/") || url.includes(".mp4") || url.includes(".webm") || url.includes(".mov");
                forceUIComponent = `[UI_COMPONENT:{"type":"VideoPlayerCard","data":{"url":"${url}","isVideo":${isVideo}}}]`;
+               suppressText = true;
                toolResponsePayload = { success: true, message: "Asset UI generated and displayed to user." };
             } else {
                toolResponsePayload = { success: false, message: "Asset not found for this agent." };
@@ -1116,6 +1274,7 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             
             if (profilePicture && promoVideo) {
                forceUIComponent = `[UI_COMPONENT:{"type":"PromoCard","data":{"name":"${data.name || agentName || 'Agent'}","role":"${data.role || ''}","profilePicture":"${profilePicture}","videoUrl":"${promoVideo}"}}]`;
+               suppressText = true;
                toolResponsePayload = { success: true, message: "Promo card displayed." };
             } else {
                toolResponsePayload = { success: false, message: "Agent is missing profile picture or video." };
@@ -1128,9 +1287,18 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             try {
               // 1. Generate Vector
               let vector = null;
-              const embedResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`, {
+              const embedUrl = process.env.GEMINI_API_KEY?.startsWith("AQ.") 
+                  ? `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent` 
+                  : `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`;
+                  
+              const embedHeaders: any = { "Content-Type": "application/json" };
+              if (process.env.GEMINI_API_KEY?.startsWith("AQ.")) {
+                  embedHeaders["Authorization"] = `Bearer ${process.env.GEMINI_API_KEY}`;
+              }
+              
+              const embedResponse = await fetch(embedUrl, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: embedHeaders,
                 body: JSON.stringify({
                   model: "models/text-embedding-004",
                   content: { parts: [{ text: funcCall.args.question }] }
@@ -1178,6 +1346,11 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
           } else {
             toolResponsePayload = { success: false, message: "agentId missing." };
           }
+        } else if (funcCall.name === "show_insight_card") {
+          const { title, text, icon } = funcCall.args;
+          forceUIComponent = `[UI_COMPONENT:${JSON.stringify({ type: "InsightCard", data: { title, text, icon, color: "#4ade80" } })}]`;
+          suppressText = false;
+          toolResponsePayload = { success: true, message: "Card displayed." };
         } else if (funcCall.name === "define_agent_capability") {
           if (agentId) {
             await adminDb
@@ -1239,6 +1412,53 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
           } else {
             toolResponsePayload = { success: false, message: "agentId missing." };
           }
+        } else if (funcCall.name === "read_file") {
+          try {
+            const targetPath = path.resolve(process.cwd(), funcCall.args.filepath);
+            if (!targetPath.startsWith(process.cwd())) {
+              toolResponsePayload = { success: false, message: "Access denied. Cannot read outside project directory." };
+            } else {
+              const content = fs.readFileSync(targetPath, "utf8");
+              toolResponsePayload = { success: true, content: content };
+            }
+          } catch (e: any) {
+            toolResponsePayload = { success: false, message: e.message };
+          }
+        } else if (funcCall.name === "write_file") {
+          try {
+            const targetPath = path.resolve(process.cwd(), funcCall.args.filepath);
+            if (!targetPath.startsWith(process.cwd())) {
+              toolResponsePayload = { success: false, message: "Access denied. Cannot write outside project directory." };
+            } else {
+              fs.writeFileSync(targetPath, funcCall.args.content, "utf8");
+              toolResponsePayload = { success: true, message: `Successfully wrote to ${funcCall.args.filepath}` };
+            }
+          } catch (e: any) {
+            toolResponsePayload = { success: false, message: e.message };
+          }
+        } else if (funcCall.name === "request_media_upload") {
+           forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"${funcCall.args.title}","assetType":"${funcCall.args.assetType}"}}]`;
+           suppressText = false;
+           toolResponsePayload = { success: true, message: "Upload UI displayed to user. Waiting for them to upload." };
+        } else if (funcCall.name === "execute_system_function") {
+           try {
+             const reqUrl = req.url ? new URL(req.url).origin : "http://localhost:3000";
+             const res = await fetch(`${reqUrl}/api/system-map/execute`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "action",
+                  functionName: funcCall.args.functionName,
+                  actionFile: funcCall.args.actionFile,
+                  params: typeof funcCall.args.params === "string" ? JSON.parse(funcCall.args.params) : funcCall.args.params,
+                  userId: finalUserId
+                })
+             });
+             const data = await res.json();
+             toolResponsePayload = { success: res.ok, result: data };
+           } catch (e: any) {
+             toolResponsePayload = { success: false, message: e.message };
+           }
         } else {
           // If it's none of the hardcoded system tools, it must be a custom dynamic capability!
           // We will save the collected data into the `collected_data` table for this agent.
@@ -1263,31 +1483,31 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
       }
 
       if (modelCallType === "interactions") {
+        let interactionsTools: any[] = [];
+        if (toolsConfig && toolsConfig.length > 0 && toolsConfig[0].functionDeclarations) {
+          interactionsTools = toolsConfig[0].functionDeclarations.map((decl: any) => ({
+            type: "function",
+            ...decl,
+          }));
+        } else if (toolsConfig && toolsConfig.length > 0) {
+          interactionsTools = toolsConfig;
+        }
+
         return await (ai.interactions as any).create({
           model: "gemini-3.5-flash",
           previous_interaction_id:
             prevResult.interactionId ||
             prevResult.id ||
             previous_interaction_id,
-          contents: [
+          functionResponses: [
             {
-              role: "tool",
-              parts: [
-                {
-                  functionResponse: {
-                    name: funcResponseName,
-                    response: toolResponsePayload,
-                  },
-                },
-              ],
+              id: funcCall.id || funcCall.name,
+              name: funcResponseName,
+              response: toolResponsePayload,
             },
           ],
-          config: {
-            systemInstruction,
-            ...(toolsConfig && toolsConfig.length > 0
-              ? { tools: toolsConfig }
-              : {}),
-          },
+          system_instruction: systemInstruction,
+          ...(interactionsTools && interactionsTools.length > 0 ? { tools: interactionsTools } : {}),
         });
       } else {
         if (prevResult.candidates && prevResult.candidates[0].content) {
@@ -1330,59 +1550,34 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             );
           }
 
-          assistantMessage = result.text || "I don't know what to say.";
+          let resText = "";
+          if (typeof result.output_text === 'string') {
+            resText = result.output_text;
+          } else if (typeof result.text === 'function') {
+            resText = result.text();
+          } else if (typeof result.text === 'string') {
+            resText = result.text;
+          } else if (result.response && typeof result.response.text === 'function') {
+            resText = result.response.text();
+          } else if (result.response && typeof result.response.text === 'string') {
+            resText = result.response.text;
+          } else if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+            resText = result.candidates[0].content.parts[0].text;
+          }
+          
+          if (typeof resText !== 'string') {
+            resText = String(resText || "");
+          }
+
+          assistantMessage = resText || "I don't know what to say.";
           newInteractionId =
             result.interactionId || result.id || previous_interaction_id;
         } else {
-          throw new Error("Interactions API not found on SDK, falling back");
+          throw new Error("Interactions API not found on SDK");
         }
       } catch (apiError: any) {
-        console.warn(
-          "Falling back to standard generateContent:",
-          apiError.message,
-        );
-
-        const historySnap = await sessionRef
-          .collection("messages")
-          .orderBy("createdAt", "asc")
-          .get();
-        const historyContents: any[] = [];
-        historySnap.forEach((doc) => {
-          const msg = doc.data();
-          historyContents.push({
-            role: msg.role === "agent" ? "model" : "user",
-            parts: [{ text: msg.text }],
-          });
-        });
-        historyContents.push({
-          role: "user",
-          parts: [{ text: userText || "Hello" }],
-        });
-
-        let fallbackResult = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: historyContents,
-          config: {
-            systemInstruction,
-            ...(toolsConfig && toolsConfig.length > 0
-              ? { tools: toolsConfig }
-              : {}),
-          },
-        });
-
-        if (
-          fallbackResult.functionCalls &&
-          fallbackResult.functionCalls.length > 0
-        ) {
-          fallbackResult = await executeTool(
-            fallbackResult.functionCalls[0],
-            "generateContent",
-            fallbackResult,
-            historyContents,
-          );
-        }
-        assistantMessage =
-          fallbackResult.text || "Hello. How can I assist you today?";
+        console.error("Interactions API failed:", apiError.message);
+        throw apiError;
       }
 
       if (ttsClient && assistantMessage) {

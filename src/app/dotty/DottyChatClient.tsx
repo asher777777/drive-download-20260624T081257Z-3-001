@@ -541,6 +541,27 @@ function InteractiveMultiSelect({
   );
 }
 
+function InsightCard({ ui, onAction }: { ui: any; onAction: (text: string) => void }) {
+  const data = ui.data;
+  const IconCmp = data.icon === "Users" ? Users : data.icon === "AlertCircle" ? AlertCircle : data.icon === "Activity" ? Activity : data.icon === "Bug" ? Bug : Info;
+
+  return (
+    <div style={{ 
+      width: "100%", maxWidth: "400px", margin: "0 auto", padding: "30px 20px", 
+      background: "rgba(10,10,10,0.8)", border: "1px solid rgba(212, 175, 55, 0.4)", 
+      borderRadius: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", color: "#fff", 
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      textAlign: "center"
+    }}>
+      <div style={{ color: data.color || "#D4AF37", marginBottom: "15px" }}>
+        <IconCmp size={40} />
+      </div>
+      <h2 style={{ fontSize: "1.4rem", marginBottom: "10px", fontWeight: "bold" }}>{data.title}</h2>
+      <p style={{ fontSize: "1.1rem", color: "#ccc", margin: 0 }}>{data.text}</p>
+    </div>
+  );
+}
+
 const GenerativeRenderer = ({
   ui,
   onAction,
@@ -671,48 +692,10 @@ const GenerativeRenderer = ({
     );
   }
 
-  if (ui.type === "AnalyticsCard") {
-    return (
-      <div style={{ width: "100%", maxWidth: "600px", margin: "0 auto", padding: "20px", background: "rgba(10,10,10,0.8)", border: "1px solid rgba(212, 175, 55, 0.4)", borderRadius: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", color: "#fff", display: "flex", flexDirection: "column", gap: "20px" }}>
-        <h2 style={{ textAlign: "center", color: "#D4AF37", fontSize: "1.4rem", marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}><Activity size={24} /> סקירת מערכת כוללת</h2>
-        
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "15px" }}>
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
-            <div style={{ color: "#D4AF37", marginBottom: "8px" }}><Users size={28} style={{ margin: "0 auto" }} /></div>
-            <div style={{ fontSize: "1.8rem", fontWeight: "bold" }}>{ui.data.employees}</div>
-            <div style={{ fontSize: "0.9rem", color: "#aaa" }}>סוכנים פעילים</div>
-          </div>
-          
-          <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center" }}>
-            <div style={{ color: "#f59e0b", marginBottom: "8px" }}><AlertCircle size={28} style={{ margin: "0 auto" }} /></div>
-            <div style={{ fontSize: "1.8rem", fontWeight: "bold", color: "#f59e0b" }}>{ui.data.missingAssets}</div>
-            <div style={{ fontSize: "0.9rem", color: "#f59e0b" }}>ממתינים להשלמה</div>
-          </div>
-          
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
-            <div style={{ color: "#4ade80", marginBottom: "8px" }}><Activity size={28} style={{ margin: "0 auto" }} /></div>
-            <div style={{ fontSize: "1.8rem", fontWeight: "bold" }}>{ui.data.users}</div>
-            <div style={{ fontSize: "0.9rem", color: "#aaa" }}>כניסות משתמשים</div>
-          </div>
-          
-          <div style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
-            <div style={{ color: "#f87171", marginBottom: "8px" }}><Bug size={28} style={{ margin: "0 auto" }} /></div>
-            <div style={{ fontSize: "1.8rem", fontWeight: "bold" }}>{ui.data.bugs}</div>
-            <div style={{ fontSize: "0.9rem", color: "#aaa" }}>באגים פתוחים</div>
-          </div>
-        </div>
-
-        {ui.data.missingAssets > 0 && (
-          <button 
-            onClick={() => onAction("אני רוצה להשלים את ההגדרות של הסוכנים")} 
-            style={{ padding: "12px 24px", background: "linear-gradient(135deg, #D4AF37 0%, #aa8529 100%)", color: "#000", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "1.1rem", marginTop: "10px" }}
-          >
-            טיפול בסוכנים חסרים
-          </button>
-        )}
-      </div>
-    );
+  if (ui.type === "InsightCard") {
+    return <InsightCard ui={ui} onAction={onAction} />;
   }
+
 
   if (ui.type === "PromoCard") {
     return <PromoCard ui={ui} />;
