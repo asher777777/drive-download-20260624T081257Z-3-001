@@ -20,7 +20,8 @@ import {
   Bug,
   Users,
   AlertCircle,
-  Video
+  Video,
+  Volume2
 } from "lucide-react";
 
 const AgentCardUI = ({
@@ -84,6 +85,7 @@ const AgentCardUI = ({
 };
 
 const MediaUploadCard = ({
+  title,
   assetType,
   onAction,
 }: {
@@ -92,57 +94,139 @@ const MediaUploadCard = ({
   onAction: (text: string, mediaData: string) => void;
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [driveLink, setDriveLink] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onAction(`[UPLOAD_ASSET] ${assetType || "media"}`, reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      if (file.size > 2 * 1024 * 1024) {
+        // If file is > 2MB, use a signed URL to upload directly to GCS
+        try {
+          setIsUploading(true);
+          setProgress(10); // Indicate starting
+          
+          // 1. Get Signed URL from our backend
+          const res = await fetch("/api/upload-url", {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({ fileName: file.name, contentType: file.type })
+          });
+          
+          if (!res.ok) throw new Error("Failed to get upload URL");
+          
+          const { uploadUrl, downloadUrl } = await res.json();
+          setProgress(30);
+
+          // 2. Upload file directly to GCS using the Signed URL
+          // Note: fetch doesn't support upload progress naturally, so we just set to 50% during upload
+          setProgress(50);
+          const uploadRes = await fetch(uploadUrl, {
+             method: "PUT",
+             body: file,
+             headers: { "Content-Type": file.type }
+          });
+
+          if (!uploadRes.ok) throw new Error("Failed to upload file to Cloud Storage");
+          
+          setProgress(100);
+          setIsUploading(false);
+          onAction(`[UPLOAD_ASSET] ${assetType || "media"}`, downloadUrl);
+        } catch (err) {
+          console.error("Signed URL upload failed", err);
+          setIsUploading(false);
+          alert("העלאה נכשלה, נסה להדביק קישור מגוגל דרייב");
+        }
+      } else {
+        // Fallback for small files (images)
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          onAction(`[UPLOAD_ASSET] ${assetType || "media"}`, reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
+  };
+
+  const handleDriveSubmit = () => {
+    if (!driveLink) return;
+    let finalUrl = driveLink;
+    // Extract ID and convert to direct streamable link if it's a Drive link
+    const driveMatch = driveLink.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (driveMatch && driveMatch[1]) {
+      finalUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+    } else {
+      const idMatch = driveLink.match(/id=([a-zA-Z0-9_-]+)/);
+      if (idMatch && idMatch[1]) {
+        finalUrl = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+      }
+    }
+    // Must include an extension hint so our backend knows it's a video if needed, though drive links are opaque.
+    // The backend uses startsWith('data:video') or includes('.mp4') to know if it's video.
+    // Let's add a fake hash to help it:
+    if (assetType?.toLowerCase().includes("video")) {
+      finalUrl += "#.mp4"; 
+    }
+    onAction(`[UPLOAD_ASSET] ${assetType || "media"}`, finalUrl);
   };
 
   const isVideo = assetType?.toLowerCase().includes("video");
   const Icon = isVideo ? Video : Camera;
 
   return (
-    <div 
-      onClick={() => fileInputRef.current?.click()}
-      style={{
-        width: "100px",
-        height: "100px",
-        margin: "1rem auto",
-        borderRadius: "50%",
-        border: "1px dashed rgba(212, 175, 55, 0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        background: "rgba(10, 10, 10, 0.4)",
-        boxShadow: "0 0 15px rgba(212, 175, 55, 0.05)",
-        transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-      }}
-      onMouseOver={(e) => {
-        e.currentTarget.style.transform = "scale(1.1)";
-        e.currentTarget.style.boxShadow = "0 0 25px rgba(212, 175, 55, 0.2)";
-        e.currentTarget.style.border = "1px solid rgba(212, 175, 55, 1)";
-      }}
-      onMouseOut={(e) => {
-        e.currentTarget.style.transform = "scale(1)";
-        e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.05)";
-        e.currentTarget.style.border = "1px dashed rgba(212, 175, 55, 0.6)";
-      }}
-    >
-      <input
-        type="file"
-        accept={isVideo ? "video/*" : "image/*,video/*"}
-        ref={fileInputRef}
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
-      <Icon size={36} color="#D4AF37" strokeWidth={1} style={{ opacity: 0.8 }} />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", background: "rgba(10,10,10,0.6)", padding: "20px", borderRadius: "12px", border: "1px solid rgba(212, 175, 55, 0.3)" }}>
+      {title && <h3 style={{ color: "#D4AF37", marginBottom: "15px", fontSize: "1.1rem" }}>{title}</h3>}
+      
+      {/* Upload Area */}
+      <div 
+        onClick={() => !isUploading && fileInputRef.current?.click()}
+        style={{
+          width: "100px",
+          height: "100px",
+          borderRadius: "50%",
+          border: "1px dashed rgba(212, 175, 55, 0.6)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: isUploading ? "wait" : "pointer",
+          background: "rgba(10, 10, 10, 0.4)",
+          boxShadow: "0 0 15px rgba(212, 175, 55, 0.05)",
+          transition: "all 0.3s ease",
+          marginBottom: "15px"
+        }}
+      >
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          accept={isVideo ? "video/*" : "image/*"}
+          onChange={handleFileChange}
+        />
+        {isUploading ? (
+          <div style={{ color: "#D4AF37", fontWeight: "bold" }}>{progress}%</div>
+        ) : (
+          <Icon size={32} color="#D4AF37" strokeWidth={1.5} />
+        )}
+      </div>
+
+      <div style={{ color: "#aaa", fontSize: "0.9rem", marginBottom: "10px" }}>או הדבק קישור מגוגל דרייב:</div>
+      <div style={{ display: "flex", width: "100%", gap: "8px" }}>
+        <input 
+          type="text" 
+          placeholder="https://drive.google.com/..." 
+          value={driveLink}
+          onChange={(e) => setDriveLink(e.target.value)}
+          style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#fff" }}
+        />
+        <button 
+          onClick={handleDriveSubmit}
+          style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "#D4AF37", color: "#000", fontWeight: "bold", cursor: "pointer" }}
+        >
+          שמור
+        </button>
+      </div>
     </div>
   );
 };
@@ -371,6 +455,41 @@ function InteractiveMiniForm({
   );
 }
 
+function PromoCard({ ui }: { ui: any }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  
+  return (
+    <div style={{ width: "100%", maxWidth: "320px", background: "linear-gradient(145deg, #111, #222)", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(212, 175, 55, 0.4)", boxShadow: "0 10px 30px rgba(0,0,0,0.7)", textAlign: "center", marginTop: "15px" }}>
+      {!isPlaying ? (
+        <>
+          <div style={{ position: "relative" }}>
+            <img src={ui.data.profilePicture} style={{ width: "100%", height: "240px", objectFit: "cover", borderBottom: "3px solid #D4AF37" }} alt={ui.data.name} />
+            <div style={{ position: "absolute", bottom: "10px", right: "10px", background: "rgba(0,0,0,0.7)", padding: "4px 12px", borderRadius: "12px", border: "1px solid rgba(212, 175, 55, 0.5)", color: "#D4AF37", fontSize: "0.8rem", fontWeight: "bold" }}>
+              {ui.data.role || "נציג/ה"}
+            </div>
+          </div>
+          <div style={{ padding: "15px" }}>
+            <h3 style={{ color: "#fff", fontSize: "1.4rem", margin: "0 0 15px 0" }}>{ui.data.name}</h3>
+            {ui.data.videoUrl && (
+              <button 
+                onClick={() => setIsPlaying(true)}
+                style={{ background: "linear-gradient(135deg, #D4AF37 0%, #aa8529 100%)", color: "#000", border: "none", padding: "10px 24px", borderRadius: "24px", fontSize: "1rem", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 15px rgba(212, 175, 55, 0.3)", transition: "transform 0.2s" }}
+                onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+              >
+                <Play size={18} />
+                צפה בסרטון
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <video src={ui.data.videoUrl} controls autoPlay playsInline style={{ width: "100%", display: "block", maxHeight: "400px" }} />
+      )}
+    </div>
+  );
+}
+
 function InteractiveMultiSelect({
   ui,
   onAction,
@@ -595,6 +714,22 @@ const GenerativeRenderer = ({
     );
   }
 
+  if (ui.type === "PromoCard") {
+    return <PromoCard ui={ui} />;
+  }
+
+  if (ui.type === "VideoPlayerCard") {
+    return (
+      <div style={{ width: "100%", maxWidth: "400px", borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(212, 175, 55, 0.4)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", marginTop: "15px", background: "#000" }}>
+        {ui.data.isVideo !== false ? (
+          <video src={ui.data.url} controls autoPlay playsInline style={{ width: "100%", display: "block" }} />
+        ) : (
+          <img src={ui.data.url} alt="Agent Asset" style={{ width: "100%", display: "block" }} />
+        )}
+      </div>
+    );
+  }
+
   if (ui.type === "ImageCard") {
     return (
       <div style={{ marginTop: "10px", textAlign: "center" }}>
@@ -661,6 +796,17 @@ export default function DottyChatClient({
   const [interactionId, setInteractionId] = useState("");
   const [speechSupported, setSpeechSupported] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [agentData, setAgentData] = useState<any>(null);
+  const [lastAudioBase64, setLastAudioBase64] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (agentId) {
+      fetch(`/api/employee?id=${agentId}`)
+        .then((r) => r.json())
+        .then((data) => setAgentData(data))
+        .catch(console.error);
+    }
+  }, [agentId]);
 
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -862,6 +1008,7 @@ export default function DottyChatClient({
         }
 
         if (data.audioBase64) {
+          setLastAudioBase64(data.audioBase64);
           try {
             const audio = new Audio(`data:audio/mp3;base64,${data.audioBase64}`);
             audio.onplay = () => setIsPlaying(true);
@@ -901,7 +1048,20 @@ export default function DottyChatClient({
       dir="rtl"
       lang="he"
     >
-      <div className={styles.topBar}>
+      {agentData && (agentData.idleVideo || agentData.speakingVideo) && (
+        <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
+          <video
+            src={isPlaying && agentData.speakingVideo ? agentData.speakingVideo : (agentData.idleVideo || agentData.speakingVideo)}
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </div>
+      )}
+
+      <div className={styles.topBar} style={{ zIndex: 2, position: "relative" }}>
         {isAdmin ? (
           <div className={styles.headerCenterGroup}>
             <button
@@ -923,18 +1083,46 @@ export default function DottyChatClient({
         )}
       </div>
 
-      <div className={styles.chatOverlay}>
+      <div className={styles.chatOverlay} style={{ zIndex: 2, position: "relative", background: agentData ? "transparent" : undefined }}>
         <div className={styles.spacer} />
 
         <div className={styles.messageWrapper}>
           {message && (
-            <div className={styles.messageContainer}>
+            <div className={styles.messageContainer} style={agentData ? {
+              background: "rgba(0, 0, 0, 0.7)",
+              border: "1px solid rgba(212, 175, 55, 0.4)",
+              borderRadius: "16px",
+              padding: "1rem 2rem",
+              backdropFilter: "blur(4px)",
+              color: "#fff"
+            } : {}}>
               {isThinking ? (
                 <Loader2
                   className={`animate-spin w-10 h-10 mx-auto ${isAdmin ? "text-white" : "text-slate-800"}`}
                 />
               ) : (
                 <Typewriter text={message} />
+              )}
+              {agentData && !isPlaying && lastAudioBase64 && !isThinking && (
+                <button
+                  onClick={() => {
+                    const snd = new Audio(`data:audio/mp3;base64,${lastAudioBase64}`);
+                    setIsPlaying(true);
+                    snd.play();
+                    snd.onended = () => setIsPlaying(false);
+                  }}
+                  style={{
+                    display: "block",
+                    margin: "10px auto 0",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#D4AF37",
+                  }}
+                  title="השמע שוב"
+                >
+                  <Volume2 size={24} />
+                </button>
               )}
             </div>
           )}

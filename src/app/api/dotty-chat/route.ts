@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
@@ -188,14 +188,14 @@ const tools: any[] = [
         },
       },
     ],
-  },
+  }
 ];
 
 import { auth } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
-    const {
+    let {
       userText,
       sessionId,
       previous_interaction_id,
@@ -212,6 +212,46 @@ export async function POST(req: Request) {
         { error: "Missing required fields" },
         { status: 400 },
       );
+    }
+
+    if (mediaData && mediaData.startsWith("data:")) {
+      try {
+        let bucket;
+        try {
+           bucket = adminStorage.bucket();
+        } catch (e) {
+           const projId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+           if (projId) {
+             bucket = adminStorage.bucket(`${projId}.appspot.com`);
+           } else {
+             throw e;
+           }
+        }
+        const matches = mediaData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const contentType = matches[1];
+          const base64Data = matches[2];
+          const buffer = Buffer.from(base64Data, "base64");
+          const ext = contentType.split("/")[1] || "bin";
+          const fileName = `agent_assets/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+          const file = bucket.file(fileName);
+          
+          await file.save(buffer, {
+            metadata: { contentType }
+          });
+          
+          const [url] = await file.getSignedUrl({
+            action: "read",
+            expires: "01-01-2099"
+          });
+          
+          mediaData = url;
+        }
+      } catch (err) {
+        console.error("Storage upload error", err);
+        // If storage upload fails, we MUST NOT keep the massive base64 string, or Firestore will crash with 1MB limit error.
+        mediaData = null; 
+      }
     }
 
     // Verify auth on the backend to catch newly registered users who haven't refreshed the client
@@ -234,7 +274,15 @@ export async function POST(req: Request) {
     const sessionRef = adminDb.collection("dotty_interviews").doc(dbSessionId);
     let overrideUserText = userText;
     let forceUIComponent = "";
-    const allRequired = ["introVideo", "profilePicture", "speakingVideo", "idleVideo"];
+    const allRequired = ["introVideo", "promoVideo", "idleVideo", "speakingVideo", "profilePicture", "bodyPicture"];
+    const assetHebrewNames: Record<string, string> = {
+      introVideo: "סרטון היכרות",
+      promoVideo: "סרטון תצוגה",
+      idleVideo: "סרטון המתנה",
+      speakingVideo: "סרטון דיבור",
+      profilePicture: "תמונת פרופיל",
+      bodyPicture: "תמונת גוף"
+    };
 
     const editMatch = userText ? userText.match(/אני רוצה להשלים את ההגדרות של הסוכן (.*) \((.*)\)/) : null;
     if (editMatch) {
@@ -249,8 +297,8 @@ export async function POST(req: Request) {
        if (missingAssets.length === 0) {
            overrideUserText = `SYSTEM INFO: The admin wants to edit agent ${agentName}, but all media assets are already present! Politely tell the admin the agent is fully ready and no action is needed. KEEP RESPONSE UNDER 12 WORDS.`;
        } else {
-           overrideUserText = `SYSTEM INFO: The admin clicked to complete the setup for ${agentName}. The following assets are missing: ${missingAssets.join(", ")}. Acknowledge the admin's request and ask them to upload the FIRST missing asset (${missingAssets[0]}). DO NOT say thank you for uploading. DO NOT show AgentBuilderForm. KEEP RESPONSE UNDER 12 WORDS.`;
-           forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${missingAssets[0]}","assetType":"${missingAssets[0]}"}}]`;
+           overrideUserText = `SYSTEM INFO: The admin clicked to complete the setup for ${agentName}. The following assets are missing: ${missingAssets.join(", ")}. Acknowledge the admin's request and ask them to upload the FIRST missing asset. YOU MUST EXPLICITLY NAME THE REQUIRED ASSET IN HEBREW: "${assetHebrewNames[missingAssets[0]]}". DO NOT say thank you for uploading. DO NOT show AgentBuilderForm. KEEP RESPONSE UNDER 15 WORDS.`;
+           forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${assetHebrewNames[missingAssets[0]]}","assetType":"${missingAssets[0]}"}}]`;
        }
     } else if (userText && userText.startsWith("[INIT_GREETING]")) {
        if (userRole === "MASTER_ADMIN") {
@@ -290,37 +338,41 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
        const sessionData = sessionDoc.data() || {};
        
        if (sessionData.editingAgentId && mediaData) {
-           // We are editing an existing agent
-           const editAgentRef = adminDb.collection("employees").doc(sessionData.editingAgentId);
-           await editAgentRef.update({ [assetType]: mediaData });
-           
-           const updatedAgentDoc = await editAgentRef.get();
-           const updatedData = updatedAgentDoc.data() || {};
-           const missingAssets = allRequired.filter(a => !updatedData[a]);
-           
-           if (missingAssets.length === 0) {
-               await sessionRef.update({ editingAgentId: FieldValue.delete() });
-               overrideUserText = `SYSTEM INFO: The admin successfully uploaded ${assetType}. All required assets for this existing agent are now collected! Politely tell the admin the agent is now FULLY READY and complete. DO NOT output AgentBuilderForm. KEEP RESPONSE UNDER 12 WORDS.`;
-           } else {
-               overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next one (${missingAssets[0]}). KEEP RESPONSE UNDER 12 WORDS.`;
-               forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${missingAssets[0]}","assetType":"${missingAssets[0]}"}}]`;
-           }
-       } else {
-           // We are building a NEW agent
-           let currentPending = sessionData.pendingAgentAssets || {};
-           if (mediaData) {
-               currentPending[assetType] = mediaData;
-               await sessionRef.set({ pendingAgentAssets: currentPending }, { merge: true });
-           }
-           
-           const missingAssets = allRequired.filter(a => !currentPending[a]);
-           
-           if (missingAssets.length === 0) {
-               overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. All 4 assets are collected for the NEW agent! You MUST now proceed to collect the text details (Name, Role, Goal, Tone, Tools). Ask for the agent's NAME first. ONE QUESTION AT A TIME. KEEP RESPONSE UNDER 12 WORDS.`;
-           } else {
-               overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next missing asset (${missingAssets[0]}) using MediaUploadCard. KEEP RESPONSE UNDER 12 WORDS.`;
-           }
-       }
+            // We are editing an existing agent
+            const editAgentRef = adminDb.collection("employees").doc(sessionData.editingAgentId);
+            await editAgentRef.update({ [assetType]: mediaData });
+            
+            const updatedAgentDoc = await editAgentRef.get();
+            const updatedData = updatedAgentDoc.data() || {};
+            const missingAssets = allRequired.filter(a => !updatedData[a]);
+            
+            if (missingAssets.length === 0) {
+                await sessionRef.update({ editingAgentId: FieldValue.delete() });
+                overrideUserText = `SYSTEM INFO: The admin successfully uploaded ${assetType}. All required assets for this existing agent are now collected! Politely tell the admin the agent is now FULLY READY and complete. DO NOT output AgentBuilderForm. KEEP RESPONSE UNDER 12 WORDS.`;
+            } else {
+                overrideUserText = `SYSTEM INFO: The admin successfully uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next one. YOU MUST EXPLICITLY NAME THE REQUIRED ASSET IN HEBREW: "${assetHebrewNames[missingAssets[0]]}". KEEP RESPONSE UNDER 15 WORDS.`;
+                forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${assetHebrewNames[missingAssets[0]]}","assetType":"${missingAssets[0]}"}}]`;
+            }
+        } else if (sessionData.editingAgentId && !mediaData) {
+            overrideUserText = `SYSTEM INFO: The admin tried to upload ${assetType} but the upload to cloud storage failed. Apologize briefly and ask them to try again. KEEP RESPONSE UNDER 15 WORDS.`;
+        } else {
+            // We are building a NEW agent
+            let currentPending = sessionData.pendingAgentAssets || {};
+            if (mediaData) {
+                currentPending[assetType] = mediaData;
+                await sessionRef.set({ pendingAgentAssets: currentPending }, { merge: true });
+                
+                const missingAssets = allRequired.filter(a => !currentPending[a]);
+                
+                if (missingAssets.length === 0) {
+                    overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. All 4 assets are collected for the NEW agent! You MUST now proceed to collect the text details (Name, Role, Goal, Tone, Tools). Ask for the agent's NAME first. ONE QUESTION AT A TIME. KEEP RESPONSE UNDER 12 WORDS.`;
+                } else {
+                    overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next missing asset (${missingAssets[0]}) using MediaUploadCard. KEEP RESPONSE UNDER 12 WORDS.`;
+                }
+            } else {
+                overrideUserText = `SYSTEM INFO: The admin tried to upload ${assetType} but the upload to cloud storage failed. Apologize briefly and ask them to try again. KEEP RESPONSE UNDER 15 WORDS.`;
+            }
+        }
     }
 
     // If officeSlug is provided, we fetch facts and products for that specific office owner.
@@ -450,6 +502,28 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
           required: ["workerSlug", "plan", "contactName", "contactEmail"],
         },
       },
+      show_agent_asset: {
+        name: "show_agent_asset",
+        description: "Plays a specific video or image asset for an agent in the chat UI. Call this when the admin asks to see or play an agent's video (e.g., intro video, promo video, etc). Do not refuse, just call this tool.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            agentName: { type: "STRING", description: "The name of the agent (e.g., 'דן' or 'Mike'). Leave empty if implicitly talking about the current agent." },
+            assetType: { type: "STRING", description: "The type of asset to show (introVideo, promoVideo, idleVideo, speakingVideo, profilePicture, bodyPicture)" }
+          },
+          required: ["assetType"],
+        },
+      },
+      show_agent_promo_card: {
+        name: "show_agent_promo_card",
+        description: "Creates and displays a virtual business card (Promo Card) for an agent. It combines their profile picture, name, role, and a prominent button to play their promo/intro video. Call this when the user specifically asks to 'connect the picture with the link', 'show the agent card', or 'show the profile picture with the video link'.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            agentName: { type: "STRING", description: "The name of the agent (e.g., 'דן' or 'Mike'). Leave empty if implicitly talking about the current agent." }
+          },
+        },
+      },
     };
 
     let systemInstruction = "";
@@ -543,6 +617,9 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             customDeclarations.push(metaTools.scan_website);
           if (assignedTools.includes("build_form"))
             customDeclarations.push(metaTools.build_form);
+            
+          customDeclarations.push(metaTools.show_agent_asset);
+          customDeclarations.push(metaTools.show_agent_promo_card);
         }
 
         if (customDeclarations.length > 0) {
@@ -556,10 +633,12 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
 2. STRICT LENGTH LIMIT: Never exceed 12 words per response. 
 3. If speaking Hebrew, you MUST use flawless, native-level Hebrew. 
 4. Ensure perfect grammatical gender matching (Zachar/Nekeva) for both yourself and the user. Never mix male and female verb conjugations for the same subject.
-5. Avoid literal translations from English that sound robotic (e.g. instead of 'איך אני יכול לעזור לך היום', use natural phrases like 'איך אפשר לעזור?').`;
+5. Avoid literal translations from English that sound robotic (e.g. instead of 'איך אני יכול לעזור לך היום', use natural phrases like 'איך אפשר לעזור?').
+6. PROACTIVE CONTINUATION: NEVER 'restart' the conversation by asking generic greetings like 'What can I help you with today?'. If a user's request is ambiguous or short, you MUST proactively ask clarifying questions to understand their exact intent and push the conversation forward. Always take initiative to apply their requests.`;
       }
     } else {
       if (userRole === "MASTER_ADMIN") {
+        toolsConfig = [{ functionDeclarations: [...tools[0].functionDeclarations, metaTools.show_agent_asset, metaTools.show_agent_promo_card] }];
         const sessionDoc = await sessionRef.get();
         const editingAgentId = sessionDoc.data()?.editingAgentId;
 
@@ -570,8 +649,13 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
           const stateStr = `Current Draft State:\nName: ${draftState.name || 'Missing'}\nRole: ${draftState.role || 'Missing'}\nGoal: ${draftState.goal || 'Missing'}\nTone: ${draftState.tone || 'Missing'}\nTools: ${draftState.tools || 'Missing'}`;
 
           systemInstruction =
-            'You are Dotty, the Chief Agent Architect of Golden Flute. You help business owners construct their AI workforce.\n\nCRITICAL RULE FOR CREATING EMPLOYEES: You must collect information ONE QUESTION AT A TIME. DO NOT ask multiple questions at once.\nWhen the user answers, ALWAYS use the `update_agent_draft` tool to save their answer, then ask the NEXT missing question.\nHere is what you have collected so far:\n' + stateStr + '\n\nStep 1: Collect Media (introVideo, profilePicture, speakingVideo, idleVideo) by asking for them and outputting [UI_COMPONENT:{"type":"MediaUploadCard"}]. The system will tell you when they are all collected.\nStep 2: Collect Name. If Missing, ask for the Name.\nStep 3: Collect Role. If Missing, ask for Role and output EXACTLY: [UI_COMPONENT:{"type":"MenuGrid","data":{"items":[{"title":"מכירות","icon":"💼","action":"מכירות"},{"title":"תמיכה","icon":"🎧","action":"תמיכה"},{"title":"שירות לקוחות","icon":"🤝","action":"שירות לקוחות"}]}}] \nStep 4: Collect Goal. If Missing, ask for Goal. Wait for answer.\nStep 5: Collect Tone. If Missing, ask for Tone. Output MenuGrid with ["מקצועי", "ידידותי", "אסרטיבי"].\nStep 6: Collect Tools. If Missing, ask for Tools. Output EXACTLY: [UI_COMPONENT:{"type":"MultiSelectGrid","data":{"items":[{"title":"CRM"},{"title":"תשלומים"},{"title":"טפסים"},{"title":"תוכן"}]}}]. Wait for user to submit.\nStep 7: Once ALL details are collected (Name, Role, Goal, Tone, Tools are NOT Missing), call the `create_smart_employee` tool.\n\nABSOLUTE REQUIREMENT: KEEP EVERY SINGLE RESPONSE EXTREMELY SHORT. NEVER EXCEED 12 WORDS TOTAL IN YOUR RESPONSE.';
+            'You are Dotty, the Chief Agent Architect of Golden Flute. You help business owners construct their AI workforce.\n\nCRITICAL RULE FOR CREATING EMPLOYEES: You must collect information ONE QUESTION AT A TIME. DO NOT ask multiple questions at once.\nWhen the user answers, ALWAYS use the `update_agent_draft` tool to save their answer, then ask the NEXT missing question.\nHere is what you have collected so far:\n' + stateStr + '\n\nStep 1: Collect Media (introVideo, promoVideo, idleVideo, speakingVideo, profilePicture, bodyPicture) by asking for them ONE BY ONE and outputting [UI_COMPONENT:{"type":"MediaUploadCard"}]. The system will tell you when they are all collected.\nStep 2: Collect Name. If Missing, ask for the Name.\nStep 3: Collect Role. If Missing, ask for Role and output EXACTLY: [UI_COMPONENT:{"type":"MenuGrid","data":{"items":[{"title":"מכירות","icon":"💼","action":"מכירות"},{"title":"תמיכה","icon":"🎧","action":"תמיכה"},{"title":"שירות לקוחות","icon":"🤝","action":"שירות לקוחות"}]}}] \nStep 4: Collect Goal. If Missing, ask for Goal. Wait for answer.\nStep 5: Collect Tone. If Missing, ask for Tone. Output MenuGrid with ["מקצועי", "ידידותי", "אסרטיבי"].\nStep 6: Collect Tools. If Missing, ask for Tools. Output EXACTLY: [UI_COMPONENT:{"type":"MultiSelectGrid","data":{"items":[{"title":"CRM"},{"title":"תשלומים"},{"title":"טפסים"},{"title":"תוכן"}]}}]. Wait for user to submit.\nStep 7: Once ALL details are collected (Name, Role, Goal, Tone, Tools are NOT Missing), call the `create_smart_employee` tool.\n\nABSOLUTE REQUIREMENT: KEEP EVERY SINGLE RESPONSE EXTREMELY SHORT. NEVER EXCEED 12 WORDS TOTAL IN YOUR RESPONSE.';
         }
+        
+
+        systemInstruction += `\n\nSYSTEM INFO: You DO have the ability to play videos in the chat using your 'show_agent_asset' tool. NEVER tell the user you cannot play videos. If the admin asks to SEE or PLAY a video for any agent, you MUST call the 'show_agent_asset' tool with the correct assetType and agentName.\nIf the admin asks to connect a profile picture with a link (or show the agent's promo card), you MUST use the 'show_agent_promo_card' tool. Do not output any apologies or limitations.`;
+        
+        systemInstruction += `\n\nPROACTIVE CONTINUATION: NEVER 'restart' the conversation by asking generic greetings like 'What can I help you with today?' or 'How can I assist?'. If a user's request is ambiguous, short, or unclear, you MUST proactively ask clarifying questions to understand their exact intent and push the conversation forward. Always take initiative.`;
         
         systemInstruction += factsString + productsString;
 
@@ -581,17 +665,17 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
         }
       } else if (userRole === "MANAGER") {
         systemInstruction =
-          "You are Dotty, the manager's AI assistant. Help the manager review their office and manage agents. Keep responses extremely concise. Never exceed 25 words." +
+          "You are Dotty, the manager's AI assistant. Help the manager review their office and manage agents. Keep responses extremely concise. Never exceed 25 words.\n\nPROACTIVE CONTINUATION: NEVER 'restart' the conversation by asking generic greetings like 'What can I help you with today?'. If a user's request is ambiguous, short, or unclear, you MUST proactively ask clarifying questions to understand their exact intent and push the conversation forward. Always take initiative." +
           factsString +
           productsString;
-        toolsConfig = []; // Managers don't use Dotty's creation tools
+        toolsConfig = [{ functionDeclarations: [metaTools.show_agent_asset, metaTools.show_agent_promo_card] }]; 
       } else {
         const loginStatus = finalUserId ? "REGISTERED AND LOGGED IN" : "ANONYMOUS (NOT LOGGED IN)";
         systemInstruction =
-          `You are Betty, the Global Receptionist of Golden Flute. You present our products, register new users, and sell smart workers for rent. The user's login status is: ${loginStatus}. Use fetch_smart_workers to see available workers and their prices. If a user wants to rent one, use process_mock_payment to charge them and open their office. Keep responses extremely concise. Never exceed 25 words.` +
+          `You are Betty, the Global Receptionist of Golden Flute. You present our products, register new users, and sell smart workers for rent. The user's login status is: ${loginStatus}. Use fetch_smart_workers to see available workers and their prices. If a user wants to rent one, use process_mock_payment to charge them and open their office. Keep responses extremely concise. Never exceed 25 words.\n\nPROACTIVE CONTINUATION: NEVER 'restart' the conversation by asking generic greetings like 'What can I help you with today?'. If a user's request is ambiguous, short, or unclear, you MUST proactively ask clarifying questions to understand their exact intent and push the conversation forward. Always take initiative.` +
           factsString +
           productsString;
-        toolsConfig = [{ functionDeclarations: [metaTools.fetch_smart_workers, metaTools.process_mock_payment] }];
+        toolsConfig = [{ functionDeclarations: [metaTools.fetch_smart_workers, metaTools.process_mock_payment, metaTools.show_agent_asset, metaTools.show_agent_promo_card] }];
       }
     }
 
@@ -850,7 +934,9 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             officeSlug: officeSlug || userId || "1",
             mediaData: pendingAssets.profilePicture || mediaData || null, // fallback
             introVideo: pendingAssets.introVideo || null,
+            promoVideo: pendingAssets.promoVideo || null,
             profilePicture: pendingAssets.profilePicture || null,
+            bodyPicture: pendingAssets.bodyPicture || null,
             speakingVideo: pendingAssets.speakingVideo || null,
             idleVideo: pendingAssets.idleVideo || null,
             voice_gender: funcCall.args.voice_gender || "female",
@@ -933,6 +1019,105 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
           currentDraft[field] = value;
           await sessionRef.set({ draftAgentState: currentDraft }, { merge: true });
           toolResponsePayload = { success: true, message: `Draft field ${field} updated to ${value}. Ask the next missing question.` };
+        } else if (funcCall.name === "show_agent_asset") {
+          const { assetType, agentName } = funcCall.args;
+          const sessionDoc = await sessionRef.get();
+          let targetAgentId = sessionDoc.data()?.editingAgentId;
+          
+          if (!targetAgentId && agentName) {
+             let lowerName = agentName.toLowerCase();
+             const hebrewToEng: Record<string, string> = { "בטי": "betty", "דותי": "dotty", "מייק": "mike", "דן": "dan" };
+             if (hebrewToEng[lowerName]) lowerName = hebrewToEng[lowerName];
+             
+             const allEmployees = await adminDb.collection("employees").get();
+             const match = allEmployees.docs.find(d => {
+                 const data = d.data();
+                 return d.id.toLowerCase().includes(lowerName) || 
+                        (data.name && data.name.toLowerCase() === lowerName) ||
+                        (data.slug && data.slug.toLowerCase() === lowerName);
+             });
+             if (match) {
+                 targetAgentId = match.id;
+             } else {
+                 // Try to fallback to smart_workers if it's a global worker like Betty
+                 const allWorkers = await adminDb.collection("smart_workers").get();
+                 const workerMatch = allWorkers.docs.find(d => {
+                     const data = d.data();
+                     return d.id.toLowerCase().includes(lowerName) || 
+                            (data.name && data.name.toLowerCase() === lowerName) ||
+                            (data.slug && data.slug.toLowerCase() === lowerName);
+                 });
+                 if (workerMatch) targetAgentId = workerMatch.id;
+             }
+          }
+          
+          if (targetAgentId) {
+            // First check employees, then smart_workers
+            let agentDoc = await adminDb.collection("employees").doc(targetAgentId).get();
+            if (!agentDoc.exists) {
+                agentDoc = await adminDb.collection("smart_workers").doc(targetAgentId).get();
+            }
+            
+            const url = agentDoc.data()?.[assetType];
+            if (url) {
+               const isVideo = url.startsWith("data:video/") || url.includes(".mp4") || url.includes(".webm") || url.includes(".mov");
+               forceUIComponent = `[UI_COMPONENT:{"type":"VideoPlayerCard","data":{"url":"${url}","isVideo":${isVideo}}}]`;
+               toolResponsePayload = { success: true, message: "Asset UI generated and displayed to user." };
+            } else {
+               toolResponsePayload = { success: false, message: "Asset not found for this agent." };
+            }
+          } else {
+            toolResponsePayload = { success: false, message: "Could not identify which agent to show the asset for." };
+          }
+        } else if (funcCall.name === "show_agent_promo_card") {
+          const { agentName } = funcCall.args;
+          const sessionDoc = await sessionRef.get();
+          let targetAgentId = sessionDoc.data()?.editingAgentId;
+          
+          if (!targetAgentId && agentName) {
+             let lowerName = agentName.toLowerCase();
+             const hebrewToEng: Record<string, string> = { "בטי": "betty", "דותי": "dotty", "מייק": "mike", "דן": "dan" };
+             if (hebrewToEng[lowerName]) lowerName = hebrewToEng[lowerName];
+             
+             const allEmployees = await adminDb.collection("employees").get();
+             const match = allEmployees.docs.find(d => {
+                 const data = d.data();
+                 return d.id.toLowerCase().includes(lowerName) || 
+                        (data.name && data.name.toLowerCase() === lowerName) ||
+                        (data.slug && data.slug.toLowerCase() === lowerName);
+             });
+             if (match) targetAgentId = match.id;
+             else {
+                 const allWorkers = await adminDb.collection("smart_workers").get();
+                 const workerMatch = allWorkers.docs.find(d => {
+                     const data = d.data();
+                     return d.id.toLowerCase().includes(lowerName) || 
+                            (data.name && data.name.toLowerCase() === lowerName) ||
+                            (data.slug && data.slug.toLowerCase() === lowerName);
+                 });
+                 if (workerMatch) targetAgentId = workerMatch.id;
+             }
+          }
+
+          if (targetAgentId) {
+            let agentDoc = await adminDb.collection("employees").doc(targetAgentId).get();
+            if (!agentDoc.exists) {
+                agentDoc = await adminDb.collection("smart_workers").doc(targetAgentId).get();
+            }
+            
+            const data = agentDoc.data();
+            const profilePicture = data?.profilePicture;
+            const promoVideo = data?.promoVideo || data?.introVideo || data?.speakingVideo;
+            
+            if (profilePicture && promoVideo) {
+               forceUIComponent = `[UI_COMPONENT:{"type":"PromoCard","data":{"name":"${data.name || agentName || 'Agent'}","role":"${data.role || ''}","profilePicture":"${profilePicture}","videoUrl":"${promoVideo}"}}]`;
+               toolResponsePayload = { success: true, message: "Promo card displayed." };
+            } else {
+               toolResponsePayload = { success: false, message: "Agent is missing profile picture or video." };
+            }
+          } else {
+            toolResponsePayload = { success: false, message: "Could not identify which agent to show the card for." };
+          }
         } else if (funcCall.name === "save_agreed_answer") {
           if (agentId) {
             try {
@@ -1241,16 +1426,32 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
       await sessionRef
         .collection("messages")
         .add({ role: "agent", text: assistantMessage, createdAt: new Date() });
-      await sessionRef.set(
-        {
-          userId: userId || null,
-          lastUpdatedAt: new Date(),
-          interactionId: newInteractionId || null,
-          mode: userRole,
-          agentId: agentId || null,
-        },
-        { merge: true },
-      );
+      try {
+        await sessionRef.set(
+          {
+            userId: userId || null,
+            lastUpdatedAt: new Date(),
+            interactionId: newInteractionId || null,
+            mode: userRole,
+            agentId: agentId || null,
+          },
+          { merge: true },
+        );
+      } catch (e: any) {
+        if (e.message && e.message.includes("exceeds the maximum allowed size")) {
+          console.warn("Session document is bloated. Recreating to clear stuck 2MB media.", e.message);
+          await sessionRef.delete();
+          await sessionRef.set({
+            userId: userId || null,
+            lastUpdatedAt: new Date(),
+            interactionId: newInteractionId || null,
+            mode: userRole,
+            agentId: agentId || null,
+          });
+        } else {
+          throw e;
+        }
+      }
       
       // Save specifically under the agent's collection for easy management
       if (agentId) {
