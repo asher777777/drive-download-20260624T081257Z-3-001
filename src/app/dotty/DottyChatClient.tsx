@@ -12,6 +12,15 @@ import {
   Plus,
   Play,
   Info,
+  Camera,
+  Check,
+  Sparkles,
+  Folder,
+  Activity,
+  Bug,
+  Users,
+  AlertCircle,
+  Video
 } from "lucide-react";
 
 const AgentCardUI = ({
@@ -75,8 +84,11 @@ const AgentCardUI = ({
 };
 
 const MediaUploadCard = ({
+  assetType,
   onAction,
 }: {
+  title?: string;
+  assetType?: string;
   onAction: (text: string, mediaData: string) => void;
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,38 +98,51 @@ const MediaUploadCard = ({
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        onAction("Media uploaded successfully", reader.result as string);
+        onAction(`[UPLOAD_ASSET] ${assetType || "media"}`, reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const isVideo = assetType?.toLowerCase().includes("video");
+  const Icon = isVideo ? Video : Camera;
+
   return (
-    <div className={styles.miniForm}>
-      <h3 className={styles.formTitle}>Upload Employee Media</h3>
-      <p
-        className={styles.productDesc}
-        style={{ textAlign: "center", marginBottom: "10px" }}
-      >
-        Please upload an image or video for the smart employee.
-      </p>
+    <div 
+      onClick={() => fileInputRef.current?.click()}
+      style={{
+        width: "100px",
+        height: "100px",
+        margin: "1rem auto",
+        borderRadius: "50%",
+        border: "1px dashed rgba(212, 175, 55, 0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        background: "rgba(10, 10, 10, 0.4)",
+        boxShadow: "0 0 15px rgba(212, 175, 55, 0.05)",
+        transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+      }}
+      onMouseOver={(e) => {
+        e.currentTarget.style.transform = "scale(1.1)";
+        e.currentTarget.style.boxShadow = "0 0 25px rgba(212, 175, 55, 0.2)";
+        e.currentTarget.style.border = "1px solid rgba(212, 175, 55, 1)";
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.transform = "scale(1)";
+        e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.05)";
+        e.currentTarget.style.border = "1px dashed rgba(212, 175, 55, 0.6)";
+      }}
+    >
       <input
         type="file"
-        accept="image/*,video/*"
+        accept={isVideo ? "video/*" : "image/*,video/*"}
         ref={fileInputRef}
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        className={styles.productBtn}
-        style={{
-          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-          color: "black",
-        }}
-      >
-        Select File
-      </button>
+      <Icon size={36} color="#D4AF37" strokeWidth={1} style={{ opacity: 0.8 }} />
     </div>
   );
 };
@@ -140,116 +165,125 @@ const AgentBuilderForm = ({
     displayAgent: false,
   });
 
+  const [step, setStep] = useState(0);
+
+  const handleNext = () => setStep(s => s + 1);
+
   const handleSubmit = () => {
-    const selectedTools = Object.entries(tools)
-      .filter(([_, v]) => v)
-      .map(([k]) => k);
-    onAction(
-      `Create a smart employee named ${name}, role: ${role}. Goal: ${goal}. Tone: ${tone}. Tools: ${selectedTools.join(", ")}`,
-      selectedTools,
-    );
+    const selectedTools = Object.entries(tools).filter(([_, v]) => v).map(([k]) => k);
+    onAction(`Create a smart employee named ${name}, role: ${role}. Goal: ${goal}. Tone: ${tone}. Tools: ${selectedTools.join(", ")}`, selectedTools);
   };
 
+  const renderStep = () => {
+    switch (step) {
+      case 0:
+        return (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px" }}>
+            <h4 style={{ color: "white", fontWeight: 300 }}>מה שם העובד החדש?</h4>
+            <input
+              autoFocus
+              placeholder="שם (לדוגמה: דן)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && name && handleNext()}
+              style={{
+                background: "transparent", border: "none", borderBottom: "1px solid #D4AF37",
+                color: "white", padding: "10px", fontSize: "18px", textAlign: "center", outline: "none", width: "100%"
+              }}
+            />
+            {name && (
+              <div onClick={handleNext} style={nextBtnStyle}>
+                <Folder size={24} color="#070D1D" />
+              </div>
+            )}
+          </div>
+        );
+      case 1:
+        return (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px" }}>
+            <h4 style={{ color: "white", fontWeight: 300 }}>מה תפקידו?</h4>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+              {["מכירות", "תמיכה", "שירות לקוחות", "הדרכה"].map(r => (
+                <div key={r} onClick={() => { setRole(r); handleNext(); }} style={chipStyle(role === r)}>
+                  {r}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 2:
+        return (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px" }}>
+            <h4 style={{ color: "white", fontWeight: 300 }}>מה מטרת העל שלו?</h4>
+            <input
+              autoFocus
+              placeholder="לדוגמה: לקבוע פגישות"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && goal && handleNext()}
+              style={{
+                background: "transparent", border: "none", borderBottom: "1px solid #D4AF37",
+                color: "white", padding: "10px", fontSize: "18px", textAlign: "center", outline: "none", width: "100%"
+              }}
+            />
+            {goal && (
+              <div onClick={handleNext} style={nextBtnStyle}>
+                <Folder size={24} color="#070D1D" />
+              </div>
+            )}
+          </div>
+        );
+      case 3:
+        return (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px" }}>
+            <h4 style={{ color: "white", fontWeight: 300 }}>באיזה טון הוא ידבר?</h4>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+              {["מקצועי", "ידידותי", "אסרטיבי", "אמפתי"].map(t => (
+                <div key={t} onClick={() => { setTone(t); handleNext(); }} style={chipStyle(tone === t)}>
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 4:
+        return (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px" }}>
+            <h4 style={{ color: "white", fontWeight: 300 }}>אילו כלים להפעיל? (אפשר לבחור כמה)</h4>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: "15px" }}>
+              {Object.entries(tools).map(([key, val]) => (
+                <div key={key} onClick={() => setTools({ ...tools, [key]: !val })} style={chipStyle(val)}>
+                  {val && <Check size={14} />}
+                  {key === "crm" ? "CRM" : key === "payments" ? "תשלומים" : key === "forms" ? "טפסים" : key === "contentCreation" ? "תוכן" : "הצגת סוכן"}
+                </div>
+              ))}
+            </div>
+            <div onClick={handleSubmit} style={nextBtnStyle}>
+              <Folder size={24} color="#070D1D" />
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const nextBtnStyle = {
+    width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", background: "linear-gradient(135deg, #D4AF37 0%, #aa8529 100%)", boxShadow: "0 4px 15px rgba(212, 175, 55, 0.3)",
+    transition: "transform 0.2s"
+  };
+
+  const chipStyle = (isActive: boolean) => ({
+    padding: "8px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.3s",
+    border: isActive ? "1px solid #D4AF37" : "1px solid rgba(255,255,255,0.2)",
+    color: isActive ? "#D4AF37" : "#aaa",
+    background: isActive ? "rgba(212, 175, 55, 0.1)" : "transparent",
+  });
+
   return (
-    <div className={styles.miniForm} style={{ textAlign: "left" }}>
-      <h3 className={styles.formTitle}>Smart Employee Setup</h3>
-
-      <div style={{ marginBottom: "10px" }}>
-        <input
-          placeholder="Employee Name (e.g., Dan)"
-          className={styles.formInput}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          placeholder="Role (e.g., Sales Rep)"
-          className={styles.formInput}
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        />
-        <input
-          placeholder="Specific Goal"
-          className={styles.formInput}
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-        />
-        <input
-          placeholder="Tone of Voice (e.g., Professional)"
-          className={styles.formInput}
-          value={tone}
-          onChange={(e) => setTone(e.target.value)}
-        />
-      </div>
-
-      <h4 style={{ color: "white", marginBottom: "5px", fontSize: "14px" }}>
-        Capabilities & Tools:
-      </h4>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "5px",
-          color: "#ccc",
-          fontSize: "14px",
-          marginBottom: "15px",
-        }}
-      >
-        <label>
-          <input
-            type="checkbox"
-            checked={tools.crm}
-            onChange={(e) => setTools({ ...tools, crm: e.target.checked })}
-          />{" "}
-          CRM Read/Write
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={tools.payments}
-            onChange={(e) => setTools({ ...tools, payments: e.target.checked })}
-          />{" "}
-          Process Payments
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={tools.forms}
-            onChange={(e) => setTools({ ...tools, forms: e.target.checked })}
-          />{" "}
-          Create Forms
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={tools.contentCreation}
-            onChange={(e) =>
-              setTools({ ...tools, contentCreation: e.target.checked })
-            }
-          />{" "}
-          Content Creation
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={tools.displayAgent}
-            onChange={(e) =>
-              setTools({ ...tools, displayAgent: e.target.checked })
-            }
-          />{" "}
-          Display Page Agent
-        </label>
-      </div>
-
-      <button
-        onClick={handleSubmit}
-        className={styles.productBtn}
-        style={{
-          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-          color: "black",
-        }}
-      >
-        Build Smart Employee
-      </button>
+    <div className={styles.miniForm} style={{ textAlign: "center", border: "1px solid rgba(212, 175, 55, 0.3)", background: "rgba(10,10,10,0.6)", minHeight: "200px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      {renderStep()}
     </div>
   );
 };
@@ -337,17 +371,70 @@ function InteractiveMiniForm({
   );
 }
 
-function GenerativeRenderer({
+function InteractiveMultiSelect({
   ui,
   onAction,
 }: {
   ui: any;
-  onAction: (text: string, mediaData?: string) => void;
+  onAction: (text: string) => void;
 }) {
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+  const toggleItem = (title: string) => {
+    if (selectedItems.includes(title)) {
+      setSelectedItems(selectedItems.filter((i) => i !== title));
+    } else {
+      setSelectedItems([...selectedItems, title]);
+    }
+  };
+
+  const nextBtnStyle = {
+    width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", background: "linear-gradient(135deg, #D4AF37 0%, #aa8529 100%)", boxShadow: "0 4px 15px rgba(212, 175, 55, 0.3)",
+    transition: "transform 0.2s", margin: "20px auto 0"
+  };
+
+  const chipStyle = (isActive: boolean) => ({
+    padding: "8px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.3s",
+    border: isActive ? "1px solid #D4AF37" : "1px solid rgba(255,255,255,0.2)",
+    color: isActive ? "#D4AF37" : "#aaa",
+    background: isActive ? "rgba(212, 175, 55, 0.1)" : "transparent",
+  });
+
+  return (
+    <div style={{ textAlign: "center", border: "1px solid rgba(212, 175, 55, 0.3)", background: "rgba(10,10,10,0.6)", padding: "20px", borderRadius: "12px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <h3 style={{ color: "#D4AF37", marginBottom: "20px", fontSize: "1.2rem" }}>{ui.data.title || "בחר את הכלים המתאימים:"}</h3>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+        {ui.data.items.map((item: any, i: number) => {
+          const isActive = selectedItems.includes(item.title);
+          return (
+            <div key={i} onClick={() => toggleItem(item.title)} style={chipStyle(isActive)}>
+              {isActive && <Check size={14} />}
+              {item.title}
+            </div>
+          );
+        })}
+      </div>
+      <div onClick={() => onAction(selectedItems.length > 0 ? selectedItems.join(", ") : "אין כלים")} style={nextBtnStyle}>
+        <Folder size={24} color="#070D1D" />
+      </div>
+    </div>
+  );
+}
+
+const GenerativeRenderer = ({
+  ui,
+  onAction,
+}: {
+  ui: any;
+  onAction: (text: string, media?: string) => void;
+}) => {
   if (ui.type === "ProductCard") {
     return (
       <div className={styles.productCard}>
-        <div className={styles.productIcon}>✨</div>
+        <div className={styles.productIcon} style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+          <Sparkles size={28} color="#D4AF37" strokeWidth={1.5} />
+        </div>
         <h3 className={styles.productName}>{ui.data.name}</h3>
         <p className={styles.productDesc}>{ui.data.desc}</p>
         <div className={styles.productPrice}>{ui.data.price}</div>
@@ -390,7 +477,13 @@ function GenerativeRenderer({
   }
 
   if (ui.type === "MediaUploadCard") {
-    return <MediaUploadCard onAction={(text, media) => onAction(text)} />; // Wait, onAction in GenerativeRenderer only takes text. I need to update GenerativeRenderer's onAction type!
+    return (
+      <MediaUploadCard
+        title={ui.data?.title}
+        assetType={ui.data?.assetType}
+        onAction={(text, media) => onAction(text, media)}
+      />
+    );
   }
 
   if (ui.type === "MiniForm") {
@@ -429,6 +522,75 @@ function GenerativeRenderer({
             <p className={styles.menuDesc}>{item.desc}</p>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (ui.type === "MultiSelectGrid") {
+    return <InteractiveMultiSelect ui={ui} onAction={onAction} />;
+  }
+
+  if (ui.type === "MissingAssetsLobby") {
+    return (
+      <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <p style={{ color: "#f59e0b", marginBottom: "1rem" }}>
+          הסוכנים הבאים ממתינים להשלמת נכסי המדיה שלהם (סרטונים ותמונות):
+        </p>
+        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "center" }}>
+          {ui.data?.agents?.map((ag: any, idx: number) => (
+            <div
+              key={idx}
+              className={styles.menuCard}
+              onClick={() => onAction(`אני רוצה להשלים את ההגדרות של הסוכן ${ag.name} (${ag.id})`)}
+            >
+              <h4 className={styles.menuTitle}>{ag.name}</h4>
+              <p className={styles.menuDesc}>לחץ להשלמת פרופיל</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (ui.type === "AnalyticsCard") {
+    return (
+      <div style={{ width: "100%", maxWidth: "600px", margin: "0 auto", padding: "20px", background: "rgba(10,10,10,0.8)", border: "1px solid rgba(212, 175, 55, 0.4)", borderRadius: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", color: "#fff", display: "flex", flexDirection: "column", gap: "20px" }}>
+        <h2 style={{ textAlign: "center", color: "#D4AF37", fontSize: "1.4rem", marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}><Activity size={24} /> סקירת מערכת כוללת</h2>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "15px" }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
+            <div style={{ color: "#D4AF37", marginBottom: "8px" }}><Users size={28} style={{ margin: "0 auto" }} /></div>
+            <div style={{ fontSize: "1.8rem", fontWeight: "bold" }}>{ui.data.employees}</div>
+            <div style={{ fontSize: "0.9rem", color: "#aaa" }}>סוכנים פעילים</div>
+          </div>
+          
+          <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center" }}>
+            <div style={{ color: "#f59e0b", marginBottom: "8px" }}><AlertCircle size={28} style={{ margin: "0 auto" }} /></div>
+            <div style={{ fontSize: "1.8rem", fontWeight: "bold", color: "#f59e0b" }}>{ui.data.missingAssets}</div>
+            <div style={{ fontSize: "0.9rem", color: "#f59e0b" }}>ממתינים להשלמה</div>
+          </div>
+          
+          <div style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
+            <div style={{ color: "#4ade80", marginBottom: "8px" }}><Activity size={28} style={{ margin: "0 auto" }} /></div>
+            <div style={{ fontSize: "1.8rem", fontWeight: "bold" }}>{ui.data.users}</div>
+            <div style={{ fontSize: "0.9rem", color: "#aaa" }}>כניסות משתמשים</div>
+          </div>
+          
+          <div style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
+            <div style={{ color: "#f87171", marginBottom: "8px" }}><Bug size={28} style={{ margin: "0 auto" }} /></div>
+            <div style={{ fontSize: "1.8rem", fontWeight: "bold" }}>{ui.data.bugs}</div>
+            <div style={{ fontSize: "0.9rem", color: "#aaa" }}>באגים פתוחים</div>
+          </div>
+        </div>
+
+        {ui.data.missingAssets > 0 && (
+          <button 
+            onClick={() => onAction("אני רוצה להשלים את ההגדרות של הסוכנים")} 
+            style={{ padding: "12px 24px", background: "linear-gradient(135deg, #D4AF37 0%, #aa8529 100%)", color: "#000", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "1.1rem", marginTop: "10px" }}
+          >
+            טיפול בסוכנים חסרים
+          </button>
+        )}
       </div>
     );
   }
@@ -476,23 +638,17 @@ export default function DottyChatClient({
   officeSlug,
   agentId,
   agentName,
+  missingAssetsAgents,
 }: {
   userRole?: "MASTER_ADMIN" | "MANAGER" | "END_USER";
   userId: string | null;
   officeSlug?: string;
   agentId?: string;
   agentName?: string;
+  missingAssetsAgents?: any[];
 }) {
   const isAdmin = userRole === "MASTER_ADMIN" || userRole === "MANAGER";
-  const initialWelcome =
-    userRole === "MASTER_ADMIN"
-      ? `שלום מנהל המערכת, אני כאן לעדכן את המוח שלי ואת ארגז הכלים שלי. איזה כלי חדש נלמד היום?`
-      : userRole === "MANAGER"
-        ? `שלום הבוס! אני מוכן לעבודה. איך אפשר לעזור לך לנהל את העסק היום?`
-        : `שלום! אני ${agentName || "Dotty"}, איך אפשר לעזור לך היום?`;
-
-  const [message, setMessage] = useState(initialWelcome);
-
+  const [message, setMessage] = useState("");
   const [generativeUI, setGenerativeUI] = useState<any[]>([]);
 
   const [userText, setUserText] = useState("");
@@ -500,9 +656,11 @@ export default function DottyChatClient({
   const [isInfoMode, setIsInfoMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [interactionId, setInteractionId] = useState("");
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -520,14 +678,18 @@ export default function DottyChatClient({
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      let savedSession = localStorage.getItem("dotty_session_id");
+      const storageKeyPrefix = `agent_session_${agentId || officeSlug || "default"}`;
+      const sessionKey = `${storageKeyPrefix}_id`;
+      const interactionKey = `${storageKeyPrefix}_interaction_id`;
+
+      let savedSession = localStorage.getItem(sessionKey);
       if (!savedSession) {
         savedSession = `dotty_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        localStorage.setItem("dotty_session_id", savedSession);
+        localStorage.setItem(sessionKey, savedSession);
       }
       setSessionId(savedSession);
       
-      let savedInteraction = localStorage.getItem("dotty_interaction_id");
+      let savedInteraction = localStorage.getItem(interactionKey);
       if (savedInteraction) {
         setInteractionId(savedInteraction);
       }
@@ -567,7 +729,14 @@ export default function DottyChatClient({
         recognitionRef.current.stop();
       }
     };
-  }, []);
+  }, []); // Run once on mount
+
+  // Trigger init greeting once session is ready
+  useEffect(() => {
+      if (sessionId && !hasInteracted && message === "") {
+          handleSend(`[INIT_GREETING] ${missingAssetsAgents?.length || 0}`);
+      }
+  }, [sessionId, hasInteracted, message, missingAssetsAgents]);
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -591,6 +760,7 @@ export default function DottyChatClient({
     }
 
     setIsThinking(true);
+    setHasInteracted(true);
     setMessage("");
     setGenerativeUI([]);
 
@@ -677,29 +847,42 @@ export default function DottyChatClient({
         setGenerativeUI(foundUIs);
         setSelectedMedia(null); // clear media after send
 
+        const storageKeyPrefix = `agent_session_${agentId || officeSlug || "default"}`;
+        const sessionKey = `${storageKeyPrefix}_id`;
+        const interactionKey = `${storageKeyPrefix}_interaction_id`;
+
         if (data.sessionId) {
           setSessionId(data.sessionId);
-          if (typeof window !== "undefined") localStorage.setItem("dotty_session_id", data.sessionId);
+          if (typeof window !== "undefined") localStorage.setItem(sessionKey, data.sessionId);
         }
 
         if (data.interactionId) {
           setInteractionId(data.interactionId);
-          if (typeof window !== "undefined") localStorage.setItem("dotty_interaction_id", data.interactionId);
+          if (typeof window !== "undefined") localStorage.setItem(interactionKey, data.interactionId);
         }
 
         if (data.audioBase64) {
           try {
-            const audio = new Audio(
-              `data:audio/mp3;base64,${data.audioBase64}`,
-            );
+            const audio = new Audio(`data:audio/mp3;base64,${data.audioBase64}`);
+            audio.onplay = () => setIsPlaying(true);
+            audio.onended = () => {
+              setIsPlaying(false);
+              setMessage(""); // Hide subtitles when audio finishes
+            };
+            audio.onerror = () => setIsPlaying(false);
+            
             audio
               .play()
-              .catch((e) =>
-                console.error("Audio playback blocked by browser:", e),
-              );
+              .catch((e) => {
+                console.error("Audio playback blocked by browser:", e);
+                setIsPlaying(false);
+              });
           } catch (err) {
             console.error("Audio play error", err);
           }
+        } else {
+          // If no audio returned, clear text after 5 seconds
+          setTimeout(() => setMessage(""), 5000);
         }
       } else {
         setMessage("I encountered an error processing that request.");
@@ -744,20 +927,30 @@ export default function DottyChatClient({
         <div className={styles.spacer} />
 
         <div className={styles.messageWrapper}>
-          <div className={styles.messageContainer}>
-            {isThinking ? (
-              <Loader2
-                className={`animate-spin w-10 h-10 mx-auto ${isAdmin ? "text-white" : "text-slate-800"}`}
-              />
-            ) : (
-              <Typewriter text={message} />
-            )}
-          </div>
+          {message && (
+            <div className={styles.messageContainer}>
+              {isThinking ? (
+                <Loader2
+                  className={`animate-spin w-10 h-10 mx-auto ${isAdmin ? "text-white" : "text-slate-800"}`}
+                />
+              ) : (
+                <Typewriter text={message} />
+              )}
+            </div>
+          )}
+
+          {isThinking && !message && (
+             <div className={styles.messageContainer}>
+                <Loader2
+                  className={`animate-spin w-10 h-10 mx-auto ${isAdmin ? "text-white" : "text-slate-800"}`}
+                />
+             </div>
+          )}
 
           {generativeUI.length > 0 && (
             <div className={styles.generativeContainer}>
               {generativeUI.map((ui, idx) => (
-                <GenerativeRenderer key={idx} ui={ui} onAction={handleSend} />
+                <GenerativeRenderer key={idx} ui={ui.type === "MissingAssetsLobby" ? { ...ui, data: { agents: missingAssetsAgents } } : ui} onAction={handleSend} />
               ))}
             </div>
           )}
@@ -780,6 +973,8 @@ export default function DottyChatClient({
                   background: "red",
                   color: "white",
                   borderRadius: "50%",
+                  border: "none",
+                  cursor: "pointer",
                   width: "24px",
                   height: "24px",
                 }}
@@ -814,12 +1009,6 @@ export default function DottyChatClient({
               style={{ display: "none" }}
               onChange={handleFileChange}
             />
-            <button
-              className={`${styles.goldBtn} ${styles.goldBtnSquare}`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Plus size={28} />
-            </button>
 
             {userText.trim().length > 0 || selectedMedia ? (
               <button
@@ -828,6 +1017,17 @@ export default function DottyChatClient({
                 disabled={isThinking}
               >
                 <Play size={28} fill="black" />
+              </button>
+            ) : isPlaying ? (
+              <button
+                className={`${styles.goldBtn} ${styles.goldBtnCircle}`}
+                onClick={() => {}}
+                disabled={true}
+                title="Playing Audio..."
+              >
+                <span className="flex items-center justify-center animate-pulse">
+                  <div className="w-4 h-4 bg-black rounded-full" />
+                </span>
               </button>
             ) : (
               <button

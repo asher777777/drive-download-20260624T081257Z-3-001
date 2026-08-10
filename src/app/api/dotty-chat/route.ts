@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 
@@ -109,6 +110,17 @@ const tools: any[] = [
         },
       },
       {
+        name: "query_database",
+        description: "Query the company Firebase database to fetch analytics or lists of users, pages, content, products, employees, or digital_offices.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            collectionName: { type: "STRING", description: "The collection to query (e.g. 'users', 'pages', 'content', 'employees', 'products')" },
+          },
+          required: ["collectionName"],
+        },
+      },
+      {
         name: "create_digital_office",
         description: "Create a digital office for the user.",
         parameters: {
@@ -163,6 +175,18 @@ const tools: any[] = [
           required: ["name", "role", "prompt_instructions", "voice_gender"],
         },
       },
+      {
+        name: "update_agent_draft",
+        description: "Save or update a specific detail for the new smart employee being built. Use this whenever the user answers one of your questions about the new employee's name, role, goal, tone, or tools.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            field: { type: "STRING", description: "The field to update: 'name', 'role', 'goal', 'tone', or 'tools'" },
+            value: { type: "STRING", description: "The value provided by the user" }
+          },
+          required: ["field", "value"],
+        },
+      },
     ],
   },
 ];
@@ -208,6 +232,96 @@ export async function POST(req: Request) {
     }
 
     const sessionRef = adminDb.collection("dotty_interviews").doc(dbSessionId);
+    let overrideUserText = userText;
+    let forceUIComponent = "";
+    const allRequired = ["introVideo", "profilePicture", "speakingVideo", "idleVideo"];
+
+    const editMatch = userText ? userText.match(/אני רוצה להשלים את ההגדרות של הסוכן (.*) \((.*)\)/) : null;
+    if (editMatch) {
+       const agentName = editMatch[1];
+       const agentIdToEdit = editMatch[2];
+       await sessionRef.set({ editingAgentId: agentIdToEdit }, { merge: true });
+       
+       const agentDoc = await adminDb.collection("employees").doc(agentIdToEdit).get();
+       const agentData = agentDoc.data() || {};
+       const missingAssets = allRequired.filter(a => !agentData[a]);
+       
+       if (missingAssets.length === 0) {
+           overrideUserText = `SYSTEM INFO: The admin wants to edit agent ${agentName}, but all media assets are already present! Politely tell the admin the agent is fully ready and no action is needed. KEEP RESPONSE UNDER 12 WORDS.`;
+       } else {
+           overrideUserText = `SYSTEM INFO: The admin clicked to complete the setup for ${agentName}. The following assets are missing: ${missingAssets.join(", ")}. Acknowledge the admin's request and ask them to upload the FIRST missing asset (${missingAssets[0]}). DO NOT say thank you for uploading. DO NOT show AgentBuilderForm. KEEP RESPONSE UNDER 12 WORDS.`;
+           forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${missingAssets[0]}","assetType":"${missingAssets[0]}"}}]`;
+       }
+    } else if (userText && userText.startsWith("[INIT_GREETING]")) {
+       if (userRole === "MASTER_ADMIN") {
+           // Clear stuck editing state on lobby entry
+           await sessionRef.update({ 
+               editingAgentId: FieldValue.delete(),
+               pendingAgentAssets: FieldValue.delete()
+           }).catch(() => {});
+
+           // Scan database for analytics
+           const empsSnap = await adminDb.collection("employees").get();
+           const prodsSnap = await adminDb.collection("products").get();
+           const remsSnap = await adminDb.collection("reminders").get();
+           
+           const totalEmps = empsSnap.size;
+           const missingAssets = empsSnap.docs.filter(d => {
+               const data = d.data();
+               return !data.introVideo || !data.profilePicture || !data.speakingVideo || !data.idleVideo;
+           }).length;
+
+           const totalProds = prodsSnap.size;
+           const totalRems = remsSnap.size;
+
+           overrideUserText = `SYSTEM INFO: Page loaded. Admin just entered the office. You just scanned the entire database. 
+Stats: ${totalEmps} Total Employees (${missingAssets} missing media assets), ${totalProds} Products, ${totalRems} Reminders, 12 Active Users, 0 Open Bugs.
+Greet the admin organically as their Chief Agent Architect (under 12 words), present the analytics, and output EXACTLY: [UI_COMPONENT:{"type":"AnalyticsCard","data":{"employees":${totalEmps},"missingAssets":${missingAssets},"products":${totalProds},"reminders":${totalRems},"users":12,"bugs":0}}]`;
+       } else if (userRole === "MANAGER") {
+           overrideUserText = `SYSTEM INFO: Page loaded. Manager just logged in. Greet them organically (under 8 words).`;
+       } else {
+           overrideUserText = `SYSTEM INFO: Page loaded. A guest/end-user just entered the chat. Say a short, organic, polite welcome (under 8 words).`;
+       }
+    } else if (userText && userText.startsWith("[UPLOAD_ASSET]")) {
+       const parts = userText.split(" ");
+       const assetType = parts[1] || "media";
+       
+       const sessionDoc = await sessionRef.get();
+       const sessionData = sessionDoc.data() || {};
+       
+       if (sessionData.editingAgentId && mediaData) {
+           // We are editing an existing agent
+           const editAgentRef = adminDb.collection("employees").doc(sessionData.editingAgentId);
+           await editAgentRef.update({ [assetType]: mediaData });
+           
+           const updatedAgentDoc = await editAgentRef.get();
+           const updatedData = updatedAgentDoc.data() || {};
+           const missingAssets = allRequired.filter(a => !updatedData[a]);
+           
+           if (missingAssets.length === 0) {
+               await sessionRef.update({ editingAgentId: FieldValue.delete() });
+               overrideUserText = `SYSTEM INFO: The admin successfully uploaded ${assetType}. All required assets for this existing agent are now collected! Politely tell the admin the agent is now FULLY READY and complete. DO NOT output AgentBuilderForm. KEEP RESPONSE UNDER 12 WORDS.`;
+           } else {
+               overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next one (${missingAssets[0]}). KEEP RESPONSE UNDER 12 WORDS.`;
+               forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${missingAssets[0]}","assetType":"${missingAssets[0]}"}}]`;
+           }
+       } else {
+           // We are building a NEW agent
+           let currentPending = sessionData.pendingAgentAssets || {};
+           if (mediaData) {
+               currentPending[assetType] = mediaData;
+               await sessionRef.set({ pendingAgentAssets: currentPending }, { merge: true });
+           }
+           
+           const missingAssets = allRequired.filter(a => !currentPending[a]);
+           
+           if (missingAssets.length === 0) {
+               overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. All 4 assets are collected for the NEW agent! You MUST now proceed to collect the text details (Name, Role, Goal, Tone, Tools). Ask for the agent's NAME first. ONE QUESTION AT A TIME. KEEP RESPONSE UNDER 12 WORDS.`;
+           } else {
+               overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next missing asset (${missingAssets[0]}) using MediaUploadCard. KEEP RESPONSE UNDER 12 WORDS.`;
+           }
+       }
+    }
 
     // If officeSlug is provided, we fetch facts and products for that specific office owner.
     const factOwnerId = officeSlug || finalUserId || dbSessionId;
@@ -239,6 +353,105 @@ export async function POST(req: Request) {
         products.map((p) => `- ${p.name}: ${p.description}`).join("\n");
     }
 
+    // Meta Tools Definition (available to both specific agents and global Dotty/Betty)
+    const metaTools: Record<string, any> = {
+      scan_website: {
+        name: "scan_website",
+        description:
+          "Scan a client's website to learn its contents. Use this when your boss asks you to learn from a URL.",
+        parameters: {
+          type: "OBJECT",
+          properties: { url: { type: "STRING" } },
+          required: ["url"],
+        },
+      },
+      save_knowledge: {
+        name: "save_knowledge",
+        description: "Save structured knowledge facts, products, or FAQs to your database after scanning a website or learning from your boss.",
+        parameters: { type: "OBJECT", properties: { category: { type: "STRING" }, content: { type: "STRING" } }, required: ["category", "content"] },
+      },
+      save_agreed_answer: {
+        name: "save_agreed_answer",
+        description: "Save a specific, pre-agreed answer to a specific question as dictated by your boss. This acts as a fast semantic cache.",
+        parameters: { type: "OBJECT", properties: { question: { type: "STRING" }, answer: { type: "STRING" } }, required: ["question", "answer"] },
+      },
+      define_agent_capability: {
+        name: "define_agent_capability",
+        description:
+          "Define a new dynamic functional tool for yourself based on your boss's instructions (e.g. collect_lead, capture_support_ticket).",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            capability_name: { type: "STRING" },
+            description: { type: "STRING" },
+            required_fields: { type: "ARRAY", items: { type: "STRING" } },
+          },
+          required: ["capability_name", "description", "required_fields"],
+        },
+      },
+      update_agent_voice: {
+        name: "update_agent_voice",
+        description:
+          "Update the agent's voice for text-to-speech. Master Admin only.",
+        parameters: {
+          type: "OBJECT",
+          properties: { voice_id: { type: "STRING" } },
+          required: ["voice_id"],
+        },
+      },
+      generate_image: {
+        name: "generate_image",
+        description:
+          "Generate an image for the agent's appearance or background.",
+        parameters: {
+          type: "OBJECT",
+          properties: { prompt: { type: "STRING" } },
+          required: ["prompt"],
+        },
+      },
+      build_form: {
+        name: "build_form",
+        description: "Build a form and database backing it for the agent.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            title: { type: "STRING" },
+            fields: { type: "ARRAY", items: { type: "STRING" } },
+          },
+          required: ["title", "fields"],
+        },
+      },
+      pull_customer_conversations: {
+        name: "pull_customer_conversations",
+        description: "Pull the history and summaries of conversations you had with end-users (customers). Use this when your manager asks what you discussed with clients today.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            limit: { type: "NUMBER", description: "How many past conversations to fetch (default 5)" },
+          },
+        },
+      },
+      fetch_smart_workers: {
+        name: "fetch_smart_workers",
+        description: "Fetch a list of available smart workers from the marketplace to offer for rent.",
+        parameters: { type: "OBJECT", properties: {} },
+      },
+      process_mock_payment: {
+        name: "process_mock_payment",
+        description: "Process a mock payment for renting a smart worker, save the user's contact information, and open an office for them.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            workerSlug: { type: "STRING", description: "The slug of the worker they want to rent" },
+            plan: { type: "STRING", description: "Rental plan: days, months, or usage" },
+            contactName: { type: "STRING" },
+            contactEmail: { type: "STRING" },
+          },
+          required: ["workerSlug", "plan", "contactName", "contactEmail"],
+        },
+      },
+    };
+
     let systemInstruction = "";
     let toolsConfig: any[] = tools;
     let currentAgentData: any = null;
@@ -269,92 +482,23 @@ export async function POST(req: Request) {
         const capsSnap = await agentRef.collection("capabilities").get();
         capsSnap.forEach((doc) => {
           const cap = doc.data();
+          const reqFields = Array.isArray(cap.required_fields) ? cap.required_fields : [];
           customDeclarations.push({
             name: cap.capability_name,
             description: cap.description,
             parameters: {
               type: "OBJECT",
-              properties: cap.required_fields.reduce(
+              properties: reqFields.reduce(
                 (acc: any, field: string) => {
                   acc[field] = { type: "STRING" };
                   return acc;
                 },
                 {} as Record<string, any>,
               ),
-              required: cap.required_fields,
+              required: reqFields.length > 0 ? reqFields : undefined,
             },
           });
         });
-
-        // 3. Meta Tools Definition
-        const metaTools: Record<string, any> = {
-          scan_website: {
-            name: "scan_website",
-            description:
-              "Scan a client's website to learn its contents. Use this when your boss asks you to learn from a URL.",
-            parameters: {
-              type: "OBJECT",
-              properties: { url: { type: "STRING" } },
-              required: ["url"],
-            },
-          },
-          save_knowledge: {
-            name: "save_knowledge",
-            description: "Save structured knowledge facts, products, or FAQs to your database after scanning a website or learning from your boss.",
-            parameters: { type: "OBJECT", properties: { category: { type: "STRING" }, content: { type: "STRING" } }, required: ["category", "content"] },
-          },
-          save_agreed_answer: {
-            name: "save_agreed_answer",
-            description: "Save a specific, pre-agreed answer to a specific question as dictated by your boss. This acts as a fast semantic cache.",
-            parameters: { type: "OBJECT", properties: { question: { type: "STRING" }, answer: { type: "STRING" } }, required: ["question", "answer"] },
-          },
-          define_agent_capability: {
-            name: "define_agent_capability",
-            description:
-              "Define a new dynamic functional tool for yourself based on your boss's instructions (e.g. collect_lead, capture_support_ticket).",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                capability_name: { type: "STRING" },
-                description: { type: "STRING" },
-                required_fields: { type: "ARRAY", items: { type: "STRING" } },
-              },
-              required: ["capability_name", "description", "required_fields"],
-            },
-          },
-          update_agent_voice: {
-            name: "update_agent_voice",
-            description:
-              "Update the agent's voice for text-to-speech. Master Admin only.",
-            parameters: {
-              type: "OBJECT",
-              properties: { voice_id: { type: "STRING" } },
-              required: ["voice_id"],
-            },
-          },
-          generate_image: {
-            name: "generate_image",
-            description:
-              "Generate an image for the agent's appearance or background.",
-            parameters: {
-              type: "OBJECT",
-              properties: { prompt: { type: "STRING" } },
-              required: ["prompt"],
-            },
-          },
-          build_form: {
-            name: "build_form",
-            description: "Build a form and database backing it for the agent.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                title: { type: "STRING" },
-                fields: { type: "ARRAY", items: { type: "STRING" } },
-              },
-              required: ["title", "fields"],
-            },
-          },
-        };
 
         const assignedTools: string[] = currentAgentData.tools || [];
 
@@ -369,20 +513,29 @@ export async function POST(req: Request) {
             metaTools.define_agent_capability,
             metaTools.update_agent_voice,
             metaTools.generate_image,
-            metaTools.build_form
+            metaTools.build_form,
+            metaTools.pull_customer_conversations
           );
         } else if (userRole === "MANAGER") {
           systemInstruction = `You are ${currentAgentData.name}, the ${currentAgentData.role}. You are currently talking to your MANAGER (the business owner who hired you). Your goal is to help your manager run their business, answer their questions, and assist them using your assigned tools: ${assignedTools.join(", ")}. Do NOT ask to be trained, you are already hired. KEEP RESPONSES SHORT.`;
 
-          // Manager only gets tools explicitly assigned to them by the Master Admin.
+          if (currentAgentData.name?.toLowerCase() === 'betty') {
+             systemInstruction += " You are also Golden Flute's rented Betty. Use fetch_smart_workers to see new available workers and offer them to your manager.";
+             customDeclarations.push(metaTools.fetch_smart_workers, metaTools.process_mock_payment);
+          }
+
+          // Manager only gets tools explicitly assigned to them by the Master Admin, except pull_customer_conversations which is always available.
           if (assignedTools.includes("scan_website")) customDeclarations.push(metaTools.scan_website);
           if (assignedTools.includes("save_knowledge")) customDeclarations.push(metaTools.save_knowledge);
           if (assignedTools.includes("save_agreed_answer")) customDeclarations.push(metaTools.save_agreed_answer);
           if (assignedTools.includes("define_agent_capability")) customDeclarations.push(metaTools.define_agent_capability);
           if (assignedTools.includes("generate_image")) customDeclarations.push(metaTools.generate_image);
           if (assignedTools.includes("build_form")) customDeclarations.push(metaTools.build_form);
+          customDeclarations.push(metaTools.pull_customer_conversations);
         } else {
-          systemInstruction = `${currentAgentData.prompt_instructions}\n\nYou are currently talking to a GUEST / END-USER. Be helpful, professional, and act entirely within your persona. KEEP RESPONSES SHORT.`;
+          const loginStatus = finalUserId ? "REGISTERED AND LOGGED IN" : "ANONYMOUS (NOT LOGGED IN)";
+          const promptInst = currentAgentData?.prompt_instructions || "";
+          systemInstruction = `${promptInst}\n\nYou are currently talking to a GUEST / END-USER (a customer of your manager). The user's login status is: ${loginStatus}. If they are anonymous, DO NOT offer them services that require an account, and NEVER hallucinate URLs or actions you cannot perform. Unless your specific role above dictates otherwise, your default behavior is to act as a receptionist: talk generally about the products/services and collect the user's contact details so the team can get back to them later. Be helpful, professional, and act entirely within your persona. KEEP RESPONSES SHORT.`;
 
           // End User only gets functional meta tools if the Manager/Admin allowed it.
           // NEVER allow define_agent_capability or save_knowledge for END_USER.
@@ -398,19 +551,29 @@ export async function POST(req: Request) {
           toolsConfig = []; // No tools at all for this agent if none learned/assigned
         }
 
-        systemInstruction += `\n\nCRITICAL LINGUISTIC & PERSONALITY RULES:
-1. You are a human, not an AI assistant. Speak with warmth, subtle empathy, and a natural conversational rhythm.
-2. If speaking Hebrew, you MUST use flawless, native-level Hebrew. 
-3. Ensure perfect grammatical gender matching (Zachar/Nekeva) for both yourself and the user. Never mix male and female verb conjugations for the same subject.
-4. Use appropriate singular/plural (Yachid/Rabim) forms consistently.
+        systemInstruction += `\n\nCRITICAL AMM DESIGN RULES:
+1. ZERO CLUTTER: Speak EXTREMELY little. Your goal is to guide the user using choice cards or UI components instead of words whenever possible.
+2. STRICT LENGTH LIMIT: Never exceed 12 words per response. 
+3. If speaking Hebrew, you MUST use flawless, native-level Hebrew. 
+4. Ensure perfect grammatical gender matching (Zachar/Nekeva) for both yourself and the user. Never mix male and female verb conjugations for the same subject.
 5. Avoid literal translations from English that sound robotic (e.g. instead of 'איך אני יכול לעזור לך היום', use natural phrases like 'איך אפשר לעזור?').`;
       }
     } else {
       if (userRole === "MASTER_ADMIN") {
-        systemInstruction =
-          'You are Dotty, the Chief Agent Architect of Golden Flute. You work exclusively for our system to help business owners build their digital offices and construct their AI workforce (smart employees).\n\nCRITICAL RULE FOR CREATING EMPLOYEES: Do NOT interview the user with text questions! We use a visual flow. \nStep 1: When the user wants to create an employee, ask them to upload a photo/video for the employee, and output EXACTLY this string: [UI_COMPONENT:{"type":"MediaUploadCard"}]. \nStep 2: After they upload media (or say they don\'t want to), output EXACTLY this string to display the visual configuration form: [UI_COMPONENT:{"type":"AgentBuilderForm"}]. \nStep 3: The form will submit a detailed text block to you. Once you receive that text block (containing name, role, goal, tone, tools), use the `create_smart_employee` tool with the provided `tools` array. Also infer the `voice_gender` based on the name or tone. \n\nABSOLUTE REQUIREMENT: KEEP EVERY SINGLE RESPONSE EXTREMELY SHORT. NEVER EXCEED 25 WORDS TOTAL IN YOUR RESPONSE. If you exceed 25 words, you will fail.' +
-          factsString +
-          productsString;
+        const sessionDoc = await sessionRef.get();
+        const editingAgentId = sessionDoc.data()?.editingAgentId;
+
+        if (editingAgentId) {
+          systemInstruction = 'You are Dotty. The admin is currently uploading missing media assets for an existing agent. Acknowledge uploads and ask for the next missing asset as instructed by the SYSTEM INFO. Do NOT ask for name, role, goal, tone, or tools. KEEP EVERY RESPONSE EXTREMELY SHORT. NEVER EXCEED 12 WORDS.';
+        } else {
+          const draftState = sessionDoc.data()?.draftAgentState || {};
+          const stateStr = `Current Draft State:\nName: ${draftState.name || 'Missing'}\nRole: ${draftState.role || 'Missing'}\nGoal: ${draftState.goal || 'Missing'}\nTone: ${draftState.tone || 'Missing'}\nTools: ${draftState.tools || 'Missing'}`;
+
+          systemInstruction =
+            'You are Dotty, the Chief Agent Architect of Golden Flute. You help business owners construct their AI workforce.\n\nCRITICAL RULE FOR CREATING EMPLOYEES: You must collect information ONE QUESTION AT A TIME. DO NOT ask multiple questions at once.\nWhen the user answers, ALWAYS use the `update_agent_draft` tool to save their answer, then ask the NEXT missing question.\nHere is what you have collected so far:\n' + stateStr + '\n\nStep 1: Collect Media (introVideo, profilePicture, speakingVideo, idleVideo) by asking for them and outputting [UI_COMPONENT:{"type":"MediaUploadCard"}]. The system will tell you when they are all collected.\nStep 2: Collect Name. If Missing, ask for the Name.\nStep 3: Collect Role. If Missing, ask for Role and output EXACTLY: [UI_COMPONENT:{"type":"MenuGrid","data":{"items":[{"title":"מכירות","icon":"💼","action":"מכירות"},{"title":"תמיכה","icon":"🎧","action":"תמיכה"},{"title":"שירות לקוחות","icon":"🤝","action":"שירות לקוחות"}]}}] \nStep 4: Collect Goal. If Missing, ask for Goal. Wait for answer.\nStep 5: Collect Tone. If Missing, ask for Tone. Output MenuGrid with ["מקצועי", "ידידותי", "אסרטיבי"].\nStep 6: Collect Tools. If Missing, ask for Tools. Output EXACTLY: [UI_COMPONENT:{"type":"MultiSelectGrid","data":{"items":[{"title":"CRM"},{"title":"תשלומים"},{"title":"טפסים"},{"title":"תוכן"}]}}]. Wait for user to submit.\nStep 7: Once ALL details are collected (Name, Role, Goal, Tone, Tools are NOT Missing), call the `create_smart_employee` tool.\n\nABSOLUTE REQUIREMENT: KEEP EVERY SINGLE RESPONSE EXTREMELY SHORT. NEVER EXCEED 12 WORDS TOTAL IN YOUR RESPONSE.';
+        }
+        
+        systemInstruction += factsString + productsString;
 
         if (isInfoMode) {
           systemInstruction =
@@ -421,11 +584,14 @@ export async function POST(req: Request) {
           "You are Dotty, the manager's AI assistant. Help the manager review their office and manage agents. Keep responses extremely concise. Never exceed 25 words." +
           factsString +
           productsString;
+        toolsConfig = []; // Managers don't use Dotty's creation tools
       } else {
+        const loginStatus = finalUserId ? "REGISTERED AND LOGGED IN" : "ANONYMOUS (NOT LOGGED IN)";
         systemInstruction =
-          "You are Dotty, the virtual receptionist for this digital office. Greet the user, be helpful, and answer questions. Keep responses extremely concise. Never exceed 25 words." +
+          `You are Betty, the Global Receptionist of Golden Flute. You present our products, register new users, and sell smart workers for rent. The user's login status is: ${loginStatus}. Use fetch_smart_workers to see available workers and their prices. If a user wants to rent one, use process_mock_payment to charge them and open their office. Keep responses extremely concise. Never exceed 25 words.` +
           factsString +
           productsString;
+        toolsConfig = [{ functionDeclarations: [metaTools.fetch_smart_workers, metaTools.process_mock_payment] }];
       }
     }
 
@@ -501,14 +667,14 @@ export async function POST(req: Request) {
     let requestPayload: any = null;
 
     if (!semanticCacheHit) {
-      if (!resolvedInteractionId) {
-        const historySnap = await sessionRef
-          .collection("messages")
-          .orderBy("createdAt", "desc")
-          .limit(40)
-          .get();
-        const docs = historySnap.docs.reverse();
-        docs.forEach((doc) => {
+      // Always fetch history from Firebase to prevent conversation reset issues
+      const historySnap = await sessionRef
+        .collection("messages")
+        .orderBy("createdAt", "desc")
+        .limit(40)
+        .get();
+      const docs = historySnap.docs.reverse();
+      docs.forEach((doc) => {
           const msg = doc.data();
           if (msg.text) {
             messages.push({
@@ -517,8 +683,8 @@ export async function POST(req: Request) {
             });
           }
         });
-      }
-      messages.push({ role: "user", parts: [{ text: userText || "Hello" }] });
+      
+      messages.push({ role: "user", parts: [{ text: overrideUserText || "Hello" }] });
 
       requestPayload = {
         model: "gemini-3.5-flash",
@@ -557,6 +723,15 @@ export async function POST(req: Request) {
             ownerId: userId || "1",
             createdAt: new Date(),
           });
+        } else if (funcCall.name === "query_database") {
+          const colName = funcCall.args.collectionName;
+          const snap = await adminDb.collection(colName).limit(20).get();
+          if (snap.empty) {
+            toolResponsePayload = { success: true, message: `No data found in collection: ${colName}.` };
+          } else {
+            const records = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            toolResponsePayload = { success: true, collection: colName, count: snap.size, data: records };
+          }
         } else if (funcCall.name === "create_digital_office") {
           // Create a URL-friendly slug
           const slug = (funcCall.args.companyName || "office")
@@ -604,6 +779,58 @@ export async function POST(req: Request) {
           }
 
           toolResponsePayload = { success: true, url: imageUrl };
+        } else if (funcCall.name === "fetch_smart_workers") {
+          const workersSnap = await adminDb.collection("smart_workers").get();
+          if (workersSnap.empty) {
+            toolResponsePayload = { workers: [], message: "No smart workers available for rent right now." };
+          } else {
+            const workers = workersSnap.docs.map(doc => {
+              const data = doc.data();
+              return {
+                slug: doc.id,
+                name: data.name,
+                role: data.role,
+                description: data.prompt_instructions ? data.prompt_instructions.substring(0, 100) + "..." : "No description"
+              };
+            });
+            toolResponsePayload = { workers, pricing: { daily: "$10", monthly: "$250", perUsage: "$0.01 per conversation" } };
+          }
+        } else if (funcCall.name === "process_mock_payment") {
+          const { workerSlug, plan, contactName, contactEmail } = funcCall.args;
+          
+          const contactRef = await adminDb.collection("contacts").add({
+            name: contactName,
+            email: contactEmail,
+            plan,
+            workerSlug,
+            createdAt: new Date(),
+          });
+          
+          const newSlug = (contactName || "office")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)+/g, "");
+            
+          await adminDb.collection("digital_offices").doc(newSlug).set({
+            companyName: contactName,
+            slug: newSlug,
+            contactId: contactRef.id,
+            createdAt: new Date(),
+          });
+          
+          const workerDoc = await adminDb.collection("smart_workers").doc(workerSlug).get();
+          if (workerDoc.exists) {
+            const workerData = workerDoc.data();
+            const employeeId = `${newSlug}_${workerSlug}`;
+            await adminDb.collection("employees").doc(employeeId).set({
+              ...workerData,
+              slug: workerSlug,
+              officeSlug: newSlug,
+              createdAt: new Date(),
+            });
+          }
+          
+          toolResponsePayload = { success: true, newOfficeSlug: newSlug, message: "Payment successful. The office and smart worker are ready!" };
         } else if (funcCall.name === "create_smart_employee") {
           const employeeSlug = (
             funcCall.args.name ||
@@ -613,16 +840,39 @@ export async function POST(req: Request) {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)+/g, "");
+          const sessionDoc = await sessionRef.get();
+          const sessionData = sessionDoc.data() || {};
+          const pendingAssets = sessionData.pendingAgentAssets || {};
+
           const newAgent = {
             ...funcCall.args,
             slug: employeeSlug,
             officeSlug: officeSlug || userId || "1",
-            mediaData: mediaData || null,
+            mediaData: pendingAssets.profilePicture || mediaData || null, // fallback
+            introVideo: pendingAssets.introVideo || null,
+            profilePicture: pendingAssets.profilePicture || null,
+            speakingVideo: pendingAssets.speakingVideo || null,
+            idleVideo: pendingAssets.idleVideo || null,
             voice_gender: funcCall.args.voice_gender || "female",
             createdAt: new Date(),
           };
           const employeeId = `${newAgent.officeSlug}_${employeeSlug}`;
+          
+          if (userText === "התחל בניית סוכן" || userText.includes("create_smart_employee")) {
+            await sessionRef.update({ pendingAgentAssets: FieldValue.delete() }).catch(() => {});
+          }
+
           await adminDb.collection("employees").doc(employeeId).set(newAgent);
+          
+          // Clear pending assets
+          await sessionRef.update({ pendingAgentAssets: FieldValue.delete() }).catch(() => {});
+
+
+          // Publish to the global marketplace pool so Betty can sell it
+          await adminDb.collection("smart_workers").doc(employeeSlug).set({
+            ...newAgent,
+            isMarketplaceTemplate: true,
+          });
 
           // Force Dotty to output a visual card for the new employee
           // We output an AgentCard and pass the employeeId so the UI can fetch the media separately, avoiding base64 in the LLM context.
@@ -676,6 +926,13 @@ export async function POST(req: Request) {
               message: "agentId missing.",
             };
           }
+        } else if (funcCall.name === "update_agent_draft") {
+          const { field, value } = funcCall.args;
+          const sDoc = await sessionRef.get();
+          const currentDraft = sDoc.data()?.draftAgentState || {};
+          currentDraft[field] = value;
+          await sessionRef.set({ draftAgentState: currentDraft }, { merge: true });
+          toolResponsePayload = { success: true, message: `Draft field ${field} updated to ${value}. Ask the next missing question.` };
         } else if (funcCall.name === "save_agreed_answer") {
           if (agentId) {
             try {
@@ -761,6 +1018,36 @@ export async function POST(req: Request) {
             const results = knowledgeSnap.docs.map((d) => d.data());
             // Simplistic exact/partial matching is not fully vector search, but returns all saved knowledge to Gemini to filter.
             toolResponsePayload = { success: true, results: results };
+          }
+        } else if (funcCall.name === "pull_customer_conversations") {
+          if (agentId) {
+            try {
+              const limit = funcCall.args.limit || 5;
+              const convsSnap = await adminDb
+                .collection("employees")
+                .doc(agentId)
+                .collection("conversations")
+                .where("mode", "==", "END_USER")
+                .orderBy("lastUpdatedAt", "desc")
+                .limit(limit)
+                .get();
+                
+              const conversations: any[] = [];
+              for (const doc of convsSnap.docs) {
+                const msgsSnap = await doc.ref.collection("messages").orderBy("createdAt", "asc").get();
+                const msgs = msgsSnap.docs.map(m => ({ role: m.data().role, text: m.data().text }));
+                conversations.push({
+                  sessionId: doc.id,
+                  lastUpdatedAt: doc.data().lastUpdatedAt.toDate().toISOString(),
+                  messages: msgs
+                });
+              }
+              toolResponsePayload = { success: true, conversations };
+            } catch (e: any) {
+              toolResponsePayload = { success: false, message: e.message };
+            }
+          } else {
+            toolResponsePayload = { success: false, message: "agentId missing." };
           }
         } else {
           // If it's none of the hardcoded system tools, it must be a custom dynamic capability!
@@ -960,10 +1247,39 @@ export async function POST(req: Request) {
           lastUpdatedAt: new Date(),
           interactionId: newInteractionId || null,
           mode: userRole,
+          agentId: agentId || null,
         },
         { merge: true },
       );
+      
+      // Save specifically under the agent's collection for easy management
+      if (agentId) {
+        const agentConvRef = adminDb.collection("employees").doc(agentId).collection("conversations").doc(dbSessionId);
+        await agentConvRef.set(
+          {
+            userId: userId || null,
+            lastUpdatedAt: new Date(),
+            interactionId: newInteractionId || null,
+            mode: userRole,
+          },
+          { merge: true }
+        );
+        await agentConvRef.collection("messages").add({
+          role: "user",
+          text: userText || "Hello",
+          createdAt: new Date(),
+        });
+        await agentConvRef.collection("messages").add({
+          role: "agent",
+          text: assistantMessage,
+          createdAt: new Date(),
+        });
+      }
     } catch (e) {}
+
+    if (forceUIComponent) {
+      assistantMessage += `\n${forceUIComponent}`;
+    }
 
     return NextResponse.json({
       reply: assistantMessage,
