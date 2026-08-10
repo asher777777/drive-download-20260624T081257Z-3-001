@@ -4,8 +4,13 @@ import { FieldValue } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 
-// Initialize the Google GenAI SDK
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// The user mistakenly put an OAuth token (starts with AQ.) in GEMINI_API_KEY, which causes "insufficient scopes" errors. 
+// We fallback to the Firebase API key which is valid for Gemini if the API is enabled on the GCP project.
+let geminiKey = process.env.GEMINI_API_KEY;
+if (!geminiKey || geminiKey.startsWith("AQ.")) {
+  geminiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+}
+const ai = new GoogleGenAI({ apiKey: geminiKey });
 
 // Initialize Google Cloud TTS Client
 let ttsClient: TextToSpeechClient | null = null;
@@ -697,7 +702,7 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
 
     if (userText && userRole !== "MASTER_ADMIN" && agentId) {
       try {
-        const embedResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${process.env.GEMINI_API_KEY}`, {
+        const embedResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1123,7 +1128,7 @@ Greet the admin organically as their Chief Agent Architect (under 12 words), pre
             try {
               // 1. Generate Vector
               let vector = null;
-              const embedResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${process.env.GEMINI_API_KEY}`, {
+              const embedResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
