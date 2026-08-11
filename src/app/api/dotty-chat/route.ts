@@ -194,6 +194,63 @@ const tools: any[] = [
           required: ["field", "value"],
         },
       },
+      {
+        name: "switch_agent_context",
+        description: "Switch Dotty's active target agent to edit, manage, or train (e.g. 'betty', 'sari', 'מיכאל', or an employee ID). Use this when the user says 'אנחנו עובדים עכשיו על בטי' or wants to manage a specific worker.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            agentIdOrName: { type: "STRING", description: "The name, slug, or ID of the agent to manage (e.g. 'betty', 'sari', '1_agent_123')" }
+          },
+          required: ["agentIdOrName"]
+        }
+      },
+      {
+        name: "edit_agent_profile",
+        description: "Update the configuration, instructions, name, role, voice, or pricing of an agent (such as Betty or any smart worker/employee). Saves immediately to the database in the exact right collection.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            agentId: { type: "STRING", description: "The agent ID or slug (e.g. 'betty')" },
+            name: { type: "STRING", description: "Updated name" },
+            role: { type: "STRING", description: "Updated role" },
+            prompt_instructions: { type: "STRING", description: "Updated detailed system prompt instructions" },
+            voice_gender: { type: "STRING", description: "'male' or 'female'" },
+            description: { type: "STRING", description: "Short description" }
+          },
+          required: ["agentId"]
+        }
+      },
+      {
+        name: "add_agent_agreed_answer",
+        description: "Add a trained question-and-answer pair (agreed answer / Q&A) for a specific agent (like Betty) so they know how to answer it immediately.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            agentId: { type: "STRING", description: "The agent ID (e.g. 'betty')" },
+            question: { type: "STRING", description: "The question or scenario" },
+            answer: { type: "STRING", description: "The precise answer the agent should give" },
+            category: { type: "STRING", description: "Optional category" }
+          },
+          required: ["agentId", "question", "answer"]
+        }
+      },
+      {
+        name: "get_agent_details",
+        description: "Fetch the current settings, prompt, Q&As, and status of a specific agent (such as Betty) to review what is configured.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            agentIdOrName: { type: "STRING", description: "The agent ID or name (e.g. 'betty')" }
+          },
+          required: ["agentIdOrName"]
+        }
+      },
+      {
+        name: "list_system_agents",
+        description: "List all smart workers and employees in the system with their status and IDs.",
+        parameters: { type: "OBJECT", properties: {} }
+      },
     ],
   }
 ];
@@ -313,7 +370,8 @@ export async function POST(req: Request) {
            // Clear stuck editing state on lobby entry
            await sessionRef.update({ 
                editingAgentId: FieldValue.delete(),
-               pendingAgentAssets: FieldValue.delete()
+               pendingAgentAssets: FieldValue.delete(),
+               draftAgentState: FieldValue.delete()
            }).catch(() => {});
 
            // Scan database for analytics
@@ -341,26 +399,33 @@ export async function POST(req: Request) {
                title: "סטטוס ארכיטקטורה", 
                text: `המערכת מורכבת מ-${totalEmps} סוכנים, ${systemMetrics.totalFiles} קבצי קוד, ו-${systemMetrics.totalAppRoutes} נתיבים ראשיים.` 
            };
-           let nextInsights = "";
+           // Select a dynamic greeting to avoid being repetitive
+           const greetings = [
+             "Welcome back. How can we optimize the system today?",
+             "System online. Ready when you are.",
+             "All systems operational. What's on the agenda?",
+             "Hello. I'm ready to assist with agent management."
+           ];
+           const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
            let agentInstruction = "";
-           
+
            if (missingAssets > 0) {
                primaryInsight = {
                    icon: "AlertCircle",
-                   title: "פעולה נדרשת", text: `${missingAssets} סוכנים ממתינים להשלמת נכסי מדיה!`
+                   title: "פעולה נדרשת", text: `${missingAssets} סוכנים ממתינים להשלמת נכסי מדיה`
                };
-               nextInsights = `1. The system has ${totalEmps} total agents and ${systemMetrics.totalFiles} codebase files.`;
-               agentInstruction = "The first insight card about missing assets is already displayed. Ask the admin if they want to handle the missing media assets now or review the codebase architecture. Keep it under 15 words.";
+               agentInstruction = `Greet the admin naturally using this vibe: "${randomGreeting}". Mention that there are missing media assets and ask if they want to complete them now. KEEP IT UNDER 15 WORDS.`;
            } else {
-               nextInsights = `1. The system has ${totalProds} active products.\n2. The system has ${systemMetrics.totalFiles} files and ${systemMetrics.totalAppRoutes} routes.\n3. The system has 12 active users.`;
-               agentInstruction = "The first insight card about the architecture and agents is already displayed. Ask the admin what they want to focus on today (codebase or agents). Keep it under 12 words.";
+               primaryInsight = {
+                   icon: "Activity",
+                   title: "מערכת תקינה", text: `מערכת האייג'נטים פועלת כסדרה. כל הסוכנים מוכנים.`
+               };
+               agentInstruction = `Greet the admin naturally using this vibe: "${randomGreeting}". Ask how you can assist them today. KEEP IT UNDER 12 WORDS.`;
            }
 
            overrideUserText = `SYSTEM INFO: Page loaded. Admin just entered the office.
-You have the following additional system insights available to show the admin later:
-${nextInsights}
 INSTRUCTIONS: ${agentInstruction}
-DO NOT output any UI components in your text. You will use 'show_insight_card' tool later if the admin asks for more stats.`;
+DO NOT output any UI components in your text.`;
            
            forceUIComponent = `[UI_COMPONENT:${JSON.stringify({ type: "InsightCard", data: primaryInsight })}]`;
            suppressText = false;
@@ -376,7 +441,12 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
        const sessionDoc = await sessionRef.get();
        const sessionData = sessionDoc.data() || {};
        
-       if (sessionData.editingAgentId && mediaData) {
+       if (sessionData.editingGlobalAgentId && mediaData) {
+            const editAgentRef = adminDb.collection("smart_workers").doc(sessionData.editingGlobalAgentId);
+            await editAgentRef.update({ [assetType]: mediaData });
+            await sessionRef.update({ editingGlobalAgentId: FieldValue.delete() });
+            overrideUserText = `SYSTEM INFO: The admin successfully uploaded the asset ${assetType} to your profile. Acknowledge this with a brief, friendly confirmation in Hebrew. KEEP RESPONSE UNDER 12 WORDS.`;
+       } else if (sessionData.editingAgentId && mediaData) {
             // We are editing an existing agent
             const editAgentRef = adminDb.collection("employees").doc(sessionData.editingAgentId);
             await editAgentRef.update({ [assetType]: mediaData });
@@ -400,13 +470,30 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
             if (mediaData) {
                 currentPending[assetType] = mediaData;
                 await sessionRef.set({ pendingAgentAssets: currentPending }, { merge: true });
+
+                // Mirror directly to the agent's actual document immediately
+                const draftAgent = sessionData.draftAgentState || {};
+                let employeeSlug = draftAgent.slug;
+                if (!employeeSlug) {
+                    employeeSlug = "agent_" + Math.random().toString(36).substring(2, 9);
+                    draftAgent.slug = employeeSlug;
+                    await sessionRef.set({ draftAgentState: draftAgent }, { merge: true });
+                }
+                const tempOfficeSlug = officeSlug || userId || "1";
+                const employeeId = `${tempOfficeSlug}_${employeeSlug}`;
+                await adminDb.collection("employees").doc(employeeId).set({
+                    [assetType]: mediaData,
+                    slug: employeeSlug,
+                    officeSlug: tempOfficeSlug
+                }, { merge: true });
                 
                 const missingAssets = allRequired.filter(a => !currentPending[a]);
                 
                 if (missingAssets.length === 0) {
                     overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. All 4 assets are collected for the NEW agent! You MUST now proceed to collect the text details (Name, Role, Goal, Tone, Tools). Ask for the agent's NAME first. ONE QUESTION AT A TIME. KEEP RESPONSE UNDER 12 WORDS.`;
                 } else {
-                    overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next missing asset (${missingAssets[0]}) using MediaUploadCard. KEEP RESPONSE UNDER 12 WORDS.`;
+                    overrideUserText = `SYSTEM INFO: The admin uploaded ${assetType}. Still missing: ${missingAssets.join(", ")}. Ask the admin to upload the next missing asset (${missingAssets[0]}). YOU MUST EXPLICITLY NAME THE REQUIRED ASSET IN HEBREW: "${assetHebrewNames[missingAssets[0]]}". KEEP RESPONSE UNDER 15 WORDS.`;
+                    forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"העלאת ${assetHebrewNames[missingAssets[0]]}","assetType":"${missingAssets[0]}"}}]`;
                 }
             } else {
                 overrideUserText = `SYSTEM INFO: The admin tried to upload ${assetType} but the upload to cloud storage failed. Apologize briefly and ask them to try again. KEEP RESPONSE UNDER 15 WORDS.`;
@@ -611,6 +698,50 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           required: ["functionName", "actionFile", "params"]
         }
       },
+      crm_get_contacts: {
+        name: "crm_get_contacts",
+        description: "Fetch the list of contacts or customers from the CRM.",
+        parameters: { type: "OBJECT", properties: {} },
+      },
+      crm_create_contact: {
+        name: "crm_create_contact",
+        description: "Create a new contact in the CRM.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            firstName: { type: "STRING" },
+            lastName: { type: "STRING" },
+            phone: { type: "STRING" },
+            email: { type: "STRING" }
+          },
+          required: ["firstName"]
+        },
+      },
+      update_my_own_media: {
+        name: "update_my_own_media",
+        description: "Ask the admin to upload a new video or image for your own global profile. Call this when the Master Admin asks to update your video.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            assetType: { type: "STRING", enum: ["idleVideo", "speakingVideo", "promoVideo", "profilePicture"] },
+            title: { type: "STRING" }
+          },
+          required: ["assetType", "title"]
+        }
+      },
+      crm_update_contact: {
+        name: "crm_update_contact",
+        description: "Update an existing contact in the CRM.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            id: { type: "STRING", description: "The contact ID" },
+            firstName: { type: "STRING" },
+            phone: { type: "STRING" }
+          },
+          required: ["id"]
+        },
+      },
     };
 
     let systemInstruction = "";
@@ -703,7 +834,7 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
 
           if (currentAgentData.name?.toLowerCase() === 'betty') {
              systemInstruction += " You are also Golden Flute's rented Betty. Use fetch_smart_workers to see new available workers and offer them to your manager.";
-             customDeclarations.push(metaTools.fetch_smart_workers, metaTools.process_mock_payment);
+             customDeclarations.push(metaTools.fetch_smart_workers, metaTools.process_mock_payment, metaTools.crm_get_contacts, metaTools.crm_create_contact, metaTools.crm_update_contact, metaTools.update_my_own_media);
           }
 
           // Manager only gets tools explicitly assigned to them by the Master Admin, except pull_customer_conversations which is always available.
@@ -757,7 +888,7 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           const stateStr = `Current Draft State:\nName: ${draftState.name || 'Missing'}\nRole: ${draftState.role || 'Missing'}\nGoal: ${draftState.goal || 'Missing'}\nTone: ${draftState.tone || 'Missing'}\nTools: ${draftState.tools || 'Missing'}`;
 
           systemInstruction =
-            'You are Dotty, the Chief Agent Architect of Golden Flute. You help business owners construct their AI workforce.\n\nCRITICAL RULE FOR CREATING EMPLOYEES: You must collect information ONE QUESTION AT A TIME. DO NOT ask multiple questions at once.\nWhen the user answers, ALWAYS use the `update_agent_draft` tool to save their answer, then ask the NEXT missing question.\nHere is what you have collected so far:\n' + stateStr + '\n\nStep 1: Collect Media (introVideo, promoVideo, idleVideo, speakingVideo, profilePicture, bodyPicture) by asking for them ONE BY ONE and outputting [UI_COMPONENT:{"type":"MediaUploadCard"}]. The system will tell you when they are all collected.\nStep 2: Collect Name. If Missing, ask for the Name.\nStep 3: Collect Role. If Missing, ask for Role and output EXACTLY: [UI_COMPONENT:{"type":"MenuGrid","data":{"items":[{"title":"מכירות","icon":"💼","action":"מכירות"},{"title":"תמיכה","icon":"🎧","action":"תמיכה"},{"title":"שירות לקוחות","icon":"🤝","action":"שירות לקוחות"}]}}] \nStep 4: Collect Goal. If Missing, ask for Goal. Wait for answer.\nStep 5: Collect Tone. If Missing, ask for Tone. Output MenuGrid with ["מקצועי", "ידידותי", "אסרטיבי"].\nStep 6: Collect Tools. If Missing, ask for Tools. Output EXACTLY: [UI_COMPONENT:{"type":"MultiSelectGrid","data":{"items":[{"title":"CRM"},{"title":"תשלומים"},{"title":"טפסים"},{"title":"תוכן"}]}}]. Wait for user to submit.\nStep 7: Once ALL details are collected (Name, Role, Goal, Tone, Tools are NOT Missing), call the `create_smart_employee` tool.\n\nABSOLUTE REQUIREMENT: KEEP EVERY SINGLE RESPONSE EXTREMELY SHORT. NEVER EXCEED 12 WORDS TOTAL IN YOUR RESPONSE.';
+            'You are Dotty, the Chief Agent Architect of Golden Flute. You help business owners construct their AI workforce.\n\nCRITICAL RULE FOR CREATING EMPLOYEES: You must collect information ONE QUESTION AT A TIME. DO NOT ask multiple questions at once.\nWhen the user answers, ALWAYS use the `update_agent_draft` tool to save their answer, then ask the NEXT missing question.\nHere is what you have collected so far:\n' + stateStr + '\n\nStep 1: Collect Media (introVideo, promoVideo, idleVideo, speakingVideo, profilePicture, bodyPicture) by asking for them ONE BY ONE. YOU MUST DO THIS BY EXPLICITLY outputting the MediaUploadCard component with the EXACT assetType you are asking for, e.g. [UI_COMPONENT:{"type":"MediaUploadCard","data":{"assetType":"introVideo","title":"העלאת סרטון"}}]. DO NOT just ask for it in text. DO NOT forget the data block. The system will tell you when they are all collected.\nStep 2: Collect Name. If Missing, ask for the Name.\nStep 3: Collect Role. If Missing, ask for Role and output EXACTLY: [UI_COMPONENT:{"type":"MenuGrid","data":{"items":[{"title":"מכירות","icon":"💼","action":"מכירות"},{"title":"תמיכה","icon":"🎧","action":"תמיכה"},{"title":"שירות לקוחות","icon":"🤝","action":"שירות לקוחות"}]}}] \nStep 4: Collect Goal. If Missing, ask for Goal. Wait for answer.\nStep 5: Collect Tone. If Missing, ask for Tone. Output MenuGrid with ["מקצועי", "ידידותי", "אסרטיבי"].\nStep 6: Collect Tools. If Missing, ask for Tools. Output EXACTLY: [UI_COMPONENT:{"type":"MultiSelectGrid","data":{"items":[{"title":"CRM"},{"title":"תשלומים"},{"title":"טפסים"},{"title":"תוכן"}]}}]. Wait for user to submit.\nStep 7: Once ALL details are collected (Name, Role, Goal, Tone, Tools are NOT Missing), call the `create_smart_employee` tool.\n\nABSOLUTE REQUIREMENT: KEEP EVERY SINGLE RESPONSE EXTREMELY SHORT. NEVER EXCEED 12 WORDS TOTAL IN YOUR RESPONSE.';
         }
         
 
@@ -945,6 +1076,7 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
       }
     }
 
+    let lastToolResponsePayload: any = null;
     const executeTool = async (
       funcCall: any,
       modelCallType: "interactions" | "generateContent",
@@ -1077,18 +1209,38 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           }
           
           toolResponsePayload = { success: true, newOfficeSlug: newSlug, message: "Payment successful. The office and smart worker are ready!" };
+        } else if (funcCall.name === "crm_get_contacts") {
+          const owner = officeSlug || finalUserId || "1";
+          const snap = await adminDb.collection("contacts").where("ownerId", "==", owner).limit(20).get();
+          const contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          toolResponsePayload = { success: true, contacts };
+        } else if (funcCall.name === "crm_create_contact") {
+          const owner = officeSlug || finalUserId || "1";
+          const ref = await adminDb.collection("contacts").add({
+            ...funcCall.args,
+            ownerId: owner,
+            createdAt: new Date(),
+          });
+          toolResponsePayload = { success: true, contactId: ref.id, message: "Contact created successfully" };
+        } else if (funcCall.name === "crm_update_contact") {
+          const owner = officeSlug || finalUserId || "1";
+          const { id, ...updates } = funcCall.args;
+          await adminDb.collection("contacts").doc(id).update({
+            ...updates,
+            updatedAt: new Date(),
+          });
+          toolResponsePayload = { success: true, message: "Contact updated successfully" };
         } else if (funcCall.name === "create_smart_employee") {
-          const employeeSlug = (
-            funcCall.args.name ||
-            funcCall.args.role ||
-            "employee"
-          )
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)+/g, "");
           const sessionDoc = await sessionRef.get();
           const sessionData = sessionDoc.data() || {};
           const pendingAssets = sessionData.pendingAgentAssets || {};
+          const draftAgent = sessionData.draftAgentState || {};
+          
+          let employeeSlug = draftAgent.slug;
+          if (!employeeSlug) {
+              employeeSlug = (funcCall.args.name || funcCall.args.role || "employee").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+              if (!employeeSlug) employeeSlug = "agent_" + Math.random().toString(36).substring(2, 9);
+          }
 
           const newAgent = {
             ...funcCall.args,
@@ -1107,16 +1259,18 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           const employeeId = `${newAgent.officeSlug}_${employeeSlug}`;
           
           if (userText === "התחל בניית סוכן" || userText.includes("create_smart_employee")) {
-            await sessionRef.update({ pendingAgentAssets: FieldValue.delete() }).catch(() => {});
+            await sessionRef.update({ 
+              pendingAgentAssets: FieldValue.delete(),
+              draftAgentState: FieldValue.delete()
+            }).catch(() => {});
           }
 
           await adminDb.collection("employees").doc(employeeId).set(newAgent);
-          
-          // Clear pending assets
-          await sessionRef.update({ pendingAgentAssets: FieldValue.delete() }).catch(() => {});
-
-
-          // Publish to the global marketplace pool so Betty can sell it
+          // Clear pending assets and draft state so she doesn't get stuck in a loop!
+          await sessionRef.update({ 
+            pendingAgentAssets: FieldValue.delete(),
+            draftAgentState: FieldValue.delete()
+          }).catch(() => {});          // Publish to the global marketplace pool so Betty can sell it
           await adminDb.collection("smart_workers").doc(employeeSlug).set({
             ...newAgent,
             isMarketplaceTemplate: true,
@@ -1127,15 +1281,9 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           toolResponsePayload = {
             success: true,
             agent: newAgent,
-            message:
-              'Successfully created employee! Tell the user the employee is ready and output exactly this string at the end of your response: [UI_COMPONENT:{"type":"AgentCard","data":{"employeeId":"' +
-              employeeId +
-              '","name":"' +
-              newAgent.name +
-              '","role":"' +
-              newAgent.role +
-              '"}}]',
+            message: 'Successfully created employee! Tell the user the employee is ready and thank them.',
           };
+          forceUIComponent = `[UI_COMPONENT:{"type":"AgentCard","data":{"employeeId":"${employeeId}","name":"${newAgent.name}","role":"${newAgent.role}"}}]`;
         } else if (funcCall.name === "scan_website") {
           try {
             const response = await fetch(funcCall.args.url);
@@ -1180,6 +1328,29 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           const currentDraft = sDoc.data()?.draftAgentState || {};
           currentDraft[field] = value;
           await sessionRef.set({ draftAgentState: currentDraft }, { merge: true });
+          
+          // Mirror directly to the agent's actual document immediately
+          let employeeSlug = currentDraft.slug;
+          if (!employeeSlug) {
+              // If the slug doesn't exist yet, we can base it on the name if provided, or generate a random one.
+              employeeSlug = (currentDraft.name || currentDraft.role) 
+                ? (currentDraft.name || currentDraft.role).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")
+                : "agent_" + Math.random().toString(36).substring(2, 9);
+              
+              if (!employeeSlug) employeeSlug = "agent_" + Math.random().toString(36).substring(2, 9);
+              
+              currentDraft.slug = employeeSlug;
+              await sessionRef.set({ draftAgentState: currentDraft }, { merge: true });
+          }
+
+          const tempOfficeSlug = officeSlug || userId || "1";
+          const employeeId = `${tempOfficeSlug}_${employeeSlug}`;
+          await adminDb.collection("employees").doc(employeeId).set({
+              [field]: value,
+              slug: employeeSlug,
+              officeSlug: tempOfficeSlug
+          }, { merge: true });
+
           toolResponsePayload = { success: true, message: `Draft field ${field} updated to ${value}. Ask the next missing question.` };
         } else if (funcCall.name === "show_agent_asset") {
           const { assetType, agentName } = funcCall.args;
@@ -1440,6 +1611,147 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
            forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"${funcCall.args.title}","assetType":"${funcCall.args.assetType}"}}]`;
            suppressText = false;
            toolResponsePayload = { success: true, message: "Upload UI displayed to user. Waiting for them to upload." };
+        } else if (funcCall.name === "update_my_own_media") {
+           const { assetType, title } = funcCall.args;
+           await sessionRef.update({ editingGlobalAgentId: agentId || "BATTY" });
+           forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"${title}","assetType":"${assetType}"}}]`;
+           suppressText = false;
+           toolResponsePayload = { success: true, message: "Upload UI displayed to Master Admin. Waiting for upload." };
+        } else if (funcCall.name === "switch_agent_context") {
+          const { agentIdOrName } = funcCall.args;
+          let targetSlug = (agentIdOrName || "").toLowerCase().trim();
+          const hebrewMap: Record<string, string> = { "בטי": "betty", "דותי": "dotty", "מיכאל": "michael", "דן": "dan", "סרי": "sari", "שרי": "sari", "אור": "or" };
+          if (hebrewMap[targetSlug]) targetSlug = hebrewMap[targetSlug];
+
+          let matchedCol = "smart_workers";
+          let agentDoc = await adminDb.collection("smart_workers").doc(targetSlug).get();
+          
+          if (!agentDoc.exists) {
+            const allWorkers = await adminDb.collection("smart_workers").get();
+            const foundW = allWorkers.docs.find((d: any) => d.id.toLowerCase() === targetSlug || d.data()?.name?.toLowerCase() === targetSlug || d.data()?.slug?.toLowerCase() === targetSlug);
+            if (foundW) {
+              agentDoc = foundW;
+              matchedCol = "smart_workers";
+            }
+          }
+
+          if (!agentDoc.exists) {
+            agentDoc = await adminDb.collection("employees").doc(targetSlug).get();
+            matchedCol = "employees";
+          }
+
+          if (!agentDoc.exists) {
+            const allEmps = await adminDb.collection("employees").get();
+            const foundE = allEmps.docs.find((d: any) => d.id.toLowerCase().includes(targetSlug) || d.data()?.name?.toLowerCase() === targetSlug || d.data()?.slug?.toLowerCase() === targetSlug);
+            if (foundE) {
+              agentDoc = foundE;
+              matchedCol = "employees";
+            }
+          }
+
+          if (agentDoc.exists) {
+            const matchedAgent: any = { id: agentDoc.id, ...agentDoc.data() };
+            await sessionRef.set({ activeTargetAgentId: agentDoc.id, activeTargetCol: matchedCol }, { merge: true });
+            
+            toolResponsePayload = {
+              success: true,
+              agentId: agentDoc.id,
+              name: matchedAgent.name || targetSlug,
+              role: matchedAgent.role || "Smart Worker",
+              collection: matchedCol,
+              prompt: matchedAgent.prompt_instructions || "",
+              message: `Active context switched to agent '${matchedAgent.name || agentDoc.id}'. You are now managing and editing this specific agent in Firestore collection '${matchedCol}'.`
+            };
+          } else {
+            toolResponsePayload = {
+              success: false,
+              message: `Agent '${agentIdOrName}' not found in database. You can offer to create it as a new worker.`
+            };
+          }
+        } else if (funcCall.name === "edit_agent_profile") {
+          const { agentId: targetId, name, role, prompt_instructions, voice_gender, description } = funcCall.args;
+          const updateData: any = {};
+          if (name) updateData.name = name;
+          if (role) updateData.role = role;
+          if (prompt_instructions) updateData.prompt_instructions = prompt_instructions;
+          if (voice_gender) updateData.voice_gender = voice_gender;
+          if (description) updateData.description = description;
+          updateData.updatedAt = new Date();
+
+          let savedPath = "";
+          const smartDoc = await adminDb.collection("smart_workers").doc(targetId).get();
+          if (smartDoc.exists) {
+            await adminDb.collection("smart_workers").doc(targetId).set(updateData, { merge: true });
+            savedPath = `smart_workers/${targetId}`;
+          } else {
+            await adminDb.collection("employees").doc(targetId).set(updateData, { merge: true });
+            savedPath = `employees/${targetId}`;
+          }
+
+          toolResponsePayload = {
+            success: true,
+            savedPath,
+            updatedFields: Object.keys(updateData),
+            message: `פרופיל הסוכן '${targetId}' עודכן בהצלחה בנתיב ${savedPath}.`
+          };
+        } else if (funcCall.name === "add_agent_agreed_answer") {
+          const { agentId: targetId, question, answer, category = "general" } = funcCall.args;
+          
+          let targetCol = "smart_workers";
+          const smartDoc = await adminDb.collection("smart_workers").doc(targetId).get();
+          if (!smartDoc.exists) targetCol = "employees";
+
+          const qaRef = await adminDb.collection(targetCol).doc(targetId).collection("agreed_answers").add({
+            question,
+            answer,
+            category,
+            createdAt: new Date()
+          });
+
+          toolResponsePayload = {
+            success: true,
+            qaId: qaRef.id,
+            path: `${targetCol}/${targetId}/agreed_answers/${qaRef.id}`,
+            message: `תשובה מוסכמת (Q&A) נשמרה בהצלחה עבור ${targetId}: שאלה "${question}", תשובה "${answer}".`
+          };
+        } else if (funcCall.name === "get_agent_details") {
+          const { agentIdOrName } = funcCall.args;
+          let targetSlug = (agentIdOrName || "").toLowerCase().trim();
+          const hebrewMap: Record<string, string> = { "בטי": "betty", "דותי": "dotty", "מיכאל": "michael", "דן": "dan", "סרי": "sari", "שרי": "sari", "אור": "or" };
+          if (hebrewMap[targetSlug]) targetSlug = hebrewMap[targetSlug];
+
+          let agentDoc = await adminDb.collection("smart_workers").doc(targetSlug).get();
+          let col = "smart_workers";
+          if (!agentDoc.exists) {
+            agentDoc = await adminDb.collection("employees").doc(targetSlug).get();
+            col = "employees";
+          }
+
+          if (agentDoc.exists) {
+            const data = agentDoc.data();
+            const qasSnap = await adminDb.collection(col).doc(agentDoc.id).collection("agreed_answers").limit(20).get();
+            const qas = qasSnap.docs.map((d: any) => d.data());
+
+            toolResponsePayload = {
+              success: true,
+              agent: {
+                id: agentDoc.id,
+                ...data,
+                collection: col,
+                agreed_answers: qas
+              }
+            };
+          } else {
+            toolResponsePayload = { success: false, message: `סוכן '${agentIdOrName}' לא נמצא.` };
+          }
+        } else if (funcCall.name === "list_system_agents") {
+          const workersSnap = await adminDb.collection("smart_workers").get();
+          const empsSnap = await adminDb.collection("employees").get();
+          const allList = [
+            ...workersSnap.docs.map((d: any) => ({ id: d.id, name: d.data().name || d.id, role: d.data().role, type: "smart_worker" })),
+            ...empsSnap.docs.map((d: any) => ({ id: d.id, name: d.data().name || d.id, role: d.data().role, type: "employee" }))
+          ];
+          toolResponsePayload = { success: true, count: allList.length, agents: allList };
         } else if (funcCall.name === "execute_system_function") {
            try {
              const reqUrl = req.url ? new URL(req.url).origin : "http://localhost:3000";
@@ -1461,21 +1773,33 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
            }
         } else {
           // If it's none of the hardcoded system tools, it must be a custom dynamic capability!
-          // We will save the collected data into the `collected_data` table for this agent.
+          // We will save the collected data into a table named after the function!
           if (agentId) {
+            let collectionName = funcCall.name;
+            // e.g. "create_invoice" -> "invoices" (simple pluralization fallback if needed, but funcCall.name is fine)
+            if (collectionName.startsWith("create_")) {
+              collectionName = collectionName.replace("create_", "") + "s";
+            }
+            if (collectionName.startsWith("upload_")) {
+              collectionName = collectionName.replace("upload_", "") + "s";
+            }
+
             await adminDb
               .collection("employees")
               .doc(agentId)
-              .collection("collected_data")
+              .collection(collectionName)
               .add({
+                ...funcCall.args,
                 tool_used: funcCall.name,
-                collected_args: funcCall.args,
                 createdAt: new Date(),
               });
             toolResponsePayload = {
               success: true,
-              message: `Successfully executed custom tool ${funcCall.name} and saved data.`,
+              message: `Successfully executed custom tool ${funcCall.name} and saved data to ${collectionName}.`,
             };
+            
+            // Give visual feedback for the dynamic function
+            forceUIComponent = `[UI_COMPONENT:{"type":"MenuGrid","data":{"items":[{"title":"הפעולה הצליחה","desc":"הנתונים נשמרו ב-${collectionName}","icon":"✅","action":""}]}}]`;
           }
         }
       } catch (e) {
@@ -1493,22 +1817,30 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
           interactionsTools = toolsConfig;
         }
 
-        return await (ai.interactions as any).create({
-          model: "gemini-3.5-flash",
-          previous_interaction_id:
-            prevResult.interactionId ||
-            prevResult.id ||
-            previous_interaction_id,
-          functionResponses: [
-            {
-              id: funcCall.id || funcCall.name,
-              name: funcResponseName,
-              response: toolResponsePayload,
-            },
-          ],
-          system_instruction: systemInstruction,
-          ...(interactionsTools && interactionsTools.length > 0 ? { tools: interactionsTools } : {}),
-        });
+        try {
+          return await (ai.interactions as any).create({
+            model: "gemini-3.5-flash",
+            previous_interaction_id:
+              prevResult.interactionId ||
+              prevResult.id ||
+              previous_interaction_id,
+            functionResponses: [
+              {
+                id: funcCall.id || funcCall.name,
+                name: funcResponseName,
+                response: toolResponsePayload,
+              },
+            ],
+            system_instruction: systemInstruction,
+            ...(interactionsTools && interactionsTools.length > 0 ? { tools: interactionsTools } : {}),
+          });
+        } catch (callErr: any) {
+          console.warn("Interactions functionResponse failed, returning tool message fallback:", callErr.message);
+          return {
+            output_text: toolResponsePayload?.message || "מצוין, טיפלתי בזה בהצלחה!",
+            interactionId: prevResult.interactionId || prevResult.id || previous_interaction_id
+          };
+        }
       } else {
         if (prevResult.candidates && prevResult.candidates[0].content) {
           historyContents!.push(prevResult.candidates[0].content);
@@ -1550,26 +1882,42 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
             );
           }
 
-          let resText = "";
-          if (typeof result.output_text === 'string') {
-            resText = result.output_text;
-          } else if (typeof result.text === 'function') {
-            resText = result.text();
-          } else if (typeof result.text === 'string') {
-            resText = result.text;
-          } else if (result.response && typeof result.response.text === 'function') {
-            resText = result.response.text();
-          } else if (result.response && typeof result.response.text === 'string') {
-            resText = result.response.text;
-          } else if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
-            resText = result.candidates[0].content.parts[0].text;
-          }
-          
-          if (typeof resText !== 'string') {
-            resText = String(resText || "");
+          function extractModelText(res: any): string {
+            if (!res) return "";
+            if (typeof res.output_text === "string" && res.output_text.trim()) return res.output_text;
+            if (typeof res.text === "string" && res.text.trim()) return res.text;
+            if (typeof res.text === "function") {
+              try {
+                const t = res.text();
+                if (typeof t === "string" && t.trim()) return t;
+              } catch (e) {}
+            }
+            if (Array.isArray(res.outputs)) {
+              for (const out of res.outputs) {
+                if (typeof out?.text === "string" && out.text.trim()) return out.text;
+                if (typeof out?.content === "string" && out.content.trim()) return out.content;
+                if (typeof out === "string" && out.trim()) return out;
+              }
+            }
+            if (Array.isArray(res.candidates)) {
+              for (const cand of res.candidates) {
+                if (cand.content?.parts) {
+                  for (const part of cand.content.parts) {
+                    if (typeof part.text === "string" && part.text.trim()) return part.text;
+                  }
+                }
+              }
+            }
+            if (res.response) return extractModelText(res.response);
+            return "";
           }
 
-          assistantMessage = resText || "I don't know what to say.";
+          let resText = extractModelText(result);
+          if (!resText && lastToolResponsePayload?.message) {
+            resText = lastToolResponsePayload.message;
+          }
+
+          assistantMessage = resText || "מצוין, טיפלתי בזה עבורך!";
           newInteractionId =
             result.interactionId || result.id || previous_interaction_id;
         } else {
@@ -1679,6 +2027,7 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
     } catch (e) {}
 
     if (forceUIComponent) {
+      assistantMessage = assistantMessage.replace(/\[UI_COMPONENT:[\s\S]*/g, "").trim();
       assistantMessage += `\n${forceUIComponent}`;
     }
 
@@ -1690,11 +2039,13 @@ DO NOT output any UI components in your text. You will use 'show_insight_card' t
       sessionId: dbSessionId,
     });
   } catch (error: any) {
-    console.error("API Error:", error);
-    return NextResponse.json(
-      { error: "Failed to process request", details: error.message },
-      { status: 500 },
-    );
+    console.error("API Error Detailed:", error);
+    return NextResponse.json({
+      reply: "היי, הייתה לי לרגע קטיעה קלה בתקשורת מול השרת, אבל אני לגמרי כאן איתך. אפשר לשלוח את הבקשה שוב או לשאול אותי כל דבר אחר?",
+      sessionId: "recovery_session",
+      debugError: error.message,
+      debugStack: error.stack
+    }, { status: 200 });
   }
 }
 

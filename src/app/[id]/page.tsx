@@ -1,5 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Hero } from "@/components/sections/Hero";
 import { ServicesGrid } from "@/components/sections/ServicesGrid";
 import { LandingSection } from "@/components/sections/LandingSection";
@@ -11,6 +11,8 @@ import { ContactSection } from "@/components/sections/ContactSection";
 import { getGlobalSettings } from "@/features/settings/actions";
 import { Metadata } from "next";
 import { HomeClient } from "@/app/HomeClient";
+import DottyChatClient from "../dotty/DottyChatClient";
+import { auth } from "@/lib/auth";
 
 export const revalidate = 3600; // Revalidate every hour
 
@@ -28,6 +30,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       return {
         title: data?.seo?.title || data?.hero?.title || "עמוד נחיתה",
         description: data?.seo?.description || data?.hero?.subtitle || "עמוד נחיתה שנבנה באמצעות מערכת מחולל הקהילות",
+      };
+    }
+
+    // Check smart_workers
+    const agentDoc = await adminDb.collection("smart_workers").doc(id).get();
+    if (agentDoc.exists) {
+      const data = agentDoc.data();
+      return {
+        title: data?.name || "סוכן חכם",
+        description: data?.role || "סוכן דיגיטלי חכם",
       };
     }
   } catch (e) {}
@@ -50,7 +62,35 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
   const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const isPreview = resolvedSearchParams.preview === "true";
+  const session = await auth();
+
+  // 1. Check if this is a system-level smart worker (e.g., betty) or office
+  try {
+    let agentDoc = await adminDb.collection("smart_workers").doc(id).get();
+    if (!agentDoc.exists) {
+      agentDoc = await adminDb.collection("smart_workers").doc(id.toUpperCase()).get();
+    }
+    if (agentDoc.exists) {
+      const isSuperAdmin = session?.user?.role === "SUPERADMIN";
+      const userRole = isSuperAdmin ? "MASTER_ADMIN" : "END_USER";
+      const userId = session?.user?.id || null;
+
+      return (
+        <div className="flex flex-col h-screen w-full relative">
+          <div className="flex-grow relative">
+            <DottyChatClient userRole={userRole} userId={userId} agentId={id} />
+          </div>
+        </div>
+      );
+    }
+
+    const officeDoc = await adminDb.collection("offices").doc(id).get();
+    if (officeDoc.exists) {
+      redirect(`/office/${id}`);
+    }
+  } catch (e) {}
   
+  // 2. Fetch landing / custom page configuration
   let pageConfig: any = null;
 
   try {
@@ -67,11 +107,9 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
 
   if (!pageConfig) {
     const fallback = staticLandingPages.find(p => p.id === id);
-    console.log("DEBUG: ID=", id, "FALLBACK FOUND=", !!fallback, "ALL PAGES=", staticLandingPages?.length);
     if (fallback) {
       pageConfig = fallback;
     } else {
-      console.log("DEBUG: Returning notFound() because pageConfig is null and fallback is null");
       return notFound();
     }
   }
@@ -122,9 +160,6 @@ export default async function LandingPage({ params, searchParams }: { params: Pr
       buttonVisible: config.community.buttonVisible !== false
     }
   };
-
-  const { auth } = await import("@/lib/auth");
-  const session = await auth();
   
   // If this page was created by the new builder (v2), we use the clean V2 viewer
   if (pageConfig?.builderVersion === "v2") {

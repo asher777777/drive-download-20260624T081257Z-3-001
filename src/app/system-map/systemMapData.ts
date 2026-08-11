@@ -665,6 +665,24 @@ export const FEATURE_MODULES: FeatureModule[] = [
       { name: 'getIncomes', signature: '(userId: string, period: string)', description: 'שליפת נתוני הכנסות לפי חודש/שנה' }
     ],
     components: ['ExpenseForm.tsx', 'ExpensesList.tsx', 'KesherManualReceiptsForm.tsx']
+  },
+  {
+    id: 'ai-agents-dotty',
+    name: 'סוכני AI חכמים (Dotty)',
+    icon: 'Bot',
+    description: 'מנוע הסוכנים החכמים, כלי עריכה וניהול מודלים, ותפקוד אוטונומי של Dotty ואחרים.',
+    folder: 'src/app/api/dotty-chat',
+    actionsFile: 'src/app/api/dotty-chat/route.ts',
+    functions: [
+      { name: 'switch_agent_context', signature: '(agentIdOrName: string)', description: 'החלפת ההקשר של דותי לעריכת סוכן ספציפי (למשל: בטי)' },
+      { name: 'edit_agent_profile', signature: '(agentId: string, name: string, role: string, prompt_instructions: string...)', description: 'עדכון תצורה והגדרות אופי של סוכן AI במסד הנתונים' },
+      { name: 'add_agent_agreed_answer', signature: '(agentId: string, question: string, answer: string)', description: 'אימון הסוכן והוספת תשובה מוסכמת לשאלה מסוימת' },
+      { name: 'get_agent_details', signature: '(agentIdOrName: string)', description: 'שליפת נתוני סוכן וצפייה בהגדרות הקיימות' },
+      { name: 'list_system_agents', signature: '()', description: 'הצגת רשימת כל העובדים והסוכנים הקיימים במערכת' },
+      { name: 'create_smart_employee', signature: '(name, role, prompt, voice, tools)', description: 'יצירת עובד וירטואלי חדש והגדרת יכולותיו' },
+      { name: 'query_database', signature: '(collectionName: string)', description: 'שאילתת AI חכמה לקריאת נתונים ממסד הנתונים של החברה' }
+    ],
+    components: ['DottyChatClient.tsx', 'AgentChatShell.tsx']
   }
 ];
 

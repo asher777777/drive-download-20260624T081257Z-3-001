@@ -10,7 +10,13 @@ export async function GET(req: Request) {
   }
 
   try {
-    const doc = await adminDb.collection('employees').doc(id).get();
+    let doc = await adminDb.collection('employees').doc(id).get();
+    if (!doc.exists) {
+      doc = await adminDb.collection('smart_workers').doc(id).get();
+    }
+    if (!doc.exists) {
+      doc = await adminDb.collection('smart_workers').doc(id.toLowerCase()).get();
+    }
     if (!doc.exists) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }

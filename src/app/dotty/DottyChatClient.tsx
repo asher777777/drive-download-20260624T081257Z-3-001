@@ -547,17 +547,19 @@ function InsightCard({ ui, onAction }: { ui: any; onAction: (text: string) => vo
 
   return (
     <div style={{ 
-      width: "100%", maxWidth: "400px", margin: "0 auto", padding: "30px 20px", 
-      background: "rgba(10,10,10,0.8)", border: "1px solid rgba(212, 175, 55, 0.4)", 
-      borderRadius: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", color: "#fff", 
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      textAlign: "center"
+      width: "auto", maxWidth: "400px", margin: "0 auto", padding: "12px 24px", 
+      background: "rgba(15, 15, 15, 0.8)", border: "1px solid rgba(212, 175, 55, 0.3)", 
+      borderRadius: "30px", boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+      display: "flex", flexDirection: "row", alignItems: "center", gap: "12px",
+      backdropFilter: "blur(8px)"
     }}>
-      <div style={{ color: data.color || "#D4AF37", marginBottom: "15px" }}>
-        <IconCmp size={40} />
+      <div style={{ color: data.color || "#D4AF37", display: "flex" }}>
+        <IconCmp size={20} />
       </div>
-      <h2 style={{ fontSize: "1.4rem", marginBottom: "10px", fontWeight: "bold" }}>{data.title}</h2>
-      <p style={{ fontSize: "1.1rem", color: "#ccc", margin: 0 }}>{data.text}</p>
+      <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+        <h2 style={{ fontSize: "0.95rem", margin: "0 0 2px 0", fontWeight: "600", color: "#f8fafc" }}>{data.title}</h2>
+        <p style={{ fontSize: "0.85rem", color: "#94a3b8", margin: 0 }}>{data.text}</p>
+      </div>
     </div>
   );
 }
@@ -917,7 +919,7 @@ export default function DottyChatClient({
       if (!res.ok) {
         const text = await res.text();
         console.error("API error response:", text);
-        setMessage("Connection error: " + res.status);
+        setMessage("היי, חוויתי לרגע קטיעה קלה בתקשורת. אני כאן, אפשר לנסות שוב בעוד כמה שניות!");
         return;
       }
 
@@ -1015,11 +1017,11 @@ export default function DottyChatClient({
           setTimeout(() => setMessage(""), 5000);
         }
       } else {
-        setMessage("I encountered an error processing that request.");
+        setMessage("היי, הייתה לי שניה קטיעה קלה מול השרת, אבל אני לגמרי איתך. אפשר לשלוח את ההודעה שוב?");
       }
     } catch (err) {
       console.error(err);
-      setMessage("Connection error. Please try again.");
+      setMessage("היי, החיבור התחדש כעת. אפשר לחזור על הבקשה ואני מיד מטפלת בה!");
     } finally {
       setIsThinking(false);
     }
@@ -1126,6 +1128,8 @@ export default function DottyChatClient({
             </div>
           )}
         </div>
+
+        <div className={styles.spacer} />
 
         <div className={styles.controlsContainer}>
           {selectedMedia && (

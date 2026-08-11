@@ -203,6 +203,50 @@ function serializeFirestoreData(obj: any): any {
   return obj;
 }
 
+// Safely delete any document or collection recursively (including nested subcollections)
+async function safelyDeletePath(rawPath: string): Promise<{ success: boolean; path: string; error?: string }> {
+  const path = rawPath.replace(/^\/+|\/+$/g, '');
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length === 0) return { success: false, path, error: 'נתיב ריק' };
+
+  try {
+    const isDoc = segments.length % 2 === 0;
+
+    // 1. Try Firebase Admin native recursiveDelete
+    if (typeof adminDb.recursiveDelete === 'function') {
+      const ref = isDoc ? adminDb.doc(path) : adminDb.collection(path);
+      await adminDb.recursiveDelete(ref);
+      return { success: true, path };
+    }
+
+    // 2. Fallback recursive deletion
+    if (isDoc) {
+      const docRef = adminDb.doc(path);
+      try {
+        if (typeof docRef.listCollections === 'function') {
+          const subCols = await docRef.listCollections();
+          for (const subCol of subCols) {
+            const subDocs = await subCol.get();
+            for (const subDoc of subDocs.docs) {
+              await safelyDeletePath(subDoc.ref.path);
+            }
+          }
+        }
+      } catch (e) {}
+      await docRef.delete();
+    } else {
+      const colRef = adminDb.collection(path);
+      const snapshot = await colRef.get();
+      for (const doc of snapshot.docs) {
+        await safelyDeletePath(doc.ref.path);
+      }
+    }
+    return { success: true, path };
+  } catch (err: any) {
+    return { success: false, path, error: err?.message || 'שגיאה במחיקת הנתיב' };
+  }
+}
+
 // GET: List collections & discover users
 export async function GET() {
   const startTime = performance.now();
@@ -252,7 +296,7 @@ export async function GET() {
   }
 }
 
-// POST: Query documents in ANY path (supporting nested sub-collections like employees/agent/conversations/sessionId/messages)
+// POST: Query documents in ANY path
 export async function POST(req: NextRequest) {
   const startTime = performance.now();
   try {
@@ -384,13 +428,58 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE: Delete ANY document, page, landing page, user, employee or session
+// DELETE: Robust Recursive Deletion (Single, Multi-Path Batch, and Full Collection Purge)
 export async function DELETE(req: NextRequest) {
   const startTime = performance.now();
   try {
     const body = await req.json();
-    const { path: rawPath, collectionName, docId, userId } = body;
+    const { paths, path: rawPath, collectionName, docId, userId, purgeCollection } = body;
 
+    // 1. FULL COLLECTION PURGE
+    if (purgeCollection && (rawPath || collectionName)) {
+      let targetColPath = rawPath || collectionName;
+      if (userId && !targetColPath.startsWith('users/') && !KNOWN_COLLECTIONS.some(c => c.id === targetColPath && c.type === 'root')) {
+        targetColPath = `users/${userId}/${targetColPath}`;
+      }
+
+      const res = await safelyDeletePath(targetColPath);
+      const executionTimeMs = Math.round(performance.now() - startTime);
+
+      if (!res.success) {
+        return NextResponse.json({ success: false, error: res.error }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        purgedCollection: targetColPath,
+        executionTimeMs,
+        message: `כל המסמכים בקולקציה '${targetColPath}' נמחקו לצמיתות בהצלחה`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 2. BATCH / BULK MULTI-PATH DELETION
+    if (Array.isArray(paths) && paths.length > 0) {
+      const results = await Promise.all(paths.map(p => safelyDeletePath(p)));
+      const deletedPaths = results.filter(r => r.success).map(r => r.path);
+      const failedPaths = results.filter(r => !r.success).map(r => r.path);
+
+      const executionTimeMs = Math.round(performance.now() - startTime);
+
+      return NextResponse.json({
+        success: deletedPaths.length > 0,
+        isBatch: true,
+        deletedCount: deletedPaths.length,
+        totalRequested: paths.length,
+        deletedPaths,
+        failedPaths,
+        executionTimeMs,
+        message: `${deletedPaths.length} מתוך ${paths.length} מסמכים נמחקו לצמיתות ממסד הנתונים`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 3. SINGLE DOCUMENT DELETION
     let fullPath = rawPath;
     if (!fullPath) {
       if (collectionName && docId) {
@@ -403,38 +492,25 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (!fullPath) {
-      return NextResponse.json({ success: false, error: 'יש לציין נתיב מסמך מלא למחיקה' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'יש לציין נתיב מלא למחיקה' }, { status: 400 });
     }
 
-    const pathSegments = fullPath.split('/').filter(Boolean);
-    if (pathSegments.length % 2 !== 0) {
-      return NextResponse.json({
-        success: false,
-        error: `הנתיב '${fullPath}' מצביע על קולקציה ולא על מסמך ספציפי. ניתן למחוק רק מסמכים מוגדרים.`
-      }, { status: 400 });
-    }
-
-    const docRef = adminDb.doc(fullPath);
-    const docSnap = await docRef.get();
-
-    if (!docSnap.exists) {
-      return NextResponse.json({
-        success: false,
-        error: `המסמך בנתיב '${fullPath}' לא נמצא במסד הנתונים (יתכן שכבר נמחק).`
-      }, { status: 404 });
-    }
-
-    // Perform deletion
-    await docRef.delete();
-
+    const deleteRes = await safelyDeletePath(fullPath);
     const executionTimeMs = Math.round(performance.now() - startTime);
+
+    if (!deleteRes.success) {
+      return NextResponse.json({
+        success: false,
+        error: deleteRes.error || `שגיאה במחיקת '${fullPath}'`,
+        executionTimeMs
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
       deletedPath: fullPath,
-      docId: docSnap.id,
       executionTimeMs,
-      message: `המסמך '${fullPath}' נמחק בהצלחה ממסד הנתונים`,
+      message: `הנתיב '${fullPath}' נמחק בהצלחה ממסד הנתונים`,
       timestamp: new Date().toISOString()
     });
 

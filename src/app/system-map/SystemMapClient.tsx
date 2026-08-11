@@ -62,10 +62,11 @@ import {
   Trash2,
   AlertTriangle,
   ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   Calendar,
-  X
+  X,
+  CheckSquare,
+  Square,
+  Flame
 } from 'lucide-react';
 
 type TabType = 'database' | 'overview' | 'routes' | 'apis' | 'features' | 'files' | 'libs' | 'skills';
@@ -123,7 +124,7 @@ interface DBDocumentItem {
   subCollections?: string[];
 }
 
-// Smart timestamp extractor for any Firestore document
+// Smart timestamp extractor
 function extractDocTimestamp(doc: DBDocumentItem): number {
   if (!doc) return 0;
   const d = doc.data || {};
@@ -150,7 +151,6 @@ function extractDocTimestamp(doc: DBDocumentItem): number {
     }
   }
 
-  // Check embedded numeric timestamp in ID (e.g. dotty_1785965425046_..., mock_17859654...)
   const match = doc.id?.match(/(\d{12,14})/);
   if (match) {
     const num = parseInt(match[1], 10);
@@ -195,11 +195,18 @@ export default function SystemMapClient() {
   const [dbLatency, setDbLatency] = useState<number | null>(null);
   const [dbSearchQuery, setDbSearchQuery] = useState<string>('');
   const [dbSearchField, setDbSearchField] = useState<string>('all');
-  const [dbSortOrder, setDbSortOrder] = useState<DbSortType>('oldest-first'); // Default: מההתחלה לסוף (כרונולוגי עולה)
+  const [dbSortOrder, setDbSortOrder] = useState<DbSortType>('oldest-first');
   const [dbCategoryFilter, setDbCategoryFilter] = useState<string>('all');
   const [inspectingDoc, setInspectingDoc] = useState<DBDocumentItem | null>(null);
 
-  // Deletion Modal State
+  // Multi-Selection / Batch Deletion State
+  const [selectedDocPaths, setSelectedDocPaths] = useState<string[]>([]);
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
+  const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState<boolean>(false);
+  const [purgeModalOpen, setPurgeModalOpen] = useState<boolean>(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState<boolean>(false);
+
+  // Single Deletion Modal State
   const [deleteTarget, setDeleteTarget] = useState<{ path: string; docId: string; title?: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [deleteNotification, setDeleteNotification] = useState<{ message: string; isError?: boolean } | null>(null);
@@ -227,7 +234,7 @@ export default function SystemMapClient() {
     data: any;
   } | null>(null);
 
-  // 1. Fetch live dynamic codebase scan
+  // 1. Fetch live dynamic scan
   const fetchLiveScan = async () => {
     setIsScanning(true);
     try {
@@ -304,6 +311,7 @@ export default function SystemMapClient() {
 
   useEffect(() => {
     if (currentDbPath) {
+      setSelectedDocPaths([]); // Reset selection on path change
       fetchPathDocs(currentDbPath);
     }
   }, [currentDbPath]);
@@ -341,7 +349,38 @@ export default function SystemMapClient() {
     setDbSearchQuery('');
   };
 
-  // Execute Document Deletion
+  // Toggle single document selection
+  const toggleDocSelection = (path: string) => {
+    setSelectedDocPaths(prev =>
+      prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]
+    );
+  };
+
+  // Toggle select all in current filtered documents
+  const toggleSelectAllDocs = () => {
+    const allPaths = filteredAndSortedDocs.map(d => d.path);
+    const allSelected = allPaths.length > 0 && allPaths.every(p => selectedDocPaths.includes(p));
+
+    if (allSelected) {
+      setSelectedDocPaths(prev => prev.filter(p => !allPaths.includes(p)));
+    } else {
+      setSelectedDocPaths(prev => Array.from(new Set([...prev, ...allPaths])));
+    }
+  };
+
+  // Toggle select all routes
+  const toggleSelectAllRoutes = () => {
+    const allRouteIds = filteredRoutes.map(r => r.id);
+    const allSelected = allRouteIds.length > 0 && allRouteIds.every(id => selectedRoutes.includes(id));
+
+    if (allSelected) {
+      setSelectedRoutes([]);
+    } else {
+      setSelectedRoutes(allRouteIds);
+    }
+  };
+
+  // Execute Single Document Deletion
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -353,7 +392,8 @@ export default function SystemMapClient() {
       });
       const json = await res.json();
       if (json.success) {
-        setDeleteNotification({ message: `המסמך ${deleteTarget.docId} נמחק בהצלחה!` });
+        setDeleteNotification({ message: `המסמך ${deleteTarget.docId} נמחק לצמיתות!` });
+        setSelectedDocPaths(prev => prev.filter(p => p !== deleteTarget.path));
         setDeleteTarget(null);
         if (inspectingDoc?.path === deleteTarget.path) setInspectingDoc(null);
         await fetchPathDocs(currentDbPath);
@@ -369,7 +409,65 @@ export default function SystemMapClient() {
     }
   };
 
-  // Open Function Runner with Smart Default Params
+  // Execute Batch / Bulk Deletion
+  const confirmBatchDelete = async () => {
+    if (selectedDocPaths.length === 0) return;
+    setIsBatchDeleting(true);
+    try {
+      const res = await fetch('/api/system-map/database', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths: selectedDocPaths })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDeleteNotification({ message: `${json.deletedCount || selectedDocPaths.length} מסמכים נמחקו לצמיתות בהצלחה!` });
+        setSelectedDocPaths([]);
+        setBatchDeleteModalOpen(false);
+        await fetchPathDocs(currentDbPath);
+        await fetchDbMetadata();
+      } else {
+        setDeleteNotification({ message: json.error || 'שגיאה במחיקה מרובה', isError: true });
+      }
+    } catch (e: any) {
+      setDeleteNotification({ message: e.message || 'שגיאת רשת במחיקה מרובה', isError: true });
+    } finally {
+      setIsBatchDeleting(false);
+      setTimeout(() => setDeleteNotification(null), 4000);
+    }
+  };
+
+  // Execute Full Collection Purge
+  const confirmPurgeCollection = async () => {
+    setIsBatchDeleting(true);
+    try {
+      const res = await fetch('/api/system-map/database', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          purgeCollection: true,
+          path: currentDbPath
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDeleteNotification({ message: `כל המסמכים בנתיב '${currentDbPath}' נמחקו לצמיתות!` });
+        setSelectedDocPaths([]);
+        setPurgeModalOpen(false);
+        await fetchPathDocs(currentDbPath);
+        await fetchDbMetadata();
+      } else {
+        setDeleteNotification({ message: json.error || 'שגיאה בריקון הקולקציה', isError: true });
+      }
+    } catch (e: any) {
+      setDeleteNotification({ message: e.message || 'שגיאת רשת בריקון הקולקציה', isError: true });
+    } finally {
+      setIsBatchDeleting(false);
+      setTimeout(() => setDeleteNotification(null), 4000);
+    }
+  };
+
+  // Open Function Runner
   const openRunner = (targetName: string, type: 'action' | 'api', opts?: { endpoint?: string; method?: string; file?: string }) => {
     let defaults: any = {};
 
@@ -451,11 +549,10 @@ export default function SystemMapClient() {
     }
   };
 
-  // Filtered & Sorted DB Documents (Time-based Sorting & Deep Search)
+  // Filtered & Sorted DB Documents
   const filteredAndSortedDocs = useMemo(() => {
     let docs = [...collectionDocs];
 
-    // 1. Apply Search Query
     if (dbSearchQuery.trim()) {
       const q = dbSearchQuery.trim().toLowerCase();
       docs = docs.filter(doc => {
@@ -471,16 +568,13 @@ export default function SystemMapClient() {
       });
     }
 
-    // 2. Apply Chronological & Custom Sorting
     docs.sort((a, b) => {
       if (dbSortOrder === 'oldest-first') {
-        // Chronological Ascending: First / Oldest created to Last / Newest created
         const tA = extractDocTimestamp(a);
         const tB = extractDocTimestamp(b);
         if (tA !== tB) return tA - tB;
         return a.id.localeCompare(b.id, 'he', { numeric: true });
       } else if (dbSortOrder === 'newest-first') {
-        // Chronological Descending: Most recent first
         const tA = extractDocTimestamp(a);
         const tB = extractDocTimestamp(b);
         if (tA !== tB) return tB - tA;
@@ -495,6 +589,11 @@ export default function SystemMapClient() {
 
     return docs;
   }, [collectionDocs, dbSearchQuery, dbSearchField, dbSortOrder]);
+
+  const isAllDocsSelected = useMemo(() => {
+    const allPaths = filteredAndSortedDocs.map(d => d.path);
+    return allPaths.length > 0 && allPaths.every(p => selectedDocPaths.includes(p));
+  }, [filteredAndSortedDocs, selectedDocPaths]);
 
   // Filtered DB Collections in sidebar
   const filteredCollections = useMemo(() => {
@@ -522,6 +621,11 @@ export default function SystemMapClient() {
       return matchesCat && matchesSearch;
     });
   }, [searchQuery, selectedCategory]);
+
+  const isAllRoutesSelected = useMemo(() => {
+    const allRouteIds = filteredRoutes.map(r => r.id);
+    return allRouteIds.length > 0 && allRouteIds.every(id => selectedRoutes.includes(id));
+  }, [filteredRoutes, selectedRoutes]);
 
   // Filtered APIs
   const filteredApis = useMemo(() => {
@@ -566,13 +670,13 @@ export default function SystemMapClient() {
   }, [liveFiles, searchQuery]);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#09090b] text-slate-100 font-sans pb-24 selection:bg-amber-500/30 selection:text-amber-200">
+    <div dir="rtl" className="min-h-screen bg-[#09090b] text-slate-100 font-sans pb-36 selection:bg-amber-500/30 selection:text-amber-200">
       {/* Ambient Glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[350px] bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent blur-3xl pointer-events-none -z-10" />
 
       {/* Floating Notification Toast */}
       {deleteNotification && (
-        <div className="fixed bottom-6 left-6 z-50 animate-bounce">
+        <div className="fixed bottom-28 left-6 z-50 animate-bounce">
           <div
             className={`px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2 text-sm font-bold ${
               deleteNotification.isError
@@ -582,6 +686,49 @@ export default function SystemMapClient() {
           >
             {deleteNotification.isError ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
             <span>{deleteNotification.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING BATCH ACTIONS TOOLBAR */}
+      {selectedDocPaths.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="bg-[#181416]/95 backdrop-blur-xl border-2 border-rose-500/60 shadow-[0_10px_40px_rgba(244,63,94,0.35)] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center font-bold text-sm shrink-0">
+                {selectedDocPaths.length}
+              </div>
+              <div>
+                <div className="text-sm font-bold text-white">
+                  נבחרו {selectedDocPaths.length} מסמכים מתוך {filteredAndSortedDocs.length}
+                </div>
+                <div className="text-xs text-rose-300">
+                  מוכנים למחיקה מרוכזת ורקורסיבית ממסד הנתונים
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                onClick={toggleSelectAllDocs}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-xl border border-slate-700 transition"
+              >
+                {isAllDocsSelected ? 'בטל הכל' : 'בחר את כולם'}
+              </button>
+              <button
+                onClick={() => setSelectedDocPaths([])}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+              >
+                נקה בחירה
+              </button>
+              <button
+                onClick={() => setBatchDeleteModalOpen(true)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-xl shadow-[0_0_20px_rgba(244,63,94,0.5)] flex items-center gap-2 transition"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>מחק {selectedDocPaths.length} שנבחרו</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -601,11 +748,11 @@ export default function SystemMapClient() {
                   </h1>
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    Time Sorted & Searchable
+                    Recursive Batch Delete Ready
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-400">
-                  סייר מסד נתונים חי, מיון כרונולוגי מהראשון לסוף, חיפוש שדות עמוק, הרצה ומחיקה מבוקרת
+                  מחיקה רקורסיבית מלאה (מסמכים + תת-קולקציות), ריקון קולקציות, לחצן "בחר הכל" ומיון כרונולוגי
                 </p>
               </div>
             </div>
@@ -634,7 +781,7 @@ export default function SystemMapClient() {
           {/* Navigation Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mt-4 pt-2">
             {[
-              { id: 'database', label: `🗄️ בסיס נתונים וסייר שיחות (${knownCollections.length || 15})`, icon: Database },
+              { id: 'database', label: `🗄️ בסיס נתונים ומחיקה רקורסיבית (${knownCollections.length || 15})`, icon: Database },
               { id: 'overview', label: 'מבט-על ותרשימי זרימה', icon: Workflow },
               { id: 'routes', label: `סייר עמודים (${APP_ROUTES.length})`, icon: Globe },
               { id: 'apis', label: `מרכז שרתי API (${API_ROUTES.length})`, icon: Server },
@@ -667,7 +814,7 @@ export default function SystemMapClient() {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* ========================================================================= */}
-        {/* TAB: DATABASE & MULTI-LEVEL DRILLDOWN + CHRONOLOGICAL SORTING & SEARCH */}
+        {/* TAB: DATABASE & MULTI-SELECTION BATCH DELETIONS */}
         {/* ========================================================================= */}
         {activeTab === 'database' && (
           <div className="space-y-6">
@@ -679,7 +826,7 @@ export default function SystemMapClient() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    סייר מסד הנתונים וחיפוש עם מיון זמנים כרונולוגי
+                    סייר מסד הנתונים ומחיקה רקורסיבית מוחלטת
                     {dbLatency !== null && (
                       <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                         ⚡ {dbLatency}ms
@@ -687,7 +834,7 @@ export default function SystemMapClient() {
                     )}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    מיון אוטומטי מהראשון לסוף (`Oldest to Newest`), חיפוש עמוק בכל השדות ומחיקה מבוקרת
+                    מחיקה רקורסיבית מוחקת את המסמך ואת כל תת-הקולקציות המשויכות אליו (`conversations`, `messages`, וכו׳) ללא השארת שאריות ב-Firestore
                   </p>
                 </div>
               </div>
@@ -851,18 +998,60 @@ export default function SystemMapClient() {
                     )}
                   </div>
 
-                  {/* Header */}
+                  {/* Header & ACTION BUTTONS: SELECT ALL + PURGE COLLECTION */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-base font-bold text-white font-mono">{currentDbPath}</h4>
                         <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                           {filteredAndSortedDocs.length} מתוך {collectionDocs.length} מסמכים
                         </span>
+                        {selectedDocPaths.length > 0 && (
+                          <span className="text-xs font-mono text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 font-bold">
+                            {selectedDocPaths.length} מסומנים
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        ממוין כעת: {dbSortOrder === 'oldest-first' ? '⏳ מהראשון מההתחלה לסוף (כרונולוגי עולה)' : dbSortOrder === 'newest-first' ? '⌛ מהחדש לישן (הכי עדכני תחילה)' : dbSortOrder === 'id-asc' ? '🔤 לפי מזהה (א-ת)' : '🔤 לפי מזהה (ת-א)'}
+                        ממוין כעת: {dbSortOrder === 'oldest-first' ? '⏳ מהראשון מההתחלה לסוף' : dbSortOrder === 'newest-first' ? '⌛ מהחדש לישן' : '🔤 לפי מזהה'}
                       </p>
+                    </div>
+
+                    {/* ACTION BUTTONS (SELECT ALL & PURGE ALL) */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {filteredAndSortedDocs.length > 0 && (
+                        <button
+                          onClick={toggleSelectAllDocs}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border flex items-center gap-2 transition shadow-md ${
+                            isAllDocsSelected
+                              ? 'bg-amber-500 border-amber-400 text-black shadow-[0_0_20px_rgba(245,158,11,0.35)]'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300 hover:border-amber-500/40'
+                          }`}
+                        >
+                          {isAllDocsSelected ? (
+                            <CheckSquare className="w-4 h-4 text-black stroke-[2.5]" />
+                          ) : (
+                            <Square className="w-4 h-4 text-amber-400" />
+                          )}
+                          <span>
+                            {isAllDocsSelected
+                              ? `✕ בטל בחירה (${filteredAndSortedDocs.length})`
+                              : `✓ בחר הכל (${filteredAndSortedDocs.length})`}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* PURGE ALL DOCUMENTS IN THIS PATH */}
+                      {collectionDocs.length > 0 && (
+                        <button
+                          onClick={() => setPurgeModalOpen(true)}
+                          className="px-3 py-2 bg-rose-950/70 hover:bg-rose-900 text-rose-300 hover:text-rose-100 text-xs font-bold rounded-xl border border-rose-700/60 flex items-center gap-1.5 transition shadow-sm"
+                          title="רוקן ומחק את כל המסמכים בקולקציה זו לצמיתות"
+                        >
+                          <Flame className="w-3.5 h-3.5 text-rose-400" />
+                          <span>רוקן קולקציה זו</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -933,7 +1122,7 @@ export default function SystemMapClient() {
                     <div className="py-16 text-center text-slate-400 text-xs bg-[#16161b] rounded-xl border border-slate-800 p-6 space-y-2">
                       <div className="font-bold text-white text-sm">אין מסמכים בנתיב: `{currentDbPath}`</div>
                       <p className="text-slate-400">
-                        קולקציה זו טרם מכילה מסמכים או שאין תוצאות התואמות את החיפוש שלך.
+                        קולקציה זו טרם מכילה מסמכים או שכולם נמחקו בהצלחה.
                       </p>
                     </div>
                   ) : (
@@ -942,14 +1131,33 @@ export default function SystemMapClient() {
                         const subCols = doc.subCollections || [];
                         const timestamp = extractDocTimestamp(doc);
                         const formattedDate = formatDocTimestamp(timestamp);
+                        const isSelected = selectedDocPaths.includes(doc.path);
 
                         return (
                           <div
                             key={doc.id || idx}
-                            className="bg-[#16161b] border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition space-y-3"
+                            className={`border rounded-xl p-4 transition-all space-y-3 ${
+                              isSelected
+                                ? 'bg-amber-500/10 border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                                : 'bg-[#16161b] border-slate-800 hover:border-slate-700'
+                            }`}
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 truncate">
+                              {/* Left / Start: Checkbox + ID + Timestamp */}
+                              <div className="flex items-center gap-3 truncate">
+                                {/* Individual Checkbox */}
+                                <button
+                                  onClick={() => toggleDocSelection(doc.path)}
+                                  className={`p-1 rounded-lg border transition ${
+                                    isSelected
+                                      ? 'bg-amber-500 border-amber-400 text-black'
+                                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-amber-500/50'
+                                  }`}
+                                  title={isSelected ? 'בטל בחירה' : 'סמן למחיקה מרובה'}
+                                >
+                                  {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <div className="w-3.5 h-3.5" />}
+                                </button>
+
                                 <span className="text-[10px] font-bold text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
                                   #{idx + 1}
                                 </span>
@@ -966,6 +1174,7 @@ export default function SystemMapClient() {
                                 )}
                               </div>
 
+                              {/* Right / Actions: Copy, Inspect, Delete */}
                               <div className="flex items-center gap-2 shrink-0">
                                 <button
                                   onClick={() => handleCopy(JSON.stringify(doc.data, null, 2))}
@@ -986,7 +1195,7 @@ export default function SystemMapClient() {
                                 <button
                                   onClick={() => setDeleteTarget({ path: doc.path, docId: doc.id })}
                                   className="text-[11px] text-rose-300 hover:text-white bg-rose-500/15 hover:bg-rose-600/80 px-2.5 py-1 rounded font-bold border border-rose-500/30 flex items-center gap-1 transition"
-                                  title="מחק מסמך זה לצמיתות"
+                                  title="מחק מסמך זה ואת כל תת-הקולקציות שלו לצמיתות"
                                 >
                                   <Trash2 className="w-3 h-3 text-rose-400" />
                                   מחק
@@ -1043,7 +1252,7 @@ export default function SystemMapClient() {
                 <div>
                   <h4 className="text-sm font-bold text-white">קולקציות סוכנים, עמודים ושיחות מחוברות וממוינות</h4>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    מיון מהראשון לסוף, חיפוש שדות עמוק ומחיקה מבוקרת
+                    מחיקה רקורסיבית מלאה, ריקון קולקציות וחיפוש שדות עמוק
                   </p>
                 </div>
               </div>
@@ -1088,48 +1297,103 @@ export default function SystemMapClient() {
           </div>
         )}
 
-        {/* TAB: ROUTES */}
+        {/* TAB: ROUTES (WITH "SELECT ALL" BUTTON & CHECKBOXES) */}
         {activeTab === 'routes' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredRoutes.map(route => (
-              <div
-                key={route.id}
-                onClick={() => setSelectedItem({ title: route.title, type: 'route', data: route })}
-                className="bg-[#121216] border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 flex flex-col justify-between transition-all group cursor-pointer"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase">
-                      {route.category}
-                    </span>
-                    <button
-                      onClick={e => handleCopy(route.path, e)}
-                      className="p-1 text-slate-500 hover:text-amber-400 transition"
-                    >
-                      {copiedText === route.path ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                  <div className="font-mono text-sm font-bold text-amber-300 break-all">{route.path}</div>
-                  <h3 className="text-base font-bold text-white mt-1 mb-2">{route.title}</h3>
-                  <p className="text-xs text-slate-400 line-clamp-2 mb-4 leading-relaxed">{route.description}</p>
-                </div>
-
-                <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-[11px] font-mono text-slate-500 truncate max-w-[170px]">{route.file}</span>
-                  {!route.isDynamic && (
-                    <Link
-                      href={route.path}
-                      onClick={e => e.stopPropagation()}
-                      target="_blank"
-                      className="flex items-center gap-1 text-[11px] font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30 transition"
-                    >
-                      <span>פתח נתיב</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
-                  )}
-                </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-[#111115] p-4 rounded-2xl border border-slate-800">
+              <div className="text-xs text-slate-300">
+                סה״כ <strong>{filteredRoutes.length}</strong> עמודים ונתיבים במערכת
+                {selectedRoutes.length > 0 && (
+                  <span className="text-amber-400 font-bold mr-2">({selectedRoutes.length} נבחרו)</span>
+                )}
               </div>
-            ))}
+
+              {/* SELECT ALL ROUTES BUTTON */}
+              <button
+                onClick={toggleSelectAllRoutes}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold border flex items-center gap-2 transition ${
+                  isAllRoutesSelected
+                    ? 'bg-amber-500 border-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300'
+                }`}
+              >
+                {isAllRoutesSelected ? (
+                  <CheckSquare className="w-4 h-4 text-black stroke-[2.5]" />
+                ) : (
+                  <Square className="w-4 h-4 text-amber-400" />
+                )}
+                <span>{isAllRoutesSelected ? 'בטל בחירת הכל' : `✓ בחר את כל העמודים (${filteredRoutes.length})`}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredRoutes.map(route => {
+                const isSelected = selectedRoutes.includes(route.id);
+                return (
+                  <div
+                    key={route.id}
+                    onClick={() => setSelectedItem({ title: route.title, type: 'route', data: route })}
+                    className={`border rounded-2xl p-5 flex flex-col justify-between transition-all group cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500/10 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                        : 'bg-[#121216] border-slate-800 hover:border-amber-500/50'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setSelectedRoutes(prev =>
+                                prev.includes(route.id) ? prev.filter(id => id !== route.id) : [...prev, route.id]
+                              );
+                            }}
+                            className={`p-1 rounded-lg border transition ${
+                              isSelected
+                                ? 'bg-amber-500 border-amber-400 text-black'
+                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-amber-500/50'
+                            }`}
+                          >
+                            {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <div className="w-3.5 h-3.5" />}
+                          </button>
+
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase">
+                            {route.category}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={e => handleCopy(route.path, e)}
+                          className="p-1 text-slate-500 hover:text-amber-400 transition"
+                        >
+                          {copiedText === route.path ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      <div className="font-mono text-sm font-bold text-amber-300 break-all">{route.path}</div>
+                      <h3 className="text-base font-bold text-white mt-1 mb-2">{route.title}</h3>
+                      <p className="text-xs text-slate-400 line-clamp-2 mb-4 leading-relaxed">{route.description}</p>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-mono text-slate-500 truncate max-w-[170px]">{route.file}</span>
+                      {!route.isDynamic && (
+                        <Link
+                          href={route.path}
+                          onClick={e => e.stopPropagation()}
+                          target="_blank"
+                          className="flex items-center gap-1 text-[11px] font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30 transition"
+                        >
+                          <span>פתח נתיב</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1242,8 +1506,111 @@ export default function SystemMapClient() {
       </main>
 
       {/* ========================================================================= */}
-      {/* SECURE DELETION CONFIRMATION MODAL */}
+      {/* PURGE / CLEAR FULL COLLECTION CONFIRMATION MODAL */}
       {/* ========================================================================= */}
+      {purgeModalOpen && (
+        <div
+          onClick={() => !isBatchDeleting && setPurgeModalOpen(false)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-[#1c0e12] border-2 border-rose-600 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-[0_0_70px_rgba(225,29,72,0.4)]"
+          >
+            <div className="flex items-center gap-3 pb-3 border-b border-rose-950">
+              <div className="w-12 h-12 rounded-2xl bg-rose-600/20 border border-rose-500 flex items-center justify-center text-rose-400">
+                <Flame className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">אזהרה: ריקון קולקציה מלאה</h3>
+                <p className="text-xs text-rose-300">
+                  פעולה זו תמחק לצמיתות את <strong>כל {collectionDocs.length} המסמכים</strong> ואת כל תת-הקולקציות שלהם!
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-[#0f0709] p-3.5 rounded-xl border border-rose-900/60 space-y-1">
+              <div className="text-xs text-slate-400 font-semibold">הנתיב שירוקן לחלוטין מ-Firestore:</div>
+              <div className="font-mono text-sm font-bold text-rose-300 break-all">{currentDbPath}</div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setPurgeModalOpen(false)}
+                disabled={isBatchDeleting}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={confirmPurgeCollection}
+                disabled={isBatchDeleting}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-xl shadow-[0_0_25px_rgba(225,29,72,0.6)] flex items-center gap-2 transition disabled:opacity-50"
+              >
+                <Flame className={`w-4 h-4 ${isBatchDeleting ? 'animate-spin' : ''}`} />
+                <span>{isBatchDeleting ? 'מרוקן קולקציה לצמיתות...' : `🗑️ אשר ורוקן את כל המסמכים בנתיב זה`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BATCH / BULK DELETION CONFIRMATION MODAL */}
+      {batchDeleteModalOpen && (
+        <div
+          onClick={() => !isBatchDeleting && setBatchDeleteModalOpen(false)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-[#181216] border-2 border-rose-500/60 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-[0_0_60px_rgba(244,63,94,0.35)]"
+          >
+            <div className="flex items-center gap-3 pb-3 border-b border-rose-950">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">אישור מחיקה מרוכזת (Recursive Batch Delete)</h3>
+                <p className="text-xs text-rose-300">
+                  אתה עומד למחוק לצמיתות <strong>{selectedDocPaths.length}</strong> מסמכים ממסד הנתונים!
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-slate-400">רשימת המסמכים שנבחרו למחיקה:</div>
+              <div className="bg-[#0f0b0d] p-3 rounded-xl border border-rose-900/50 max-h-48 overflow-y-auto font-mono text-xs text-rose-200 space-y-1">
+                {selectedDocPaths.map((path, idx) => (
+                  <div key={idx} className="flex items-center gap-2 py-0.5 border-b border-rose-950/40 last:border-0">
+                    <span className="text-[10px] text-slate-500">#{idx + 1}</span>
+                    <span className="truncate">{path}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setBatchDeleteModalOpen(false)}
+                disabled={isBatchDeleting}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={confirmBatchDelete}
+                disabled={isBatchDeleting}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-xl shadow-[0_0_25px_rgba(244,63,94,0.5)] flex items-center gap-2 transition disabled:opacity-50"
+              >
+                <Trash2 className={`w-4 h-4 ${isBatchDeleting ? 'animate-spin' : ''}`} />
+                <span>{isBatchDeleting ? 'מוחק כעת במרוכז...' : `🗑️ אשר ומחק ${selectedDocPaths.length} מסמכים לצמיתות`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SINGLE DELETION CONFIRMATION MODAL */}
       {deleteTarget && (
         <div
           onClick={() => !isDeleting && setDeleteTarget(null)}
@@ -1259,7 +1626,7 @@ export default function SystemMapClient() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">אישור מחיקה סופית</h3>
-                <p className="text-xs text-slate-400">פעולה זו בלתי הפיכה ותמחק את המסמך לצמיתות ממסד הנתונים</p>
+                <p className="text-xs text-slate-400">פעולה זו בלתי הפיכה ותמחק את המסמך ואת כל תת-הקולקציות שלו לצמיתות</p>
               </div>
             </div>
 

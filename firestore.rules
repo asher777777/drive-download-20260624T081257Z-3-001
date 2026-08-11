@@ -16,6 +16,22 @@ service cloud.firestore {
       }
     }
 
+    // Audit Logs - Append only
+    match /audit_logs/{logId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role == "SUPERADMIN" || 
+        request.auth.token.role == "ADMIN" || 
+        resource.data.ownerId == request.auth.uid
+      );
+      allow create: if request.auth != null && (
+        request.auth.token.role == "SUPERADMIN" || 
+        request.auth.token.role == "ADMIN" || 
+        request.resource.data.ownerId == request.auth.uid
+      );
+      // No update or delete allowed for audit logs
+      allow update, delete: if false;
+    }
+
     // Apply ownerId filtering to all other collections
     match /{collection}/{document=**} {
       allow read, update, delete: if request.auth != null && (
