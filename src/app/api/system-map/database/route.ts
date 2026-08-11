@@ -428,6 +428,37 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PUT: Update an existing document
+export async function PUT(req: NextRequest) {
+  const startTime = performance.now();
+  try {
+    const body = await req.json();
+    const { path, data } = body;
+
+    if (!path || !data) {
+      return NextResponse.json({ success: false, error: 'יש לספק נתיב ומידע לעדכון' }, { status: 400 });
+    }
+
+    const docRef = adminDb.doc(path);
+    // Use .set() with merge: false if we want to replace, or set(data) completely.
+    // Assuming full replace since user is editing the full JSON.
+    await docRef.set(data);
+
+    const executionTimeMs = Math.round(performance.now() - startTime);
+    return NextResponse.json({
+      success: true,
+      message: 'המסמך עודכן בהצלחה',
+      executionTimeMs
+    });
+  } catch (err: any) {
+    return NextResponse.json({
+      success: false,
+      error: err?.message || 'שגיאה בעדכון המסמך',
+      executionTimeMs: Math.round(performance.now() - startTime)
+    }, { status: 500 });
+  }
+}
+
 // DELETE: Robust Recursive Deletion (Single, Multi-Path Batch, and Full Collection Purge)
 export async function DELETE(req: NextRequest) {
   const startTime = performance.now();

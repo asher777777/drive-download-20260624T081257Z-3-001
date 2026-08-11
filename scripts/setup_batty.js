@@ -11,7 +11,7 @@ if (fs.existsSync('.env.local')) {
   }
 }
 
-// Initialize Firebase Admin if not already initialized
+let app;
 if (!admin.apps.length) {
   const privateKeyB64 = process.env.FIREBASE_ADMIN_PRIVATE_KEY_B64;
   let privateKey = "";
@@ -24,7 +24,7 @@ if (!admin.apps.length) {
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
 
   if (projectId && clientEmail && privateKey) {
-    admin.initializeApp({
+    app = admin.initializeApp({
       credential: admin.credential.cert({
         projectId,
         clientEmail,
@@ -33,11 +33,14 @@ if (!admin.apps.length) {
     });
   } else {
     // Attempt default initialization
-    admin.initializeApp();
+    app = admin.initializeApp();
   }
+} else {
+  app = admin.apps[0];
 }
 
-const db = admin.firestore();
+const { getFirestore } = require('firebase-admin/firestore');
+const db = getFirestore(app, "default");
 
 async function createBatty() {
   try {

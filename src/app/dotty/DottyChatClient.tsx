@@ -777,6 +777,9 @@ export default function DottyChatClient({
   const [isRecording, setIsRecording] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isIntroPlaying, setIsIntroPlaying] = useState(true);
+  const [isStarted, setIsStarted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [sessionId, setSessionId] = useState("");
   const [interactionId, setInteractionId] = useState("");
   const [speechSupported, setSpeechSupported] = useState(true);
@@ -788,7 +791,12 @@ export default function DottyChatClient({
     if (agentId) {
       fetch(`/api/employee?id=${agentId}`)
         .then((r) => r.json())
-        .then((data) => setAgentData(data))
+        .then((data) => {
+          setAgentData(data);
+          if (!data.introVideo) {
+            setIsIntroPlaying(false);
+          }
+        })
         .catch(console.error);
     }
   }, [agentId]);
@@ -862,12 +870,12 @@ export default function DottyChatClient({
     };
   }, []); // Run once on mount
 
-  // Trigger init greeting once session is ready
+  // Trigger init greeting once session is ready and user interacted
   useEffect(() => {
-      if (sessionId && !hasInteracted && message === "") {
+      if (isStarted && sessionId && !hasInteracted && message === "") {
           handleSend(`[INIT_GREETING] ${missingAssetsAgents?.length || 0}`);
       }
-  }, [sessionId, hasInteracted, message, missingAssetsAgents]);
+  }, [sessionId, hasInteracted, message, missingAssetsAgents, isStarted]);
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -1033,15 +1041,43 @@ export default function DottyChatClient({
       dir="rtl"
       lang="he"
     >
-      {agentData && (agentData.idleVideo || agentData.speakingVideo) && (
-        <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
+      {!isStarted && agentData && (
+        <div 
+          onClick={() => {
+            setIsStarted(true);
+            if (videoRef.current) {
+              videoRef.current.play().catch(e => console.error("Play failed:", e));
+            }
+          }}
+          style={{ position: "absolute", zIndex: 9999, top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(5px)" }}
+        >
+           <div style={{ padding: "20px", background: "linear-gradient(135deg, #D4AF37 0%, #aa8529 100%)", borderRadius: "50%", boxShadow: "0 4px 30px rgba(212,175,55,0.4)" }}>
+              <Play size={48} color="#000" />
+           </div>
+           <p style={{ color: "#D4AF37", marginTop: "20px", fontSize: "1.2rem", fontWeight: "bold" }}>הקש/י להתחלה</p>
+        </div>
+      )}
+
+      {agentData && (agentData.idleVideo || agentData.speakingVideo || agentData.introVideo || agentData.noddingVideo) && (
+        <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0, overflow: "hidden", pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <video
-            src={isPlaying && agentData.speakingVideo ? agentData.speakingVideo : (agentData.idleVideo || agentData.speakingVideo)}
-            autoPlay
-            loop
-            muted
+            ref={videoRef}
+            src={
+              isIntroPlaying && agentData.introVideo ? agentData.introVideo :
+              isPlaying && agentData.speakingVideo ? agentData.speakingVideo :
+              (isRecording || isThinking) && agentData.noddingVideo ? agentData.noddingVideo :
+              (agentData.idleVideo || agentData.speakingVideo)
+            }
+            autoPlay={!isIntroPlaying || isStarted}
+            loop={!isIntroPlaying}
+            muted={!isIntroPlaying}
             playsInline
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onEnded={() => {
+              if (isIntroPlaying) {
+                setIsIntroPlaying(false);
+              }
+            }}
+            style={{ minWidth: "100%", minHeight: "100%", width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }}
           />
         </div>
       )}

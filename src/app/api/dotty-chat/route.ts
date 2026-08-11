@@ -723,7 +723,7 @@ DO NOT output any UI components in your text.`;
         parameters: {
           type: "OBJECT",
           properties: {
-            assetType: { type: "STRING", enum: ["idleVideo", "speakingVideo", "promoVideo", "profilePicture"] },
+            assetType: { type: "STRING", enum: ["introVideo", "idleVideo", "speakingVideo", "noddingVideo", "promoVideo", "profilePicture"] },
             title: { type: "STRING" }
           },
           required: ["assetType", "title"]

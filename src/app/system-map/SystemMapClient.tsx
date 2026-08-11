@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import DBArchitectChat from './DBArchitectChat';
 import {
   APP_ROUTES,
   API_ROUTES,
@@ -198,6 +199,14 @@ export default function SystemMapClient() {
   const [dbSortOrder, setDbSortOrder] = useState<DbSortType>('oldest-first');
   const [dbCategoryFilter, setDbCategoryFilter] = useState<string>('all');
   const [inspectingDoc, setInspectingDoc] = useState<DBDocumentItem | null>(null);
+  const [isEditingDoc, setIsEditingDoc] = useState<boolean>(false);
+  const [editDocData, setEditDocData] = useState<string>('');
+  const [isSavingDoc, setIsSavingDoc] = useState<boolean>(false);
+  const [createDocModalOpen, setCreateDocModalOpen] = useState<boolean>(false);
+  const [createDocId, setCreateDocId] = useState<string>('');
+  const [createDocData, setCreateDocData] = useState<string>('{\n  \n}');
+  const [isCreatingDoc, setIsCreatingDoc] = useState<boolean>(false);
+  const [architectChatOpen, setArchitectChatOpen] = useState<boolean>(false);
 
   // Multi-Selection / Batch Deletion State
   const [selectedDocPaths, setSelectedDocPaths] = useState<string[]>([]);
@@ -259,12 +268,29 @@ export default function SystemMapClient() {
       const res = await fetch('/api/system-map/database');
       const json = await res.json();
       if (json.success) {
-        setKnownCollections(json.knownCollections || []);
+        const knownCols = json.knownCollections || [];
+        const dynamicCols = json.dynamicRootCollections || [];
+        const mergedCols = [...knownCols];
+        
+        dynamicCols.forEach((dCol: string) => {
+          if (!mergedCols.find((c: any) => c.id === dCol)) {
+            mergedCols.push({
+              id: dCol,
+              name: dCol,
+              type: 'root',
+              description: 'קולקציה דינמית שזוהתה אוטומטית',
+              icon: 'Database',
+              category: 'dynamic'
+            });
+          }
+        });
+        
+        setKnownCollections(mergedCols);
         setDbUsers(json.users || []);
         if (json.users?.length > 0 && selectedDbUser === '1' && !json.users.some((u: any) => u.id === '1')) {
           setSelectedDbUser(json.users[0].id);
         }
-        const empCol = (json.knownCollections || []).find((c: any) => c.id === 'employees') || json.knownCollections?.[0];
+        const empCol = mergedCols.find((c: any) => c.id === 'employees') || mergedCols[0];
         if (empCol && !selectedCollection) {
           setSelectedCollection(empCol);
           setCurrentDbPath(empCol.id);
@@ -377,6 +403,65 @@ export default function SystemMapClient() {
       setSelectedRoutes([]);
     } else {
       setSelectedRoutes(allRouteIds);
+    }
+  };
+
+  // Execute Document Creation
+  const handleCreateDoc = async () => {
+    setIsCreatingDoc(true);
+    try {
+      const parsedData = JSON.parse(createDocData || '{}');
+      const docId = createDocId.trim() || Math.random().toString(36).substring(2, 10);
+      const newPath = `${currentDbPath}/${docId}`;
+      const res = await fetch('/api/system-map/database', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: newPath, data: parsedData })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDeleteNotification({ message: `מסמך נוצר בהצלחה: ${docId}` });
+        setCreateDocModalOpen(false);
+        setCreateDocId('');
+        setCreateDocData('{\n  \n}');
+        await fetchPathDocs(currentDbPath);
+        await fetchDbMetadata();
+      } else {
+        setDeleteNotification({ message: json.error || 'שגיאה ביצירת המסמך', isError: true });
+      }
+    } catch (e: any) {
+      setDeleteNotification({ message: 'JSON לא תקין או שגיאת רשת', isError: true });
+    } finally {
+      setIsCreatingDoc(false);
+      setTimeout(() => setDeleteNotification(null), 4000);
+    }
+  };
+
+  // Execute Document Update
+  const handleSaveDoc = async () => {
+    if (!inspectingDoc) return;
+    setIsSavingDoc(true);
+    try {
+      const parsedData = JSON.parse(editDocData);
+      const res = await fetch('/api/system-map/database', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: inspectingDoc.path, data: parsedData })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDeleteNotification({ message: 'המסמך נשמר בהצלחה!' });
+        setIsEditingDoc(false);
+        setInspectingDoc(prev => prev ? { ...prev, data: parsedData } : null);
+        await fetchPathDocs(currentDbPath);
+      } else {
+        setDeleteNotification({ message: json.error || 'שגיאה בשמירת המסמך', isError: true });
+      }
+    } catch (e: any) {
+      setDeleteNotification({ message: 'JSON לא תקין או שגיאת רשת', isError: true });
+    } finally {
+      setIsSavingDoc(false);
+      setTimeout(() => setDeleteNotification(null), 4000);
     }
   };
 
@@ -861,6 +946,22 @@ export default function SystemMapClient() {
                 </select>
 
                 <button
+                  onClick={() => setCreateDocModalOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 transition flex items-center gap-1.5 font-bold text-xs"
+                  title="יצירת קולקציה/מסמך חדש בנתיב זה"
+                >
+                  <span>➕ צור חדש</span>
+                </button>
+
+                <button
+                  onClick={() => setArchitectChatOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-500/40 transition flex items-center gap-1.5 font-bold text-xs shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                  title="סיעור מוחות עם ארכיטקט נתונים AI"
+                >
+                  <span>🧠 DB Architect</span>
+                </button>
+
+                <button
                   onClick={() => fetchPathDocs(currentDbPath)}
                   disabled={dbLoading}
                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
@@ -1184,7 +1285,11 @@ export default function SystemMapClient() {
                                   העתק JSON
                                 </button>
                                 <button
-                                  onClick={() => setInspectingDoc(doc)}
+                                  onClick={() => {
+                                    setInspectingDoc(doc);
+                                    setEditDocData(JSON.stringify(doc.data, null, 2));
+                                    setIsEditingDoc(false);
+                                  }}
                                   className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 px-2.5 py-1 rounded font-bold border border-amber-500/40 flex items-center gap-1 transition"
                                 >
                                   <Eye className="w-3 h-3" />
@@ -1706,12 +1811,52 @@ export default function SystemMapClient() {
             )}
 
             <div className="relative">
-              <pre
-                dir="ltr"
-                className="p-4 bg-[#0a0a0d] border border-slate-800 rounded-xl text-xs font-mono text-emerald-300 overflow-x-auto max-h-96"
-              >
-                {JSON.stringify(inspectingDoc.data, null, 2)}
-              </pre>
+              {isEditingDoc ? (
+                <textarea
+                  dir="ltr"
+                  className="w-full min-h-[300px] p-4 bg-[#0a0a0d] border border-amber-500/50 rounded-xl text-xs font-mono text-emerald-300 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-y"
+                  value={editDocData}
+                  onChange={(e) => setEditDocData(e.target.value)}
+                />
+              ) : (
+                <pre
+                  dir="ltr"
+                  className="p-4 bg-[#0a0a0d] border border-slate-800 rounded-xl text-xs font-mono text-emerald-300 overflow-x-auto max-h-96"
+                >
+                  {JSON.stringify(inspectingDoc.data, null, 2)}
+                </pre>
+              )}
+
+              <div className="absolute top-3 right-3 flex flex-row-reverse items-center gap-2">
+                {!isEditingDoc && (
+                  <button
+                    onClick={() => setIsEditingDoc(true)}
+                    className="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 text-xs font-bold rounded-lg flex items-center gap-1.5"
+                  >
+                    ✏️ ערוך
+                  </button>
+                )}
+                {isEditingDoc && (
+                  <>
+                    <button
+                      onClick={handleSaveDoc}
+                      disabled={isSavingDoc}
+                      className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-300 text-xs font-bold rounded-lg flex items-center gap-1.5 transition"
+                    >
+                      {isSavingDoc ? 'שומר...' : '💾 שמור'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingDoc(false);
+                        setEditDocData(JSON.stringify(inspectingDoc.data, null, 2));
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition"
+                    >
+                      ביטול
+                    </button>
+                  </>
+                )}
+              </div>
 
               <div className="absolute top-3 left-3 flex items-center gap-2">
                 <button
@@ -1729,6 +1874,86 @@ export default function SystemMapClient() {
                   מחק מסמך זה
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DB ARCHITECT CHAT MODAL */}
+      <DBArchitectChat 
+        isOpen={architectChatOpen} 
+        onClose={() => setArchitectChatOpen(false)} 
+        onDataSeeded={() => {
+          if (currentDbPath) fetchPathDocs(currentDbPath);
+          fetchDbMetadata();
+        }}
+      />
+
+      {/* CREATE DOCUMENT MODAL */}
+      {createDocModalOpen && (
+        <div
+          onClick={() => setCreateDocModalOpen(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-[#141418] border border-emerald-500/40 rounded-2xl max-w-3xl w-full p-6 max-h-[85vh] overflow-y-auto space-y-4 shadow-[0_0_40px_rgba(16,185,129,0.2)]"
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
+                  Create Document
+                </span>
+                <h3 className="text-lg font-bold font-mono text-white mt-1">יצירת מסמך / קולקציה חדשה</h3>
+                <div className="text-xs font-mono text-slate-500 mt-1">נתיב נוכחי: {currentDbPath}</div>
+              </div>
+              <button
+                onClick={() => setCreateDocModalOpen(false)}
+                className="text-slate-400 hover:text-white px-3 py-1 bg-slate-800 rounded-lg text-sm"
+              >
+                סגור ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">מזהה מסמך (ID) - השאר ריק ליצירה אוטומטית</label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  placeholder="e.g. my_custom_doc_123"
+                  className="w-full bg-[#0a0a0d] border border-slate-700 rounded-xl px-4 py-2 text-sm text-emerald-300 font-mono focus:outline-none focus:border-emerald-500"
+                  value={createDocId}
+                  onChange={e => setCreateDocId(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">תוכן המסמך (JSON)</label>
+                <textarea
+                  dir="ltr"
+                  className="w-full min-h-[300px] p-4 bg-[#0a0a0d] border border-emerald-500/30 rounded-xl text-xs font-mono text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-y"
+                  value={createDocData}
+                  onChange={(e) => setCreateDocData(e.target.value)}
+                  placeholder="{\n  \n}"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <button
+                onClick={() => setCreateDocModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold rounded-xl transition"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleCreateDoc}
+                disabled={isCreatingDoc}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-extrabold rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center gap-2 transition disabled:opacity-50"
+              >
+                {isCreatingDoc ? 'יוצר...' : '✨ צור מסמך'}
+              </button>
             </div>
           </div>
         </div>
