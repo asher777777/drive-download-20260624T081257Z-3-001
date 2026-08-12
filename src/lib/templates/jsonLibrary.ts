@@ -227,35 +227,62 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
       })
     );
 
-    // Render ALL contacts from Firestore DB if multiple exist!
+    // Dynamic Header Detection from user prompt (e.g. "Full name - Phone - and actions")
+    const availableContactFields = [
+      { header: 'Full Name', keys: ['full name', 'fullname', 'name', 'שם'] },
+      { header: 'ID', keys: ['id', 'identifier', 'מזהה'] },
+      { header: 'Phone', keys: ['phone', 'phon', 'mobile', 'cell', 'tel', 'טלפון', 'נייד'] },
+      { header: 'Email', keys: ['email', 'mail', 'אימייל', 'מייל'] },
+      { header: 'Role', keys: ['role', 'position', 'title', 'תפקיד'] },
+      { header: 'Status', keys: ['status', 'state', 'סטטוס'] },
+    ];
+
+    const isExplicitPrompt = q.includes('consisting of') || q.includes('only') || q.includes('רק') || q.includes('-') || q.includes('columns') || q.includes('עמודות');
+    
+    let selectedHeaders: string[] = [];
+    if (isExplicitPrompt) {
+      availableContactFields.forEach(f => {
+        if (f.keys.some(k => q.includes(k))) {
+          selectedHeaders.push(f.header);
+        }
+      });
+    }
+
+    const headers = selectedHeaders.length > 0
+      ? selectedHeaders
+      : ['Full Name', 'ID', 'Phone', 'Email', 'Role', 'Status'];
+
+    // Map each contact to only the selected headers!
     const tableRows = contactItems.length > 0 
-      ? contactItems.map(c => ({
-          'Full Name': c.name,
-          'ID': c.id,
-          'Phone': c.phone,
-          'Email': c.email,
-          'Role': c.role,
-          'Status': c.status || 'Active'
-        }))
+      ? contactItems.map(c => {
+          const rowObj: Record<string, any> = {};
+          if (headers.includes('Full Name')) rowObj['Full Name'] = c.name;
+          if (headers.includes('ID')) rowObj['ID'] = c.id;
+          if (headers.includes('Phone')) rowObj['Phone'] = c.phone || '-';
+          if (headers.includes('Email')) rowObj['Email'] = c.email || '-';
+          if (headers.includes('Role')) rowObj['Role'] = c.role || 'Client';
+          if (headers.includes('Status')) rowObj['Status'] = c.status || 'Active';
+          return rowObj;
+        })
       : [{
-          'Full Name': contactItem.name,
-          'ID': contactItem.id || 'cnt_001',
-          'Phone': contactItem.phone || '-',
-          'Email': contactItem.email,
-          'Role': contactItem.role,
-          'Status': contactItem.status || 'Active'
+          ...(headers.includes('Full Name') ? { 'Full Name': contactItem.name } : {}),
+          ...(headers.includes('ID') ? { 'ID': contactItem.id || 'cnt_001' } : {}),
+          ...(headers.includes('Phone') ? { 'Phone': contactItem.phone || '-' } : {}),
+          ...(headers.includes('Email') ? { 'Email': contactItem.email || '-' } : {}),
+          ...(headers.includes('Role') ? { 'Role': contactItem.role || 'Client' } : {}),
+          ...(headers.includes('Status') ? { 'Status': contactItem.status || 'Active' } : {})
         }];
 
     components.push(
       JSON_TEMPLATE_LIBRARY.excel_table_card({
         text: `Interactive Contact Data Table (${tableRows.length} Firestore DB Contacts)`,
         tableData: {
-          title: `Contacts Database Table - ${contactItem.name}`,
-          headers: ['Full Name', 'ID', 'Phone', 'Email', 'Role', 'Status'],
+          title: `Contacts Database Table (${headers.join(" - ")})`,
+          headers,
           rows: tableRows
         },
         vectorShape: { type: 'table', color: '#FFC800', label: 'Contact Card' },
-        badge: 'Editable Card'
+        badge: `${headers.length} Columns`
       })
     );
   } else if (q.includes('sub') || q.includes('subscription') || q.includes('subscriptions') || q.includes('order') || q.includes('billing') || q.includes('oldest') || q.includes('newest') || q.includes('מנוי') || q.includes('מנויים') || q.includes('רכישות') || q.includes('הזמנות')) {

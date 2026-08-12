@@ -325,11 +325,38 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
         const contactsSnap = await adminDb.collection("contacts").get();
         contactsSnap.forEach((doc) => {
           const c = doc.data();
+          const extractedName =
+            c.name ||
+            c.fullName ||
+            c.full_name ||
+            c.displayName ||
+            c.display_name ||
+            c.contactName ||
+            c.contact_name ||
+            c.title ||
+            (c.firstName || c.first_name ? `${c.firstName || c.first_name || ''} ${c.lastName || c.last_name || ''}`.trim() : '') ||
+            `Contact ${doc.id.substring(0, 6)}`;
+
+          const extractedPhone =
+            c.phone ||
+            c.phoneNumber ||
+            c.phone_number ||
+            c.mobile ||
+            c.cell ||
+            c.tel ||
+            "-";
+
+          const extractedEmail =
+            c.email ||
+            c.mail ||
+            c.emailAddress ||
+            "-";
+
           contactsList.push({
             id: doc.id,
-            name: c.name || c.displayName || c.fullName || "Contact Record",
-            email: c.email || "-",
-            phone: c.phone || c.phoneNumber || "-",
+            name: extractedName,
+            email: extractedEmail,
+            phone: extractedPhone,
             role: c.role || c.title || "Client",
             company: c.company || "Organization",
             status: c.status || "Active"
