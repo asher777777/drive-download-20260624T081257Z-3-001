@@ -29,6 +29,17 @@ const tools: any[] = [
           },
           required: ["collectionPath", "documents"]
         }
+      },
+      {
+        name: "query_database",
+        description: "Read and analyze existing documents from a Firestore collection to understand the current schema and data.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            collectionPath: { type: "STRING", description: "The full path of the collection to read (e.g., 'products')" }
+          },
+          required: ["collectionPath"]
+        }
       }
     ]
   }
@@ -40,11 +51,13 @@ const systemInstruction = `
 שלבים:
 1. שאל את המשתמש איזה סוג נתונים הוא רוצה לאחסן ולנהל.
 2. הצע סכמות JSON חכמות והגיוניות הכוללות שדות שימושיים (כמו סטטוסים, תאריכים, מזהים מקושרים).
-3. לאחר שהמשתמש מאשר ומרוצה מהסכמה, הצע לייצר עבורו נתוני דמו (Mock Data).
-4. אם המשתמש מסכים, השתמש בכלי 'seed_database_collection' כדי לייצר 3-5 דוגמאות ריאליסטיות ולהזריק אותן בפועל למסד הנתונים כדי שהמשתמש יראה אותן נוצרות מולו!
+3. באפשרותך להשתמש בכלי 'query_database' כדי לקרוא קולקציות קיימות ולהבין איך הן בנויות, כך שתוכל להתאים את הסכמות החדשות למבנה הקיים.
+4. לאחר שהמשתמש מאשר ומרוצה מהסכמה, הצע לייצר עבורו נתוני דמו (Mock Data).
+5. אם המשתמש מסכים, השתמש בכלי 'seed_database_collection' כדי לייצר 3-5 דוגמאות ריאליסטיות ולהזריק אותן בפועל למסד הנתונים כדי שהמשתמש יראה אותן נוצרות מולו!
 
 שים לב: 
-- אין לך אישור למחוק נתונים! מותר לך רק ליצור מידע חדש.
+- יש לך הרשאות קריאה וכתיבה (הזרקת נתונים).
+- אין לך אישור למחוק נתונים! המשתמש הבהיר שהוא מוחק בעצמו. אל תציע למחוק.
 - תמיד ענה בעברית בצורה שירותית, טכנית ומקצועית. עזור למשתמש לחשוב על שדות חשובים שאולי פספס.
 - שים לב שאתה מסוגל לכתוב מספר מסמכים במכה אחת (Batch) בעזרת הכלי שלך.
 `;
@@ -53,8 +66,7 @@ export async function POST(req: Request) {
   try {
     const { message, history } = await req.json();
     
-    // Format history for Gemini
-    const contents = [];
+    const contents: any[] = [];
     if (history && history.length > 0) {
       for (const msg of history) {
         contents.push({
@@ -63,30 +75,46 @@ export async function POST(req: Request) {
         });
       }
     }
-    
     contents.push({
       role: 'user',
       parts: [{ text: message }]
     });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-pro", // High intelligence for architecture
-      contents,
-      config: {
-        systemInstruction,
-        tools,
-        temperature: 0.7
-      }
-    });
-
-    let functionCalls = response.functionCalls || [];
-    let textResponse = response.text || '';
-    
     let isSeeding = false;
     let seededCount = 0;
     
-    if (functionCalls && functionCalls.length > 0) {
-      for (const call of functionCalls) {
+    // Multi-turn loop
+    let maxTurns = 3;
+    let currentResponse;
+    let currentText = '';
+
+    while (maxTurns > 0) {
+      maxTurns--;
+      currentResponse = await ai.models.generateContent({
+        model: "gemini-2.5-pro",
+        contents,
+        config: {
+          systemInstruction,
+          tools,
+          temperature: 0.7
+        }
+      });
+
+      if (currentResponse.functionCalls && currentResponse.functionCalls.length > 0) {
+        const call = currentResponse.functionCalls[0];
+        let toolResponsePayload: any = {};
+
+        // Add model's function call to history
+        contents.push({
+          role: 'model',
+          parts: [{
+            functionCall: {
+              name: call.name,
+              args: call.args
+            }
+          }]
+        });
+
         if (call.name === "seed_database_collection") {
           const { collectionPath, documents } = call.args as any;
           if (collectionPath && Array.isArray(documents) && documents.length > 0) {
@@ -102,16 +130,51 @@ export async function POST(req: Request) {
               });
             });
             await batch.commit();
-            seededCount = documents.length;
-            textResponse += `\n\n[פעולת מערכת: הוזרקו בהצלחה ${seededCount} רשומות לתוך '${collectionPath}']`;
+            seededCount += documents.length;
+            toolResponsePayload = { success: true, message: `הוזרקו בהצלחה ${documents.length} רשומות לתוך ${collectionPath}` };
+          } else {
+            toolResponsePayload = { success: false, error: "Invalid parameters" };
+          }
+        } else if (call.name === "query_database") {
+          const { collectionPath } = call.args as any;
+          try {
+            const snap = await adminDb.collection(collectionPath).limit(10).get();
+            if (snap.empty) {
+              toolResponsePayload = { success: true, message: `הקולקציה ${collectionPath} ריקה או לא קיימת.` };
+            } else {
+              const records = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              toolResponsePayload = { success: true, count: snap.size, data: records };
+            }
+          } catch (err: any) {
+            toolResponsePayload = { success: false, error: err.message };
           }
         }
+
+        // Add function response to history
+        contents.push({
+          role: 'user',
+          parts: [{
+            functionResponse: {
+              name: call.name,
+              response: toolResponsePayload
+            }
+          }]
+        });
+
+      } else {
+        // No more function calls, we have the final text
+        currentText = currentResponse.text || '';
+        break;
       }
+    }
+
+    if (seededCount > 0) {
+      currentText += `\n\n[פעולת מערכת: הוזרקו בהצלחה ${seededCount} רשומות למסד הנתונים]`;
     }
 
     return NextResponse.json({
       success: true,
-      text: textResponse,
+      text: currentText,
       seededCount,
       isSeeding
     });

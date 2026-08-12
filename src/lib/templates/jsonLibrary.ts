@@ -202,12 +202,12 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
 
     const contactItem = matchedContact || { 
       id: "cnt_001", 
-      name: "Moti Cohen", 
-      email: "moti@partner.com", 
-      phone: "+972-50-9876543", 
-      role: "Senior VIP Client", 
-      company: "Moti Digital Ltd", 
-      status: "Active Partner" 
+      name: "Contact Record", 
+      email: "contact@system.com", 
+      phone: "-", 
+      role: "Client", 
+      company: "Organization", 
+      status: "Active" 
     };
 
     components.push(
@@ -240,10 +240,10 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
       : [{
           'Full Name': contactItem.name,
           'ID': contactItem.id || 'cnt_001',
-          'Phone': contactItem.phone || '+972-50-9876543',
+          'Phone': contactItem.phone || '-',
           'Email': contactItem.email,
           'Role': contactItem.role,
-          'Status': contactItem.status || 'Active Partner'
+          'Status': contactItem.status || 'Active'
         }];
 
     components.push(
@@ -259,14 +259,7 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
       })
     );
   } else if (q.includes('sub') || q.includes('subscription') || q.includes('subscriptions') || q.includes('order') || q.includes('billing') || q.includes('oldest') || q.includes('newest') || q.includes('מנוי') || q.includes('מנויים') || q.includes('רכישות') || q.includes('הזמנות')) {
-    const subs = dbData.subscriptionsSummary?.items || [
-      { date: "2024-01-10", user: "Sarah Manager (sarah@c-g-ltd.com)", plan: "Smart Worker Enterprise Plan", amount: "₪4,900", status: "Active" },
-      { date: "2024-02-14", user: "Michael Client (michael@partner.com)", plan: "Digital Agent Pro License", amount: "₪2,450", status: "Active" },
-      { date: "2024-03-01", user: "Alex Developer (alex@partner.com)", plan: "Developer API Suite Subscription", amount: "₪1,800", status: "Active" },
-      { date: "2024-04-18", user: "Dotty Designer (dotty@partner.com)", plan: "Creative AI Asset Workspace", amount: "₪1,200", status: "Active" },
-      { date: "2024-05-22", user: "David Admin (admin@c-g-ltd.com)", plan: "Executive AI Command Suite", amount: "₪8,500", status: "Active" },
-      { date: "2024-06-11", user: "Partner Agency (contact@partner.com)", plan: "Multi-Tenant Agency License", amount: "₪12,000", status: "Active" }
-    ];
+    const subs = dbData.subscriptionsSummary?.items || [];
 
     const rows = subs.map((s: any) => ({
       'Date (Oldest to Newest)': s.date,
@@ -282,7 +275,7 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
         tableData: {
           title: 'Subscriptions Ledger Table (Oldest -> Newest)',
           headers: ['Date (Oldest to Newest)', 'Subscriber / Member', 'Subscription Plan', 'Amount', 'Status'],
-          rows
+          rows: rows.length > 0 ? rows : [{ 'Date (Oldest to Newest)': '-', 'Subscriber / Member': 'No subscriptions found', 'Subscription Plan': '-', 'Amount': '-', 'Status': '-' }]
         },
         vectorShape: { type: 'table', color: '#FFC800', label: 'Subscriptions' },
         badge: 'Oldest to Newest'
@@ -305,18 +298,12 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
   } else if (q.includes('excel') || q.includes('table') || q.includes('טבלה') || q.includes('אקסל') || q.includes('נתונים') || q.includes('columns') || q.includes('column')) {
     // Check if table request is for USERS (e.g. "Table with 3 columns with user data Full name - ID - Phone")
     if (q.includes('user') || q.includes('member') || q.includes('phone') || q.includes('name') || q.includes('id') || q.includes('משתמש')) {
-      const rawUsers = dbData.usersSummary?.rawUsers || [
-        { id: "usr_001", name: "David Admin", email: "admin@c-g-ltd.com", role: "Administrator", phone: "+972-50-1112233" },
-        { id: "usr_002", name: "Sarah Manager", email: "sarah@c-g-ltd.com", role: "Manager", phone: "+972-52-4445566" },
-        { id: "usr_003", name: "Michael Client", email: "michael@partner.com", role: "Client", phone: "+972-54-7778899" },
-        { id: "usr_004", name: "Alex Developer", email: "alex@partner.com", role: "Developer", phone: "+972-53-9990011" },
-        { id: "usr_005", name: "Dotty Designer", email: "dotty@partner.com", role: "Designer", phone: "+972-58-2223344" }
-      ];
+      const rawUsers = dbData.usersSummary?.rawUsers || [];
 
       const rows = rawUsers.map((u: any) => ({
         'Full Name': u.name,
         'ID': u.id,
-        'Phone': u.phone || "+972-50-1234567",
+        'Phone': u.phone || "-",
         'Email': u.email,
         'Role': u.role
       }));
@@ -327,7 +314,7 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
           tableData: {
             title: 'User Data Table (Full Name - ID - Phone)',
             headers: ['Full Name', 'ID', 'Phone', 'Email', 'Role'],
-            rows
+            rows: rows.length > 0 ? rows : [{ 'Full Name': 'No user records', 'ID': '-', 'Phone': '-', 'Email': '-', 'Role': '-' }]
           },
           vectorShape: { type: 'table', color: '#FFC800', label: 'User Table' },
           badge: 'User Data'
@@ -335,19 +322,13 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
       );
     } else {
       // Pages Data Table
-      const rawPages = dbData.pagesSummary?.pagesList || [
-        { title: "David's Office - analyze-mode.", views: 580, conversions: 78, source: "Digital Office" },
-        { title: "David's Office - growth-mode.", views: 430, conversions: 56, source: "Digital Office" },
-        { title: "Smart Executive AI Event Page", views: 510, conversions: 65, source: "Event Page" },
-        { title: "AI Agent System Article", views: 440, conversions: 52, source: "Post Page" },
-        { title: "Premium Smart Office Service Page", views: 390, conversions: 48, source: "Service Page" }
-      ];
+      const rawPages = dbData.pagesSummary?.pagesList || [];
 
       const rows = rawPages.map((p: any) => ({
         'Collection / Title': p.title,
-        'Visits': String(p.views || p.visits || 400),
-        'Leads': String(p.conversions || p.leads || 50),
-        'Conv. Rate': `${(((p.conversions || 50) / (p.views || 400)) * 100).toFixed(1)}%`,
+        'Visits': String(p.views || p.visits || 0),
+        'Leads': String(p.conversions || p.leads || 0),
+        'Conv. Rate': `${(((p.conversions || 0) / (p.views || 1)) * 100).toFixed(1)}%`,
         'Status': p.source || 'Active'
       }));
 

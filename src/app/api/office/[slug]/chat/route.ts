@@ -327,11 +327,11 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
           const c = doc.data();
           contactsList.push({
             id: doc.id,
-            name: c.name || c.displayName || c.fullName || "Moti Cohen",
-            email: c.email || "moti@partner.com",
-            phone: c.phone || c.phoneNumber || "+972-50-9876543",
+            name: c.name || c.displayName || c.fullName || "Contact Record",
+            email: c.email || "-",
+            phone: c.phone || c.phoneNumber || "-",
             role: c.role || c.title || "Client",
-            company: c.company || "Company",
+            company: c.company || "Organization",
             status: c.status || "Active"
           });
         });
@@ -356,11 +356,11 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
               date: dateStr,
               user: data.userName || data.user || data.email || `Member ${doc.id.substring(0, 4)}`,
               plan: data.plan || data.planName || data.title || "Plan",
-              amount: `₪${(data.amount || data.price || 1490).toLocaleString()}`,
+              amount: `₪${(data.amount || data.price || 0).toLocaleString()}`,
               status: data.status || "Active"
             });
             if (data.status === "PAID" || data.status === "Active") {
-              totalRevenue += data.amount || 1490;
+              totalRevenue += data.amount || 0;
               paidCount++;
             }
           });
@@ -372,17 +372,6 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
   }
 
   await Promise.all(crmPromises);
-
-  if (contactsList.length === 0 && USE_MOCK_DATA) {
-    contactsList.push({ id: "cnt_001", name: "Moti Cohen", email: "moti@partner.com", phone: "+972-50-9876543", role: "VIP", company: "Moti Ltd", status: "Active" });
-    contactsCount = 1;
-  }
-
-  if (subscriptionsList.length === 0 && USE_MOCK_DATA) {
-    subscriptionsList.push({ date: "2024-01-10", user: "Sarah Manager", plan: "Enterprise", amount: "₪4,900", status: "Active" });
-    totalRevenue = 4900;
-    paidCount = 1;
-  }
 
   subscriptionsList.sort((a, b) => a.date.localeCompare(b.date));
   transactionsCount = subscriptionsList.length;
