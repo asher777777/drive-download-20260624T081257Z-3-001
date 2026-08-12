@@ -484,6 +484,109 @@ function TemplateExcelTableCard({ data }: { data: any }) {
   // Slice displayed rows for 5-row pagination view
   const displayedRows = sortedRows.slice(0, visibleRowsCount);
 
+  // ---------------------------------------------------------------------------
+  // VERTICAL SINGLE-PERSON CONTACT CARD (Rendered when rows.length === 1)
+  // Data stacked vertically below data - No horizontal scrolling!
+  // ---------------------------------------------------------------------------
+  if (rows.length === 1) {
+    const singleRow = rows[0];
+    const isEditingSingle = editingRowIdx === 0;
+
+    return (
+      <div className="w-full max-w-xl mx-auto p-5 bg-slate-950/95 border-2 border-amber-400/80 rounded-3xl shadow-2xl space-y-4 backdrop-blur-md text-left animate-fadeIn">
+        {/* Vertical Card Header Bar */}
+        <div className="flex items-center justify-between border-b border-amber-400/40 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-amber-400/20 border border-amber-400/60 flex items-center justify-center text-amber-400 font-bold">
+              👤
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-black text-amber-400 tracking-wide">
+                  {singleRow["Full Name"] || singleRow["name"] || initialTable.title}
+                </h4>
+                {syncStatus && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 text-[10px] font-bold animate-pulse">
+                    {syncStatus}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">Vertical Single-Person Contact Card</span>
+            </div>
+          </div>
+
+          {/* Action Buttons (Edit / Delete / Save) */}
+          <div className="flex items-center gap-2">
+            {isEditingSingle ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-400/60 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingRowIdx(null)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Cancel</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleStartEdit(0, singleRow)}
+                  className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-400/20 text-amber-400 border border-amber-400/60 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteRow(0)}
+                  className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-400/40 rounded-xl transition-all cursor-pointer"
+                  title="Delete Record"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Vertical Data List (Data Below Data) */}
+        <div className="border border-slate-800 rounded-2xl bg-black/80 font-mono divide-y divide-slate-800/80 overflow-hidden">
+          {headers.map((h: string) => (
+            <div key={h} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 hover:bg-slate-900/50 transition-colors gap-2">
+              <span className="text-xs font-bold text-amber-400/90 w-36 shrink-0">
+                {h}
+              </span>
+              {isEditingSingle ? (
+                <input
+                  type="text"
+                  value={editingRowData[h] !== undefined ? editingRowData[h] : ""}
+                  onChange={(e) =>
+                    setEditingRowData({ ...editingRowData, [h]: e.target.value })
+                  }
+                  className="w-full sm:w-2/3 bg-slate-950 border border-amber-400/80 rounded-xl px-2.5 py-1 text-xs text-amber-300 focus:outline-none"
+                />
+              ) : (
+                <span className="text-xs text-slate-100 font-medium break-all">
+                  {singleRow[h] !== undefined && singleRow[h] !== "" ? String(singleRow[h]) : "-"}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/70 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
       {/* Table Title & Header Controls */}
@@ -803,6 +906,7 @@ function ConversationalFormCard({
   onChangeValue,
   onNextStep,
   onPrevStep,
+  onInfoClick,
   onSaveAndFinish
 }: {
   step: number;
@@ -815,6 +919,7 @@ function ConversationalFormCard({
   onChangeValue: (val: string) => void;
   onNextStep: (val?: string) => void;
   onPrevStep?: () => void;
+  onInfoClick?: (step: number) => void;
   onSaveAndFinish: () => void;
 }) {
   const [isFormMicRecording, setIsFormMicRecording] = useState(false);
@@ -875,37 +980,78 @@ function ConversationalFormCard({
       {/* ------------------------------------------------------------- */}
       {/* PERFECT CIRCULAR FORM CANVAS (Exact match to screenshot design) */}
       {/* ------------------------------------------------------------- */}
-      <div className="w-[310px] sm:w-[350px] h-[310px] sm:h-[350px] rounded-full bg-[#14120C] border-4 border-[#D4AF37]/80 shadow-[0_0_60px_rgba(212,175,55,0.35)] flex flex-col items-center justify-between p-6 relative mx-auto overflow-hidden backdrop-blur-2xl transition-all duration-300">
+      <div className="w-[310px] sm:w-[350px] h-[310px] sm:h-[350px] rounded-full bg-[#14120C] border-4 border-[#D4AF37]/80 shadow-[0_0_60px_rgba(212,175,55,0.35)] flex flex-col items-center justify-between p-5 relative mx-auto overflow-hidden backdrop-blur-2xl transition-all duration-300">
         
-        {/* TOP: Metallic Golden 3D Step Number */}
-        <div className="flex flex-col items-center justify-center pt-2">
+        {/* TOP BAR: Info (i) Button [Left], 3D Metallic Step Number [Center], Door with Save Icon [Right] */}
+        <div className="w-[76%] sm:w-[78%] flex items-center justify-between pt-3 sm:pt-4 z-10">
+          {/* Top Left: Information (i) Icon */}
+          <button
+            type="button"
+            onClick={() => onInfoClick?.(step)}
+            className="text-[#FFC800] hover:text-amber-300 transition-all cursor-pointer hover:scale-115 active:scale-95"
+            title="David Explains How to Fill Field"
+          >
+            <div className="w-7 h-7 rounded-full border-2 border-[#FFC800] bg-[#14120C] flex items-center justify-center font-serif text-sm font-black text-[#FFC800] italic shadow-[0_0_10px_rgba(255,200,0,0.3)]">
+              i
+            </div>
+          </button>
+
+          {/* Top Center: Metallic Golden 3D Step Number */}
           <span className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-b from-[#FFF7D6] via-[#FFC800] to-[#997300] bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] tracking-tighter">
             {step}
           </span>
+
+          {/* Top Right: Door with Save Package Icon */}
+          <button
+            type="button"
+            onClick={onSaveAndFinish}
+            className="text-[#FFC800] hover:text-amber-300 transition-all cursor-pointer hover:scale-115 active:scale-95"
+            title="Save & Exit Form"
+          >
+            <svg className="w-7 h-7 text-[#FFC800] filter drop-shadow-[0_0_10px_rgba(255,200,0,0.3)]" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="12" y="4" width="16" height="24" rx="1.5" stroke="#FFC800" fill="#14120C" />
+              <circle cx="24" cy="16" r="1" fill="#FFC800" />
+              <rect x="4" y="9" width="11" height="9" rx="1" fill="#FFC800" stroke="#B37B00" strokeWidth="1.2" />
+              <path d="M4 12h11" stroke="#B37B00" strokeWidth="1" />
+              <path d="M9.5 9v3" stroke="#B37B00" strokeWidth="1" />
+            </svg>
+          </button>
         </div>
 
-        {/* MIDDLE TOP: Field Name Header with <<< Back Arrow */}
-        <div className="w-full flex items-center justify-center relative px-4">
-          {step > 1 && onPrevStep && (
-            <button
-              type="button"
-              onClick={onPrevStep}
-              className="absolute left-6 text-[#FFC800] hover:text-white font-extrabold text-lg sm:text-xl tracking-tighter transition-all cursor-pointer hover:scale-110 active:scale-95"
-              title="Previous Step"
-            >
-              &lt;&lt;&lt;
-            </button>
-          )}
-
+        {/* MIDDLE TOP: Field Name Header */}
+        <div className="w-full flex items-center justify-center relative px-4 -mt-1">
           <span className="text-[#FFC800] font-black text-xl sm:text-2xl tracking-wide lowercase drop-shadow-md">
             {fieldLabel}
           </span>
         </div>
 
-        {/* CENTER: Ornate Golden Bracketed Banner Input Frame */}
-        <div className="w-full flex flex-col items-center justify-center relative my-auto">
-          <div className="relative w-[92%] h-12 flex items-center justify-center">
-            {/* Ornate Gold Border SVG Frame */}
+        {/* CENTER: Choice Cards Grid (if options present) + Ornate Golden Bracketed Input Frame */}
+        <div className="w-full flex flex-col items-center justify-center relative my-auto space-y-1.5 z-10 px-3">
+          {/* Quick Select Choice Cards INSIDE CIRCLE (Exact match to user screenshot) */}
+          {options && options.length > 0 && (
+            <div className="w-[94%] grid grid-cols-2 gap-1.5 mb-1">
+              {options.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChangeValue(opt.value);
+                    onNextStep(opt.value);
+                  }}
+                  className={`py-1.5 px-2 rounded-xl border transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md ${
+                    currentValue === opt.value
+                      ? "bg-[#FFC800] text-slate-950 border-[#FFC800] font-black scale-105 shadow-[0_0_12px_rgba(255,200,0,0.5)]"
+                      : "bg-[#1A160F] border-[#D4AF37]/50 text-slate-100 hover:border-[#FFC800] hover:bg-amber-500/20"
+                  }`}
+                >
+                  <span className="text-[11px] font-bold tracking-tight line-clamp-1">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Ornate Gold Border SVG Frame Input Box */}
+          <div className="relative w-[92%] h-11 sm:h-12 flex items-center justify-center">
             <svg
               className="absolute inset-0 w-full h-full text-[#D4AF37]"
               viewBox="0 0 300 48"
@@ -942,30 +1088,51 @@ function ConversationalFormCard({
                   onNextStep(currentValue);
                 }
               }}
-              placeholder={isFormMicRecording ? "listening..." : ""}
-              className="relative z-10 w-full px-4 text-center bg-transparent text-[#B37B00] font-black text-base sm:text-lg focus:outline-none placeholder:text-slate-500 tracking-wide"
+              placeholder={
+                isFormMicRecording
+                  ? "listening..."
+                  : options && options.length > 0
+                  ? "Something else..."
+                  : ""
+              }
+              className="relative z-10 w-full px-4 text-center bg-transparent text-[#B37B00] font-black text-sm sm:text-base focus:outline-none placeholder:text-slate-500 tracking-wide"
             />
           </div>
 
           {/* Real-time Field Hint */}
           {!validation.isValid && currentValue.trim().length > 0 && (
-            <span className="text-[10px] text-amber-400/90 font-bold block mt-1">
+            <span className="text-[10px] text-amber-400/90 font-bold block mt-0.5">
               ⚠️ {validation.hint}
             </span>
           )}
         </div>
 
-        {/* BOTTOM: Action Button (Golden Retro Mic with Soundwaves OR Golden Circle Bookmark) */}
-        <div className="pb-3 flex items-center justify-center">
+        {/* BOTTOM: Left Arrow <<< [Left], Mic/Bookmark [Center], Right Arrow >>> [Right] */}
+        <div className="w-[82%] sm:w-[84%] flex items-center justify-between pb-3 z-10">
+          {/* Bottom Left: <<< Back Arrow */}
+          {step > 1 && onPrevStep ? (
+            <button
+              type="button"
+              onClick={onPrevStep}
+              className="text-[#FFC800] hover:text-white font-extrabold text-xl sm:text-2xl tracking-tighter transition-all cursor-pointer hover:scale-110 active:scale-95 px-2"
+              title="Previous Step (Back)"
+            >
+              &lt;&lt;&lt;
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
+
+          {/* Bottom Center: Action Button (Golden Retro Mic with Soundwaves OR Golden Circle Bookmark) */}
           {currentValue.trim().length > 0 && validation.isValid ? (
             /* FILLED STATE: Golden Circle Bookmark / Folder Save Button */
             <button
               type="button"
               onClick={() => onNextStep(currentValue)}
-              className="w-14 h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer group"
+              className="w-13 h-13 sm:w-14 sm:h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer group"
               title="Save Field / Next Step"
             >
-              <div className="w-10 h-10 rounded-full border border-[#D4AF37]/60 flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[#D4AF37]/60 flex items-center justify-center">
                 <Bookmark className="w-5 h-5 fill-[#FFC800] text-[#FFC800] group-hover:scale-110 transition-transform" />
               </div>
             </button>
@@ -974,7 +1141,7 @@ function ConversationalFormCard({
             <button
               type="button"
               onClick={toggleMic}
-              className={`w-14 h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer ${
+              className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer ${
                 isFormMicRecording ? "ring-4 ring-red-500 animate-pulse border-red-500 text-red-500" : ""
               }`}
               title={isFormMicRecording ? "Stop Recording" : "Click Mic to Speak"}
@@ -986,44 +1153,15 @@ function ConversationalFormCard({
               )}
             </button>
           )}
-        </div>
-      </div>
 
-      {/* QUICK CHOICE CARDS & FOLDER SAVE & FINISH CONTROLS BELOW CIRCLE */}
-      <div className="w-full max-w-sm space-y-3 mt-3">
-        {/* Quick Select Choice Cards (e.g. Role, Gender) */}
-        {options && options.length > 0 && (
-          <div className="grid grid-cols-2 gap-2">
-            {options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => {
-                  onChangeValue(opt.value);
-                  onNextStep(opt.value);
-                }}
-                className={`p-2.5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-md ${
-                  currentValue === opt.value
-                    ? "bg-[#FFC800] text-slate-950 border-[#FFC800] font-black scale-105"
-                    : "bg-slate-950/90 border-slate-800 text-slate-200 hover:border-amber-400/70 hover:bg-amber-500/10"
-                }`}
-              >
-                <span className="text-xs font-extrabold">{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Save & Finish Folder Icon Button in EVERY Step (Rule 3) */}
-        <div className="flex items-center justify-between gap-3 px-2">
+          {/* Bottom Right: >>> Forward/Next Arrow */}
           <button
             type="button"
-            onClick={onSaveAndFinish}
-            className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer hover:scale-[1.02] active:scale-98"
-            title="Save & Finish (Folder Icon)"
+            onClick={() => onNextStep(currentValue)}
+            className="text-[#FFC800] hover:text-white font-extrabold text-xl sm:text-2xl tracking-tighter transition-all cursor-pointer hover:scale-110 active:scale-95 px-2"
+            title="Next Step (Forward)"
           >
-            <Folder className="w-4 h-4 text-slate-950 fill-slate-950" />
-            <span>Save & Finish</span>
+            &gt;&gt;&gt;
           </button>
         </div>
       </div>
@@ -2145,6 +2283,17 @@ export function SmartOfficeClient({
               }}
               onPrevStep={() => {
                 if (contactStep > 1) setContactStep(contactStep - 1);
+              }}
+              onInfoClick={(currentStep) => {
+                const guideText =
+                  currentStep === 1 ? "Please enter or speak the contact's full first and last name, for example: Moti Cohen or Sarah Smith." :
+                  currentStep === 2 ? "Please enter a valid email address format, for example: name@company.com." :
+                  currentStep === 3 ? "Please provide a full phone or mobile number using digits, for example: 0501234567." :
+                  currentStep === 4 ? "Please type or select the contact's position or role, such as Manager, Partner, or Client." :
+                  "Please select or type the gender or entity type for this contact.";
+
+                setCurrentAgentSubtitle({ text: guideText, uiCards: [] });
+                speakText(guideText);
               }}
               onSaveAndFinish={handleSaveAndFinishForm}
             />

@@ -210,22 +210,28 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
       status: "Active" 
     };
 
-    components.push(
-      JSON_TEMPLATE_LIBRARY.text_image_page_vector({
-        text: `Contact Profile Card: ${contactItem.name} (${contactItem.company || 'Enterprise'})`,
-        imageUrl: '/edoffice/ed.webp',
-        pageUrl: `/office/david`,
-        pageTitle: `Contact Details: ${contactItem.email}`,
-        vectorShape: { type: 'star', color: '#FFC800', label: 'VIP Contact' },
-        badge: contactItem.status || 'Active Contact',
-        metrics: {
-          name: contactItem.name,
-          email: contactItem.email,
-          phone: contactItem.phone,
-          role: contactItem.role
-        }
-      })
-    );
+    const wantsTable = q.includes('table') || q.includes('excel') || q.includes('grid') || q.includes('list') || q.includes('טבלה') || q.includes('אקסל') || q.includes('רשימה') || q.includes('columns') || q.includes('עמודות') || q.includes('consisting of');
+    const wantsCard = (q.includes('card') || q.includes('profile') || q.includes('person') || q.includes('כרטיס') || q.includes('כרטיסייה') || q.includes('פרופיל')) && !q.includes('contact table') && !q.includes('table for me');
+
+    // ONLY push Profile Card if user explicitly asked for a Card/Profile (and didn't ask ONLY for a table)
+    if (wantsCard && !wantsTable) {
+      components.push(
+        JSON_TEMPLATE_LIBRARY.text_image_page_vector({
+          text: `Contact Profile Card: ${contactItem.name} (${contactItem.company || 'Enterprise'})`,
+          imageUrl: '/edoffice/ed.webp',
+          pageUrl: `/office/david`,
+          pageTitle: `Contact Details: ${contactItem.email}`,
+          vectorShape: { type: 'star', color: '#FFC800', label: 'VIP Contact' },
+          badge: contactItem.status || 'Active Contact',
+          metrics: {
+            name: contactItem.name,
+            email: contactItem.email,
+            phone: contactItem.phone,
+            role: contactItem.role
+          }
+        })
+      );
+    }
 
     // Dynamic Header Detection from user prompt (e.g. "Full name - Phone - and actions")
     const availableContactFields = [
@@ -273,18 +279,21 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
           ...(headers.includes('Status') ? { 'Status': contactItem.status || 'Active' } : {})
         }];
 
-    components.push(
-      JSON_TEMPLATE_LIBRARY.excel_table_card({
-        text: `Interactive Contact Data Table (${tableRows.length} Firestore DB Contacts)`,
-        tableData: {
-          title: `Contacts Database Table (${headers.join(" - ")})`,
-          headers,
-          rows: tableRows
-        },
-        vectorShape: { type: 'table', color: '#FFC800', label: 'Contact Card' },
-        badge: `${headers.length} Columns`
-      })
-    );
+    // ONLY push Table if user asked for a table/list OR if card wasn't explicitly requested alone
+    if (wantsTable || !wantsCard) {
+      components.push(
+        JSON_TEMPLATE_LIBRARY.excel_table_card({
+          text: `Interactive Contact Data Table (${tableRows.length} Firestore DB Contacts)`,
+          tableData: {
+            title: `Contacts Database Table (${headers.join(" - ")})`,
+            headers,
+            rows: tableRows
+          },
+          vectorShape: { type: 'table', color: '#FFC800', label: 'Contact Card' },
+          badge: `${headers.length} Columns`
+        })
+      );
+    }
   } else if (q.includes('sub') || q.includes('subscription') || q.includes('subscriptions') || q.includes('order') || q.includes('billing') || q.includes('oldest') || q.includes('newest') || q.includes('מנוי') || q.includes('מנויים') || q.includes('רכישות') || q.includes('הזמנות')) {
     const subs = dbData.subscriptionsSummary?.items || [];
 
