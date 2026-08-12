@@ -19,7 +19,13 @@ import {
   Activity,
   Bug,
   Folder,
-  Volume2
+  Volume2,
+  History,
+  MessageSquare,
+  User,
+  Bot,
+  PanelLeftOpen,
+  PanelLeftClose
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -178,6 +184,16 @@ export function SmartOfficeClient({
     uiCards?: any[];
   } | null>(null);
 
+  // Conversation History List for Left Sidebar
+  const [historyMessages, setHistoryMessages] = useState<Array<{
+    id: string;
+    sender: "user" | "agent";
+    text: string;
+    timestamp: string;
+    uiCards?: any[];
+  }>>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+
   const [speechSupported, setSpeechSupported] = useState(true);
 
   // Gemini State Management
@@ -186,13 +202,14 @@ export function SmartOfficeClient({
 
   const recognitionRef = useRef<any>(null);
   const topTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyScrollRef = useRef<HTMLDivElement>(null);
 
   const isManagerOrAdmin = true;
 
   const tabs = office.tabs && office.tabs.length > 0 ? office.tabs : initialOffice.tabs;
   const currentTab: SmartOfficeTab = tabs[currentTabIdx % tabs.length];
 
-  // High-Speed Real-time Speech Recognition Initialization
+  // Speech Recognition & Session Initialization
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storagePrefix = `office_sess_${office.slug}`;
@@ -221,7 +238,6 @@ export function SmartOfficeClient({
           for (let i = 0; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
           }
-          // Real-time zero-delay state update
           setUserQueryInput(transcript);
         };
 
@@ -245,7 +261,7 @@ export function SmartOfficeClient({
     };
   }, [office.slug]);
 
-  // Focus textarea when user clicks edit
+  // Focus textarea when editing
   useEffect(() => {
     if (isEditingTopText && topTextareaRef.current) {
       topTextareaRef.current.focus();
@@ -253,6 +269,13 @@ export function SmartOfficeClient({
       topTextareaRef.current.setSelectionRange(len, len);
     }
   }, [isEditingTopText]);
+
+  // Auto-scroll history panel to bottom
+  useEffect(() => {
+    if (historyScrollRef.current) {
+      historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight;
+    }
+  }, [historyMessages]);
 
   // Infinite Carousel Navigation
   const handlePrevTab = () => {
@@ -314,6 +337,18 @@ export function SmartOfficeClient({
       setIsRecording(false);
     }
 
+    const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    // Append User Request to History Sidebar
+    const userMsg = {
+      id: `u_${Date.now()}`,
+      sender: "user" as const,
+      text: inputQuery,
+      timestamp: timeStr,
+    };
+    setHistoryMessages((prev) => [...prev, userMsg]);
+
+    setUserQueryInput("");
     setIsEditingTopText(false);
     setIsThinking(true);
 
@@ -346,19 +381,33 @@ export function SmartOfficeClient({
         }
       }
 
-      // Update active agent response (replaces previous response when new answer arrives)
+      // Update active agent response
       setCurrentAgentSubtitle({
         text: replyMessage,
         uiCards: data.uiComponents || [],
       });
-      setUserQueryInput("");
+
+      // Append Agent Reply to History Sidebar
+      const agentMsg = {
+        id: `a_${Date.now()}`,
+        sender: "agent" as const,
+        text: replyMessage,
+        timestamp: timeStr,
+        uiCards: data.uiComponents || [],
+      };
+      setHistoryMessages((prev) => [...prev, agentMsg]);
 
       speakText(replyMessage, data.audioBase64);
     } catch (err: any) {
       console.error(err);
+      const errMsg = "Connection issue. Please try again.";
       setCurrentAgentSubtitle({
-        text: "Connection issue. Please try again.",
+        text: errMsg,
       });
+      setHistoryMessages((prev) => [
+        ...prev,
+        { id: `err_${Date.now()}`, sender: "agent", text: errMsg, timestamp: timeStr },
+      ]);
     } finally {
       setIsThinking(false);
     }
@@ -376,6 +425,21 @@ export function SmartOfficeClient({
       {/* GOLD TOP HEADER                                               */}
       {/* ------------------------------------------------------------- */}
       <header className="w-full bg-[#FFC800] pt-4 pb-6 px-4 flex flex-col items-center justify-center relative shadow-lg z-20">
+        {/* Toggle Left Conversation History Panel Button */}
+        <button
+          onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+          className="absolute left-4 top-4 bg-slate-950 hover:bg-black text-[#FFC800] border border-amber-400/60 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+          title={isHistoryOpen ? "Hide History Sidebar" : "Show History Sidebar"}
+        >
+          {isHistoryOpen ? <PanelLeftClose className="w-4 h-4 text-[#FFC800]" /> : <PanelLeftOpen className="w-4 h-4 text-[#FFC800]" />}
+          <span className="hidden sm:inline">Requests & Answers</span>
+          {historyMessages.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-black text-[10px] font-black">
+              {historyMessages.length}
+            </span>
+          )}
+        </button>
+
         {/* Centered Diamond Rhombus Logo Badge */}
         <div className="relative">
           <div className="w-56 sm:w-64 h-16 bg-black border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center shadow-2xl px-4 py-1">
@@ -400,6 +464,74 @@ export function SmartOfficeClient({
           </button>
         )}
       </header>
+
+      {/* ------------------------------------------------------------- */}
+      {/* LEFT SIDEBAR: REQUESTS & ANSWERS CONVERSATION HISTORY PANEL    */}
+      {/* ------------------------------------------------------------- */}
+      {isHistoryOpen && (
+        <aside className="fixed left-3 top-24 bottom-24 z-40 w-72 sm:w-80 bg-slate-950/95 border-2 border-amber-400/50 rounded-3xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden transition-all duration-300 animate-fadeIn">
+          {/* Sidebar Header */}
+          <div className="p-3.5 border-b border-amber-400/30 bg-slate-900/90 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-bold text-amber-400 tracking-wide">
+                Requests & Answers Log
+              </h3>
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {historyMessages.length} messages
+            </span>
+          </div>
+
+          {/* Sidebar Messages Timeline */}
+          <div ref={historyScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+            {historyMessages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 space-y-2">
+                <MessageSquare className="w-8 h-8 text-amber-400/40" />
+                <p className="text-xs font-medium">No conversation history yet.</p>
+                <p className="text-[10px] text-slate-400">Speak or type a prompt to see live requests and answers here.</p>
+              </div>
+            ) : (
+              historyMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  onClick={() => {
+                    if (msg.sender === "agent") {
+                      setCurrentAgentSubtitle({ text: msg.text, uiCards: msg.uiCards });
+                    }
+                  }}
+                  className={`p-3 rounded-2xl border text-xs transition-all cursor-pointer ${
+                    msg.sender === "user"
+                      ? "bg-slate-900/90 border-amber-400/40 text-amber-300 ml-4 hover:border-amber-400"
+                      : "bg-slate-900/90 border-slate-800 text-slate-100 mr-2 hover:border-amber-400/50 shadow-md"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                      {msg.sender === "user" ? (
+                        <>
+                          <User className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-amber-400">User Request</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-white">{office.agentName} Answer</span>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-slate-400 font-mono">{msg.timestamp}</span>
+                  </div>
+
+                  <p className="text-xs font-medium leading-relaxed">
+                    {msg.text}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+      )}
 
       {/* ------------------------------------------------------------- */}
       {/* BODY - CANVAS AREA                                            */}

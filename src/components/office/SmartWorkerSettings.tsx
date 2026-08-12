@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { SmartWorkerConfig, DEFAULT_SMART_WORKER_CONFIG } from "@/lib/types/office";
+import { 
+  SmartWorkerConfig, 
+  DEFAULT_SMART_WORKER_CONFIG, 
+  DEFAULT_PERMISSION_MATRIX, 
+  PermissionMatrix,
+  UserRolePermissions 
+} from "@/lib/types/office";
 import { 
   ShieldCheck, 
   Sparkles, 
@@ -19,7 +25,12 @@ import {
   Database, 
   Code2, 
   FileText, 
-  Wrench
+  Wrench,
+  X,
+  Send,
+  Zap,
+  Layers,
+  Table
 } from "lucide-react";
 
 interface SmartWorkerSettingsProps {
@@ -81,6 +92,26 @@ const TONE_STYLE_OPTIONS = [
   { id: "Down-to-earth", label: "בגובה העיניים (Down-to-earth)" },
 ];
 
+const PERMISSION_ROWS: Array<{ key: keyof UserRolePermissions; label: string; subtext?: string }> = [
+  {
+    key: "system_db_read",
+    label: "קריאה בסיס הנתונים של המערכת",
+  },
+  {
+    key: "office_db_read",
+    label: "קריאה בסיס הנתונים של בעל המשרד",
+    subtext: "root\\{office-slug}\\{smart-worker-slug}",
+  },
+  {
+    key: "db_write_edit_delete",
+    label: "כתיבה\\עריכה\\מחיקה בסיס הנתונים",
+  },
+  {
+    key: "code_files_write_edit_delete",
+    label: "כתיבה\\עריכה\\מחיקה קבצי קוד",
+  },
+];
+
 export function SmartWorkerSettings({
   officeSlug,
   workerSlug = "david",
@@ -92,11 +123,19 @@ export function SmartWorkerSettings({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isPromptAssisting, setIsPromptAssisting] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
+  // AI Prompt Consultant Modal State
+  const [isConsultantModalOpen, setIsConsultantModalOpen] = useState(false);
+  const [customUserNotes, setCustomUserNotes] = useState("");
+  const [isPromptAssisting, setIsPromptAssisting] = useState(false);
+  const [consultantPreviewPrompt, setConsultantPreviewPrompt] = useState("");
+  const [generatedCacheId, setGeneratedCacheId] = useState("");
+
   const schemaHeader = `root\\${officeSlug}\\${workerSlug}`;
+
+  const matrix: PermissionMatrix = formData.permission_matrix || DEFAULT_PERMISSION_MATRIX;
 
   // Fetch existing settings on mount
   useEffect(() => {
@@ -108,6 +147,9 @@ export function SmartWorkerSettings({
           const data = await res.json();
           if (data.smartWorkerConfig) {
             setFormData(data.smartWorkerConfig);
+            if (data.smartWorkerConfig.conversation_history_id) {
+              setGeneratedCacheId(data.smartWorkerConfig.conversation_history_id);
+            }
           }
         }
       } catch (err) {
@@ -119,15 +161,27 @@ export function SmartWorkerSettings({
     loadSettings();
   }, [officeSlug]);
 
-  // Toggle Handlers
-  const togglePermission = (key: keyof SmartWorkerConfig["permissions"]) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        [key]: !prev.permissions[key],
-      },
-    }));
+  // Toggle Matrix Cell
+  const toggleMatrixCell = (role: keyof PermissionMatrix, permKey: keyof UserRolePermissions) => {
+    setFormData((prev) => {
+      const currentMatrix = prev.permission_matrix || DEFAULT_PERMISSION_MATRIX;
+      const currentRoleObj = currentMatrix[role] || DEFAULT_PERMISSION_MATRIX[role];
+      const updatedValue = !currentRoleObj[permKey];
+
+      const updatedMatrix: PermissionMatrix = {
+        ...currentMatrix,
+        [role]: {
+          ...currentRoleObj,
+          [permKey]: updatedValue,
+        },
+      };
+
+      return {
+        ...prev,
+        permission_matrix: updatedMatrix,
+        permissions: updatedMatrix.slug_owner, // keep flat permissions in sync
+      };
+    });
   };
 
   const toggleArrayItem = (field: "ai_capabilities" | "primary_roles" | "collaboration", value: string) => {
@@ -138,24 +192,26 @@ export function SmartWorkerSettings({
     });
   };
 
-  // AI Prompt Assistant Trigger
+  // AI Prompt Assistant Consultation Trigger
   const handleAIPromptAssist = async () => {
     setIsPromptAssisting(true);
     try {
       const res = await fetch(`/api/office/${officeSlug}/prompt-assist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          custom_user_notes: customUserNotes,
+        }),
       });
 
       if (res.ok) {
         const data = await res.json();
         if (data.refinedPrompt) {
-          setFormData((prev) => ({
-            ...prev,
-            general_prompt: data.refinedPrompt,
-            conversation_history_id: data.conversation_history_id || prev.conversation_history_id,
-          }));
+          setConsultantPreviewPrompt(data.refinedPrompt);
+          if (data.conversation_history_id) {
+            setGeneratedCacheId(data.conversation_history_id);
+          }
         }
       }
     } catch (err) {
@@ -163,6 +219,18 @@ export function SmartWorkerSettings({
     } finally {
       setIsPromptAssisting(false);
     }
+  };
+
+  // Apply Prompt from Consultant Modal to Form
+  const handleApplyConsultantPrompt = () => {
+    if (consultantPreviewPrompt) {
+      setFormData((prev) => ({
+        ...prev,
+        systemPrompt: consultantPreviewPrompt,
+        conversation_history_id: generatedCacheId || prev.conversation_history_id,
+      }));
+    }
+    setIsConsultantModalOpen(false);
   };
 
   // TTS Voice Preview Player
@@ -220,7 +288,7 @@ export function SmartWorkerSettings({
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 bg-black/90 text-white rounded-3xl border border-amber-400/40 shadow-2xl space-y-6 select-none" dir="rtl">
+    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 bg-black/90 text-white rounded-3xl border border-amber-400/40 shadow-2xl space-y-6 select-none relative" dir="rtl">
       {/* ------------------------------------------------------------- */}
       {/* HEADER & SCHEMA DEFINITION                                    */}
       {/* ------------------------------------------------------------- */}
@@ -233,11 +301,11 @@ export function SmartWorkerSettings({
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Smart Worker Settings & Permission Matrix Module
+            Smart Worker Instructions, AI Capabilities & Permission Matrix
           </p>
         </div>
 
-        {/* Schema Header Header Badge */}
+        {/* Schema Header Badge */}
         <div className="bg-slate-950 border border-amber-400/60 rounded-xl px-3 py-1.5 flex items-center gap-2">
           <Database className="w-4 h-4 text-amber-400" />
           <span className="text-xs font-mono font-bold text-amber-300 dir-ltr">
@@ -295,91 +363,95 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 2. PERMISSION MATRIX (סוג הרשאה)                              */}
+      {/* 2. 2D PERMISSION MATRIX TABLE (טבלת הרשאות לפי סוג משתמש)      */}
       {/* ------------------------------------------------------------- */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-          <Lock className="w-4 h-4 text-amber-400" />
-          <span>מטריצת הרשאות (Permission Matrix)</span>
+          <Table className="w-4 h-4 text-amber-400" />
+          <span>טבלת הרשאות לפי סוג משתמש (Permission Matrix Table)</span>
         </h3>
-        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* System DB Read */}
-            <div className="p-3 bg-black/60 border border-slate-800 rounded-xl flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-200 block">קריאה בסיס הנתונים של המערכת</span>
-                <span className="text-[10px] text-slate-400 block dir-ltr">system_db_read</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => togglePermission("system_db_read")}
-                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  formData.permissions?.system_db_read ? "bg-amber-400" : "bg-slate-800"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
-                  formData.permissions?.system_db_read ? "translate-x-5" : "translate-x-0.5"
-                }`} />
-              </button>
-            </div>
 
-            {/* Office DB Read */}
-            <div className="p-3 bg-black/60 border border-slate-800 rounded-xl flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-200 block">קריאה בסיס הנתונים של בעל המשרד</span>
-                <span className="text-[10px] text-slate-400 block dir-ltr">root\{officeSlug}\{workerSlug}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => togglePermission("office_db_read")}
-                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  formData.permissions?.office_db_read ? "bg-amber-400" : "bg-slate-800"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
-                  formData.permissions?.office_db_read ? "translate-x-5" : "translate-x-0.5"
-                }`} />
-              </button>
-            </div>
+        <div className="overflow-x-auto border border-amber-400/40 rounded-2xl bg-slate-950/90 shadow-2xl">
+          <table className="w-full text-right border-collapse text-xs">
+            <thead>
+              <tr className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-amber-400/40">
+                <th className="p-3.5 font-black text-amber-400 border-l border-slate-800/80 w-2/5">
+                  סוג הרשאה
+                </th>
+                <th className="p-3.5 font-bold text-center text-slate-200 border-l border-slate-800/80 w-1/5">
+                  מנהל מערכת
+                </th>
+                <th className="p-3.5 font-bold text-center text-slate-200 border-l border-slate-800/80 w-1/5">
+                  משתמש שהוא הבעלים של הסלאג
+                </th>
+                <th className="p-3.5 font-bold text-center text-slate-200 w-1/5">
+                  משתמש שאינו הבעלים של הסלאג / אורח
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80">
+              {PERMISSION_ROWS.map((row) => (
+                <tr key={row.key} className="hover:bg-slate-900/50 transition-colors">
+                  {/* Permission Label */}
+                  <td className="p-3.5 font-bold text-slate-200 border-l border-slate-800/80">
+                    <div className="space-y-0.5">
+                      <span className="block">{row.label}</span>
+                      {row.subtext && (
+                        <span className="block text-[10px] text-amber-300/80 font-mono dir-ltr">
+                          root\\{officeSlug}\\{workerSlug}
+                        </span>
+                      )}
+                    </div>
+                  </td>
 
-            {/* DB Write Edit Delete */}
-            <div className="p-3 bg-black/60 border border-slate-800 rounded-xl flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-200 block">כתיבה \ עריכה \ מחיקה בסיס הנתונים</span>
-                <span className="text-[10px] text-slate-400 block dir-ltr">db_write_edit_delete</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => togglePermission("db_write_edit_delete")}
-                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  formData.permissions?.db_write_edit_delete ? "bg-amber-400" : "bg-slate-800"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
-                  formData.permissions?.db_write_edit_delete ? "translate-x-5" : "translate-x-0.5"
-                }`} />
-              </button>
-            </div>
+                  {/* System Admin Switch Cell */}
+                  <td className="p-3.5 text-center border-l border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => toggleMatrixCell("system_admin", row.key)}
+                      className={`w-11 h-6 rounded-full transition-colors relative mx-auto cursor-pointer ${
+                        matrix.system_admin?.[row.key] ? "bg-amber-400" : "bg-slate-800"
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
+                        matrix.system_admin?.[row.key] ? "translate-x-5" : "translate-x-0.5"
+                      }`} />
+                    </button>
+                  </td>
 
-            {/* Code Files Write Edit Delete */}
-            <div className="p-3 bg-black/60 border border-slate-800 rounded-xl flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-200 block">כתיבה \ עריכה \ מחיקה קבצי קוד</span>
-                <span className="text-[10px] text-slate-400 block dir-ltr">code_files_write_edit_delete</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => togglePermission("code_files_write_edit_delete")}
-                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  formData.permissions?.code_files_write_edit_delete ? "bg-amber-400" : "bg-slate-800"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
-                  formData.permissions?.code_files_write_edit_delete ? "translate-x-5" : "translate-x-0.5"
-                }`} />
-              </button>
-            </div>
-          </div>
+                  {/* Slug Owner Switch Cell */}
+                  <td className="p-3.5 text-center border-l border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => toggleMatrixCell("slug_owner", row.key)}
+                      className={`w-11 h-6 rounded-full transition-colors relative mx-auto cursor-pointer ${
+                        matrix.slug_owner?.[row.key] ? "bg-amber-400" : "bg-slate-800"
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
+                        matrix.slug_owner?.[row.key] ? "translate-x-5" : "translate-x-0.5"
+                      }`} />
+                    </button>
+                  </td>
+
+                  {/* Guest / Non-Owner Switch Cell */}
+                  <td className="p-3.5 text-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleMatrixCell("guest_non_owner", row.key)}
+                      className={`w-11 h-6 rounded-full transition-colors relative mx-auto cursor-pointer ${
+                        matrix.guest_non_owner?.[row.key] ? "bg-amber-400" : "bg-slate-800"
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full bg-slate-950 absolute top-0.5 transition-transform ${
+                        matrix.guest_non_owner?.[row.key] ? "translate-x-5" : "translate-x-0.5"
+                      }`} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -503,39 +575,41 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 6. GENERAL PROMPT & AI ASSIST                                 */}
+      {/* 6. SYSTEM PROMPT & AI ASSIST BUTTON                           */}
       {/* ------------------------------------------------------------- */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-amber-400 block">הנחיה כללית (General Prompt)</label>
+          <label className="text-xs font-bold text-amber-400 block">הנחיה ראשית ופרומפט סוכן (System Prompt)</label>
           
+          {/* AI Prompt Engineer Consultation Button */}
           <button
             type="button"
-            onClick={handleAIPromptAssist}
-            disabled={isPromptAssisting}
-            className="px-3 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+            onClick={() => {
+              setConsultantPreviewPrompt(formData.systemPrompt || "");
+              setIsConsultantModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition-all hover:scale-105 cursor-pointer"
           >
-            {isPromptAssisting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5" />
-            )}
+            <Sparkles className="w-3.5 h-3.5" />
             <span>עזרה עם AI (Prompt Engineer)</span>
           </button>
         </div>
 
         <textarea
-          value={formData.general_prompt || ""}
-          onChange={(e) => setFormData({ ...formData, general_prompt: e.target.value })}
+          value={formData.systemPrompt || ""}
+          onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })}
           rows={4}
-          placeholder="הכנס את ההנחיה הכללית של העובד החכם..."
+          placeholder="הכנס את ההנחיה הראשית והיחידה של העובד החכם..."
           className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-amber-400 resize-none leading-relaxed"
         />
 
-        {formData.conversation_history_id && (
-          <span className="text-[10px] text-slate-400 block dir-ltr">
-            Gemini Context Cache ID: {formData.conversation_history_id}
-          </span>
+        {(formData.conversation_history_id || generatedCacheId) && (
+          <div className="flex items-center justify-between text-[11px] text-slate-400 dir-ltr bg-slate-950 p-2 rounded-xl border border-slate-800">
+            <span className="font-mono text-amber-300">
+              Gemini Context Cache ID: {formData.conversation_history_id || generatedCacheId}
+            </span>
+            <span className="text-slate-400 text-[10px]">Tokens Optimized via Cache</span>
+          </div>
         )}
       </div>
 
@@ -557,6 +631,131 @@ export function SmartWorkerSettings({
           )}
         </button>
       </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* INTERACTIVE AI PROMPT CONSULTANT MODAL                        */}
+      {/* ------------------------------------------------------------- */}
+      {isConsultantModalOpen && (
+        <div className="fixed inset-0 z-[400] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-slate-900 border-2 border-amber-400/80 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl text-white relative">
+            <div className="flex items-center justify-between border-b border-amber-400/30 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-amber-400">
+                    יועץ AI לבניית פרומפט ממוקד (AI Prompt Engineer)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    סנכרון כל כלי ה-AI, ההרשאות והנתונים ליצירת הנחיה מדויקת וחיסכון בטוקנים
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsConsultantModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Active AI Tools Suite Summary Badge */}
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+              <span className="text-xs font-bold text-amber-400 block">
+                נתוני הטופס וכלי ה-AI שיישלחו להתייעצות:
+              </span>
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30">
+                  תפקידים: {formData.primary_roles?.join(", ") || "יועץ"}
+                </span>
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30">
+                  יכולות: {formData.ai_capabilities?.join(", ") || "טקסט, מחקר"}
+                </span>
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30">
+                  טון: {formData.tone_style || "מקצועי"}
+                </span>
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30 dir-ltr">
+                  Voice: {formData.tts_voice_id || "en-US-Studio-O"}
+                </span>
+              </div>
+            </div>
+
+            {/* User Custom Business Goals Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-amber-400 block">
+                הנחיות או מטרות עסקיות ממוקדות (אופציונלי):
+              </label>
+              <input
+                type="text"
+                value={customUserNotes}
+                onChange={(e) => setCustomUserNotes(e.target.value)}
+                placeholder="לדוגמה: התמקד בטיפול בלידים של נדל''ן, עדכון CRM אוטומטי ומענה מהיר."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            {/* Trigger AI Prompt Generation */}
+            <button
+              type="button"
+              onClick={handleAIPromptAssist}
+              disabled={isPromptAssisting}
+              className="w-full py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+            >
+              {isPromptAssisting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                  <span>מייצר פרומפט מיוטב עם Gemini AI...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 text-slate-950 fill-slate-950" />
+                  <span>צור פרומפט מיוטב עכשיו (Generate Optimized Prompt)</span>
+                </>
+              )}
+            </button>
+
+            {/* Generated Prompt Preview */}
+            {consultantPreviewPrompt && (
+              <div className="space-y-2 pt-2">
+                <label className="text-xs font-bold text-amber-400 block">
+                  תצוגה מקדימה של הפרומפט שיוצר:
+                </label>
+                <textarea
+                  value={consultantPreviewPrompt}
+                  onChange={(e) => setConsultantPreviewPrompt(e.target.value)}
+                  rows={5}
+                  className="w-full bg-slate-950 border border-amber-400/50 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-amber-400 resize-none leading-relaxed"
+                />
+
+                {generatedCacheId && (
+                  <div className="text-[10px] text-amber-300 dir-ltr bg-slate-950 p-2 rounded-xl border border-slate-800">
+                    Gemini Context Cache ID Saved: {generatedCacheId}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsConsultantModalOpen(false)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyConsultantPrompt}
+                    className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-md cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-slate-950" />
+                    <span>החל הנחיה זו למנהל העובד (Apply Prompt)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

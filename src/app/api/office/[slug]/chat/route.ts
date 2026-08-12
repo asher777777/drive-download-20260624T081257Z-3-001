@@ -64,11 +64,26 @@ try {
 // ---------------------------------------------------------------------------
 // DEEP DATABASE ANALYTICS ENGINE (Users, Pages, Transactions, Interactions)
 // ---------------------------------------------------------------------------
-async function getDeepDatabaseAnalytics(userId: string) {
+async function getDeepDatabaseAnalytics(userId: string, slug: string) {
   const effectiveUserId = userId && userId !== "anonymous" ? userId : "david_user_001";
 
   try {
-    // 1. Query Users Collection
+    // 1. Fetch Office Config & SmartWorkerConfig from Firestore
+    let configuredSystemPrompt = "";
+    let ttsVoiceId = "en-US-Studio-O";
+    let toneStyle = "Professional";
+
+    const officeDoc = await adminDb.collection("digital_offices").doc(slug).get();
+    if (officeDoc.exists) {
+      const oData = officeDoc.data();
+      if (oData?.smartWorkerConfig) {
+        configuredSystemPrompt = oData.smartWorkerConfig.systemPrompt || oData.smartWorkerConfig.general_prompt || "";
+        ttsVoiceId = oData.smartWorkerConfig.tts_voice_id || ttsVoiceId;
+        toneStyle = oData.smartWorkerConfig.tone_style || toneStyle;
+      }
+    }
+
+    // 2. Query Users Collection
     const usersSnap = await adminDb.collection("users").get();
     const usersList: Array<{ id: string; name: string; email: string; role: string }> = [];
     let adminsCount = 0;
@@ -100,7 +115,6 @@ async function getDeepDatabaseAnalytics(userId: string) {
       }
     });
 
-    // Fallback if users collection is newly seeded
     if (usersList.length === 0) {
       usersList.push(
         { id: effectiveUserId, name: "David Admin", email: "admin@c-g-ltd.com", role: "Administrator" },
@@ -112,7 +126,7 @@ async function getDeepDatabaseAnalytics(userId: string) {
       clientsCount = 1;
     }
 
-    // 2. Query Landing Pages & Pages Collections
+    // 3. Query Landing Pages & Pages Collections
     const landingPagesSnap = await adminDb.collection("landing_pages").get();
     const pagesSnap = await adminDb.collection("pages").get();
     const pagesList: Array<{ title: string; views: number; conversions: number; status: string }> = [];
@@ -147,7 +161,6 @@ async function getDeepDatabaseAnalytics(userId: string) {
       });
     });
 
-    // Fallback if pages collection empty
     if (pagesList.length === 0) {
       pagesList.push(
         { title: "Smart Office AI Portal", views: 420, conversions: 52, status: "Published" },
@@ -159,11 +172,10 @@ async function getDeepDatabaseAnalytics(userId: string) {
       totalConversions = 141;
     }
 
-    // Sort pages by traffic
     pagesList.sort((a, b) => b.views - a.views);
     const topPages = pagesList.slice(0, 3);
 
-    // 3. Query Contacts & Transactions
+    // 4. Query Contacts & Transactions
     const contactsSnap = await adminDb.collection("contacts").get();
     const transactionsSnap = await adminDb.collection("transactions").get();
     let totalRevenue = 0;
@@ -182,7 +194,7 @@ async function getDeepDatabaseAnalytics(userId: string) {
       paidCount = 76;
     }
 
-    // 4. Query Recent Interaction Memory for Active User
+    // 5. Query Recent Interaction Memory for Active User
     const interactionSnap = await adminDb
       .collection("users")
       .doc(effectiveUserId)
@@ -198,6 +210,9 @@ async function getDeepDatabaseAnalytics(userId: string) {
     });
 
     return {
+      configuredSystemPrompt,
+      ttsVoiceId,
+      toneStyle,
       activeUser: activeUserRecord,
       usersSummary: {
         totalUsers: usersList.length,
@@ -227,6 +242,9 @@ async function getDeepDatabaseAnalytics(userId: string) {
   } catch (err) {
     console.error("Error in getDeepDatabaseAnalytics:", err);
     return {
+      configuredSystemPrompt: "",
+      ttsVoiceId: "en-US-Studio-O",
+      toneStyle: "Professional",
       activeUser: { id: userId, name: "Active User", email: "user@system.com", role: "Administrator" },
       usersSummary: {
         totalUsers: 14,
@@ -324,7 +342,6 @@ function generateDeepDatabaseReply(
   const pages = dbData.pagesSummary;
   const crm = dbData.crmSummary;
 
-  // USER ANALYTICS INTENT (Deep breakdown of system users, roles, active user profile)
   if (
     q.includes("user") ||
     q.includes("member") ||
@@ -339,7 +356,6 @@ function generateDeepDatabaseReply(
     return `Deep User Intelligence for ${u.name}: The system currently manages ${users.totalUsers} registered users across ${users.adminsCount} Administrators, ${users.managersCount} Managers, and ${users.clientsCount} Client accounts. Active members include [${users.sampleUsers}]. Your current role is ${u.role}.`;
   }
 
-  // PAGE & LANDING PAGE ANALYTICS INTENT (Traffic, view counts, top performing pages)
   if (
     q.includes("page") ||
     q.includes("landing") ||
@@ -357,7 +373,6 @@ function generateDeepDatabaseReply(
     return `System Page & Traffic Audit: Operating in [${tabTitle}], I have scanned your ${pages.totalPages} landing pages, recording ${pages.totalPageViews.toLocaleString()} total visits and ${pages.totalConversions} conversions (${pages.avgConversionRate} conversion rate). Top performing hubs: ${pages.topPagesFormatted}.`;
   }
 
-  // REVENUE & FINANCIAL PERFORMANCE INTENT
   if (
     q.includes("revenue") ||
     q.includes("money") ||
@@ -372,7 +387,6 @@ function generateDeepDatabaseReply(
     return `Financial Audit for ${u.name}: Total revenue generated is ₪${crm.totalRevenueILS.toLocaleString()} from ${crm.paidTransactionsCount} paid transactions out of ${crm.totalTransactions} recorded entries, averaging ₪${crm.avgOrderValueILS.toLocaleString()} per transaction.`;
   }
 
-  // CRM LEADS & CONTACTS INTENT
   if (
     q.includes("contact") ||
     q.includes("lead") ||
@@ -384,17 +398,14 @@ function generateDeepDatabaseReply(
     return `CRM Lead Intelligence: We are tracking ${crm.totalContacts} active contacts. Lead acquisition is driven primarily by your top landing page "${pages.topPageName}" which generated ${pages.totalConversions} conversions.`;
   }
 
-  // GREETINGS & INTRO
   if (q.includes("hello") || q.includes("hi") || q.includes("hey") || q.includes("שלום") || q.includes("היי")) {
     return `Hello ${u.name}! I am ${agent}, your Senior AI Analyst in [${tabTitle}]. I have loaded deep database metrics: ${users.totalUsers} users, ${pages.totalPages} landing pages (${pages.totalPageViews} views), and ₪${crm.totalRevenueILS.toLocaleString()} revenue. How can I assist you?`;
   }
 
-  // CAPABILITIES & HELP
   if (q.includes("what can you do") || q.includes("help") || q.includes("capabilities") || q.includes("עזרה") || q.includes("תפקיד")) {
     return `As ${agent} in [${tabTitle}], I perform deep database inspection across all ${users.totalUsers} users and ${pages.totalPages} pages. I analyze traffic trends (${pages.totalPageViews} views), evaluate conversion rates (${pages.avgConversionRate}), and track ₪${crm.totalRevenueILS.toLocaleString()} in sales.`;
   }
 
-  // DYNAMIC COMPREHENSIVE EXECUTIVE DATA SUMMARY (Fallback for custom questions)
   const queryHash = Array.from(q).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const comprehensiveVariants = [
     `Executive Audit for ${u.name} ("${userText}"): Database inspection confirms ${users.totalUsers} users (${users.adminsCount} Admins, ${users.clientsCount} Clients) and ${pages.totalPages} pages with ${pages.totalPageViews.toLocaleString()} views. Top hub: "${pages.topPageName}".`,
@@ -424,11 +435,17 @@ export async function POST(
 
     const nextInteractionId = `int_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-    // 1. Fetch Deep Database Analytics (Users, Pages, CRM, Memory)
-    const dbData = await getDeepDatabaseAnalytics(userId);
+    // 1. Fetch Deep Database Analytics (Users, Pages, CRM, Memory) & Configured System Prompt
+    const dbData = await getDeepDatabaseAnalytics(userId, slug);
 
-    // 2. Query Gemini AI with Comprehensive Deep Database Context
-    const prompt = `You are ${agent}, an expert AI Smart Worker and Senior System & User Data Analyst operating in mode [${tabTitle}].
+    // 2. Query Gemini AI with systemPrompt configured from Settings Tab as PRIMARY INSTRUCTION
+    const systemPromptInstruction = dbData.configuredSystemPrompt 
+      ? `PRIMARY AGENT INSTRUCTION (from Settings Tab): "${dbData.configuredSystemPrompt}"` 
+      : `PRIMARY AGENT INSTRUCTION: You are ${agent}, an expert AI Smart Worker and Senior System Data Analyst.`;
+
+    const prompt = `${systemPromptInstruction}
+
+Mode Context: [${tabTitle}]
 Active Tools Available: [${toolsAvailable || "analytics, user_tracker, page_analyzer, crm_inspector"}].
 
 Deep System Database Knowledge Context:
@@ -441,7 +458,7 @@ Deep System Database Knowledge Context:
 
 User Query: "${userText}"
 
-Instruction: Provide an articulate, highly intelligent, educated data analysis answer (2-3 sentences max) specifically addressing ${dbData.activeUser.name}'s query about users, pages, traffic, or system performance. Include exact numbers from the database context. Keep tone professional, authoritative, and direct.`;
+Instruction: Provide an articulate, highly intelligent, educated data analysis answer (2-3 sentences max) strictly following your Primary Agent Instruction and referencing real database numbers. Keep tone professional, authoritative, and direct.`;
 
     let replyText = await generateGeminiResponse(prompt);
 
