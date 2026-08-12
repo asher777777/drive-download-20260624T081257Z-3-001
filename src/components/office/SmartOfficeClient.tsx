@@ -781,7 +781,7 @@ function ConversationalFormCard({
   options?: Array<{ label: string; value: string }>;
   currentValue: string;
   onChangeValue: (val: string) => void;
-  onNextStep: () => void;
+  onNextStep: (val?: string) => void;
   onPrevStep?: () => void;
   onSaveAndFinish: () => void;
 }) {
@@ -907,7 +907,7 @@ function ConversationalFormCard({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && validation.isValid) {
                   e.preventDefault();
-                  onNextStep();
+                  onNextStep(currentValue);
                 }
               }}
               placeholder={isFormMicRecording ? "listening..." : ""}
@@ -929,7 +929,7 @@ function ConversationalFormCard({
             /* FILLED STATE: Golden Circle Bookmark / Folder Save Button */
             <button
               type="button"
-              onClick={onNextStep}
+              onClick={() => onNextStep(currentValue)}
               className="w-14 h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer group"
               title="Save Field / Next Step"
             >
@@ -968,7 +968,7 @@ function ConversationalFormCard({
                 type="button"
                 onClick={() => {
                   onChangeValue(opt.value);
-                  onNextStep();
+                  onNextStep(opt.value);
                 }}
                 className={`p-2.5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-md ${
                   currentValue === opt.value
@@ -2092,13 +2092,14 @@ export function SmartOfficeClient({
                 if (contactStep === 4) setContactDraft((prev) => ({ ...prev, role: val }));
                 if (contactStep === 5) setContactDraft((prev) => ({ ...prev, gender: val }));
               }}
-              onNextStep={() => {
-                const val =
+              onNextStep={(val) => {
+                const finalVal =
+                  val !== undefined && val !== "" ? val :
                   contactStep === 1 ? contactDraft.name :
                   contactStep === 2 ? contactDraft.email :
                   contactStep === 3 ? contactDraft.phone :
                   contactStep === 4 ? contactDraft.role : contactDraft.gender;
-                handleSendChat(val);
+                handleSendChat(finalVal);
               }}
               onPrevStep={() => {
                 if (contactStep > 1) setContactStep(contactStep - 1);
