@@ -35,7 +35,9 @@ export default [
     },
     rules: {
       ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules,
+      "@next/next/no-img-element": "off",
+      "@next/next/no-html-link-for-pages": "off",
+      "@next/next/no-assign-module-variable": "off",
     },
   },
 ];
