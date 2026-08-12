@@ -479,6 +479,11 @@ function TemplateExcelTableCard({ data }: { data: any }) {
     }
   };
 
+  const [visibleRowsCount, setVisibleRowsCount] = useState(5);
+
+  // Slice displayed rows for 5-row pagination view
+  const displayedRows = sortedRows.slice(0, visibleRowsCount);
+
   return (
     <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/70 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
       {/* Table Title & Header Controls */}
@@ -558,14 +563,14 @@ function TemplateExcelTableCard({ data }: { data: any }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80 font-mono text-[11px]">
-            {sortedRows.length === 0 ? (
+            {displayedRows.length === 0 ? (
               <tr>
                 <td colSpan={headers.length + 1} className="p-4 text-center text-slate-400 italic">
                   No matching records found.
                 </td>
               </tr>
             ) : (
-              sortedRows.map((row: any, rIdx: number) => {
+              displayedRows.map((row: any, rIdx: number) => {
                 const originalIndex = rows.indexOf(row);
                 const isEditing = editingRowIdx === originalIndex;
 
@@ -635,6 +640,33 @@ function TemplateExcelTableCard({ data }: { data: any }) {
           </tbody>
         </table>
       </div>
+
+      {/* 5-Row Paginated / Expandable Rows Controls with ChevronDown Arrow Icon */}
+      {sortedRows.length > 5 && (
+        <div className="flex items-center justify-between pt-2 px-1 border-t border-slate-800/80">
+          <span className="text-[11px] text-slate-400 font-mono">
+            Showing {Math.min(visibleRowsCount, sortedRows.length)} of {sortedRows.length} rows
+          </span>
+          {visibleRowsCount < sortedRows.length ? (
+            <button
+              type="button"
+              onClick={() => setVisibleRowsCount((prev) => prev + 5)}
+              className="px-3.5 py-1.5 bg-amber-500/10 hover:bg-amber-400/20 border border-amber-400/60 hover:border-amber-400 text-amber-400 hover:text-amber-300 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md cursor-pointer group hover:scale-105 active:scale-95"
+            >
+              <span>Discover More (5 Rows)</span>
+              <ChevronDown className="w-4 h-4 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setVisibleRowsCount(5)}
+              className="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span>Collapse to 5 Rows</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

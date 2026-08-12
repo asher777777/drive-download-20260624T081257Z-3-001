@@ -300,24 +300,40 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
     if (q.includes('user') || q.includes('member') || q.includes('phone') || q.includes('name') || q.includes('id') || q.includes('משתמש')) {
       const rawUsers = dbData.usersSummary?.rawUsers || [];
 
-      const rows = rawUsers.map((u: any) => ({
-        'Full Name': u.name,
-        'ID': u.id,
-        'Phone': u.phone || "-",
-        'Email': u.email,
-        'Role': u.role
-      }));
+      // Check if user specifically requested 3 columns: e.g. "Table with 3 columns with user data Full name - ID - Phone"
+      const is3Cols = q.includes('3 col') || q.includes('3 עמודות') || q.includes('3 שדות') || q.includes('three col') || (q.includes('full name') && q.includes('id') && q.includes('phone') && !q.includes('email'));
+
+      const headers = is3Cols 
+        ? ['Full Name', 'ID', 'Phone']
+        : ['Full Name', 'ID', 'Phone', 'Email', 'Role'];
+
+      const rows = rawUsers.map((u: any) => {
+        if (is3Cols) {
+          return {
+            'Full Name': u.name,
+            'ID': u.id,
+            'Phone': u.phone || "-"
+          };
+        }
+        return {
+          'Full Name': u.name,
+          'ID': u.id,
+          'Phone': u.phone || "-",
+          'Email': u.email,
+          'Role': u.role
+        };
+      });
 
       components.push(
         JSON_TEMPLATE_LIBRARY.excel_table_card({
           text: `User Database Table (${rawUsers.length} Registered Members)`,
           tableData: {
-            title: 'User Data Table (Full Name - ID - Phone)',
-            headers: ['Full Name', 'ID', 'Phone', 'Email', 'Role'],
-            rows: rows.length > 0 ? rows : [{ 'Full Name': 'No user records', 'ID': '-', 'Phone': '-', 'Email': '-', 'Role': '-' }]
+            title: `User Data Table (${headers.length} Columns)`,
+            headers,
+            rows: rows.length > 0 ? rows : [is3Cols ? { 'Full Name': 'No user records', 'ID': '-', 'Phone': '-' } : { 'Full Name': 'No user records', 'ID': '-', 'Phone': '-', 'Email': '-', 'Role': '-' }]
           },
           vectorShape: { type: 'table', color: '#FFC800', label: 'User Table' },
-          badge: 'User Data'
+          badge: `${headers.length} Columns`
         })
       );
     } else {
