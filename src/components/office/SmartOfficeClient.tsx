@@ -1302,7 +1302,17 @@ export function SmartOfficeClient({
         };
 
         recognitionRef.current.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
+          const err = event?.error;
+          if (err === "no-speech" || err === "aborted") {
+            // Harmless browser events when silent or stopped - handle gracefully without console.error
+            setIsRecording(false);
+            return;
+          }
+          if (err === "not-allowed") {
+            console.warn("Microphone access denied by user.");
+          } else {
+            console.warn("Speech recognition notice:", err);
+          }
           setIsRecording(false);
         };
 

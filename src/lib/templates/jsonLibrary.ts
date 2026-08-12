@@ -188,8 +188,27 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
   const q = userQuery.toLowerCase();
   const components: JSONTemplateComponent[] = [];
   if (q.includes('contact') || q.includes('moti') || q.includes('card') || q.includes('person') || q.includes('profile') || q.includes('איש קשר') || q.includes('כרטיס')) {
-    const contactItem = dbData.contactsSummary?.items?.find((c: any) => c.name.toLowerCase().includes("moti")) ||
-      dbData.contactsSummary?.items?.[0] || { id: "cnt_001", name: "Moti Cohen", email: "moti@partner.com", phone: "+972-50-9876543", role: "Senior VIP Client", company: "Moti Digital Ltd", status: "Active Partner" };
+    const contactItems: any[] = dbData.contactsSummary?.items || [];
+    
+    // Find matching contact from Firestore DB by query words
+    const queryWords = q.split(/\s+/).filter(w => w.length > 2);
+    let matchedContact = contactItems.find((c: any) => 
+      queryWords.some(w => (c.name || '').toLowerCase().includes(w) || (c.email || '').toLowerCase().includes(w))
+    );
+
+    if (!matchedContact && contactItems.length > 0) {
+      matchedContact = contactItems[0];
+    }
+
+    const contactItem = matchedContact || { 
+      id: "cnt_001", 
+      name: "Moti Cohen", 
+      email: "moti@partner.com", 
+      phone: "+972-50-9876543", 
+      role: "Senior VIP Client", 
+      company: "Moti Digital Ltd", 
+      status: "Active Partner" 
+    };
 
     components.push(
       JSON_TEMPLATE_LIBRARY.text_image_page_vector({
@@ -208,22 +227,32 @@ export function matchAndPopulateTemplate(dbData: any, userQuery: string): JSONTe
       })
     );
 
+    // Render ALL contacts from Firestore DB if multiple exist!
+    const tableRows = contactItems.length > 0 
+      ? contactItems.map(c => ({
+          'Full Name': c.name,
+          'ID': c.id,
+          'Phone': c.phone,
+          'Email': c.email,
+          'Role': c.role,
+          'Status': c.status || 'Active'
+        }))
+      : [{
+          'Full Name': contactItem.name,
+          'ID': contactItem.id || 'cnt_001',
+          'Phone': contactItem.phone || '+972-50-9876543',
+          'Email': contactItem.email,
+          'Role': contactItem.role,
+          'Status': contactItem.status || 'Active Partner'
+        }];
+
     components.push(
       JSON_TEMPLATE_LIBRARY.excel_table_card({
-        text: `Interactive Contact Data Table (Edit & Delete Available)`,
+        text: `Interactive Contact Data Table (${tableRows.length} Firestore DB Contacts)`,
         tableData: {
-          title: `Contact Card - ${contactItem.name}`,
+          title: `Contacts Database Table - ${contactItem.name}`,
           headers: ['Full Name', 'ID', 'Phone', 'Email', 'Role', 'Status'],
-          rows: [
-            {
-              'Full Name': contactItem.name,
-              'ID': contactItem.id || 'cnt_001',
-              'Phone': contactItem.phone || '+972-50-9876543',
-              'Email': contactItem.email,
-              'Role': contactItem.role,
-              'Status': contactItem.status || 'Active Partner'
-            }
-          ]
+          rows: tableRows
         },
         vectorShape: { type: 'table', color: '#FFC800', label: 'Contact Card' },
         badge: 'Editable Card'
