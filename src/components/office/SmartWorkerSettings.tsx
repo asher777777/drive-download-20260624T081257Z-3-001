@@ -5,6 +5,7 @@ import {
   SmartWorkerConfig, 
   DEFAULT_SMART_WORKER_CONFIG, 
   DEFAULT_PERMISSION_MATRIX, 
+  DEFAULT_ALLOWED_COLLECTIONS,
   PermissionMatrix,
   UserRolePermissions 
 } from "@/lib/types/office";
@@ -30,7 +31,9 @@ import {
   Send,
   Zap,
   Layers,
-  Table
+  Table,
+  CheckSquare,
+  Square
 } from "lucide-react";
 
 interface SmartWorkerSettingsProps {
@@ -51,6 +54,20 @@ const AI_CAPABILITIES_OPTIONS = [
   { id: "generate_images", label: "יצירת תמונות", labelEn: "Generate Images", icon: Sparkles },
   { id: "generate_videos", label: "יצירת סרטונים", labelEn: "Generate Videos", icon: Bot },
   { id: "write_code", label: "כתיבת קוד", labelEn: "Code Writing", icon: Code2 },
+];
+
+const AVAILABLE_COLLECTIONS_OPTIONS = [
+  { id: "digital_offices", label: "משרדים וטאבים דיגיטליים", labelEn: "Digital Offices & Tabs" },
+  { id: "landing_pages", label: "דפי נחיתה", labelEn: "Landing Pages" },
+  { id: "pages", label: "עמודים כלליים", labelEn: "General Pages" },
+  { id: "event_page", label: "עמודי אירועים", labelEn: "Event Pages" },
+  { id: "post_page", label: "עמודי פוסטים ותוכן", labelEn: "Post Pages" },
+  { id: "service_page", label: "עמודי שירותים", labelEn: "Service Pages" },
+  { id: "site_pages", label: "עמודי אתרים", labelEn: "Site Pages" },
+  { id: "user_pages", label: "עמודי משתמשים", labelEn: "User Pages" },
+  { id: "users", label: "בסיס נתוני משתמשים", labelEn: "Users Database" },
+  { id: "contacts", label: "אנשי קשר ו-CRM", labelEn: "Contacts & CRM" },
+  { id: "transactions", label: "עסקאות ופיננסים", labelEn: "Transactions & Revenue" },
 ];
 
 const PRIMARY_ROLES_OPTIONS = [
@@ -136,6 +153,7 @@ export function SmartWorkerSettings({
   const schemaHeader = `root\\${officeSlug}\\${workerSlug}`;
 
   const matrix: PermissionMatrix = formData.permission_matrix || DEFAULT_PERMISSION_MATRIX;
+  const allowedCollections = formData.allowed_collections || DEFAULT_ALLOWED_COLLECTIONS;
 
   // Fetch existing settings on mount
   useEffect(() => {
@@ -184,7 +202,7 @@ export function SmartWorkerSettings({
     });
   };
 
-  const toggleArrayItem = (field: "ai_capabilities" | "primary_roles" | "collaboration", value: string) => {
+  const toggleArrayItem = (field: "ai_capabilities" | "primary_roles" | "collaboration" | "allowed_collections", value: string) => {
     setFormData((prev) => {
       const arr = prev[field] || [];
       const updated = arr.includes(value) ? arr.filter((i) => i !== value) : [...arr, value];
@@ -297,11 +315,11 @@ export function SmartWorkerSettings({
           <div className="flex items-center gap-2">
             <Bot className="w-6 h-6 text-amber-400" />
             <h2 className="text-xl sm:text-2xl font-black text-amber-400 tracking-tight">
-              הגדרות עובד חכם והרשאות
+              הגדרות עובד חכם, קולקציות והרשאות
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Smart Worker Instructions, AI Capabilities & Permission Matrix
+            Smart Worker Instructions, Allowed Collections Scope & Permission Matrix
           </p>
         </div>
 
@@ -363,7 +381,50 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 2. 2D PERMISSION MATRIX TABLE (טבלת הרשאות לפי סוג משתמש)      */}
+      {/* 2. ALLOWED DATABASE COLLECTIONS (בסיסי נתונים וקולקציות מורשים) */}
+      {/* ------------------------------------------------------------- */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+            <Database className="w-4 h-4 text-amber-400" />
+            <span>בסיסי נתונים וקולקציות מורשים לסריקה (Allowed Collections Scope)</span>
+          </h3>
+          <span className="text-[10px] text-slate-400">
+            {allowedCollections.length} קולקציות נבחרו
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {AVAILABLE_COLLECTIONS_OPTIONS.map((col) => {
+            const isChecked = allowedCollections.includes(col.id);
+            return (
+              <button
+                key={col.id}
+                type="button"
+                onClick={() => toggleArrayItem("allowed_collections", col.id)}
+                className={`p-2.5 rounded-2xl border flex items-center justify-between transition-all cursor-pointer ${
+                  isChecked
+                    ? "bg-amber-500/20 border-amber-400 text-amber-300 shadow-md"
+                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-amber-400/40"
+                }`}
+              >
+                <div className="text-right space-y-0.5">
+                  <span className="text-xs font-bold block leading-tight">{col.label}</span>
+                  <span className="text-[10px] text-amber-400/70 font-mono block dir-ltr">{col.id}</span>
+                </div>
+                <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                  isChecked ? "bg-amber-400 border-amber-400 text-black" : "border-slate-700"
+                }`}>
+                  {isChecked && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 3. 2D PERMISSION MATRIX TABLE (טבלת הרשאות לפי סוג משתמש)      */}
       {/* ------------------------------------------------------------- */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
@@ -456,7 +517,7 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 3. PRIMARY ROLES (תפקיד עיקרי - בחירה מרובה)                   */}
+      {/* 4. PRIMARY ROLES (תפקיד עיקרי - בחירה מרובה)                   */}
       {/* ------------------------------------------------------------- */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
@@ -485,7 +546,7 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 4. COLLABORATION (שיתוף פעולה עם עובדים נוספים)               */}
+      {/* 5. COLLABORATION (שיתוף פעולה עם עובדים נוספים)               */}
       {/* ------------------------------------------------------------- */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
@@ -522,7 +583,7 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 5. TONE & STYLE AND GOOGLE TTS VOICE                          */}
+      {/* 6. TONE & STYLE AND GOOGLE TTS VOICE                          */}
       {/* ------------------------------------------------------------- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Tone Selection */}
@@ -575,7 +636,7 @@ export function SmartWorkerSettings({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 6. SYSTEM PROMPT & AI ASSIST BUTTON                           */}
+      {/* 7. SYSTEM PROMPT & AI ASSIST BUTTON                           */}
       {/* ------------------------------------------------------------- */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -671,6 +732,9 @@ export function SmartWorkerSettings({
                 </span>
                 <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30">
                   יכולות: {formData.ai_capabilities?.join(", ") || "טקסט, מחקר"}
+                </span>
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30">
+                  קולקציות ({allowedCollections.length}): {allowedCollections.slice(0, 3).join(", ")}...
                 </span>
                 <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30">
                   טון: {formData.tone_style || "מקצועי"}

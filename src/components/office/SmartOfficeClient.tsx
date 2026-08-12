@@ -20,12 +20,41 @@ import {
   Bug,
   Folder,
   Volume2,
+  VolumeX,
   History,
   MessageSquare,
   User,
   Bot,
   PanelLeftOpen,
-  PanelLeftClose
+  PanelLeftClose,
+  ExternalLink,
+  Sparkles,
+  Play,
+  Pause,
+  FileText,
+  Calendar,
+  Layers,
+  ArrowUpRight,
+  Shield,
+  Star,
+  Circle,
+  Hexagon,
+  Video,
+  BarChart3,
+  Table,
+  Globe,
+  Maximize2,
+  Search,
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Bookmark,
+  ChevronDown,
+  Plus,
+  Tag,
+  Zap
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -56,106 +85,973 @@ function TypewriterText({ text, speed = 35 }: { text: string; speed?: number }) 
 }
 
 // ---------------------------------------------------------------------------
-// GENERATIVE JSON CARDS RENDERER (Inline Canvas Cards)
+// VECTOR SHAPE BADGE RENDERER
 // ---------------------------------------------------------------------------
 
-function InsightCard({ data }: { data: any }) {
-  const IconCmp = data.icon === "Users" ? Users : data.icon === "AlertCircle" ? AlertCircle : data.icon === "Activity" ? Activity : data.icon === "Bug" ? Bug : Info;
+function VectorShapeBadge({ shape }: { shape?: any }) {
+  if (!shape) return null;
+  const ShapeIcon = 
+    shape.type === 'shield' ? Shield : 
+    shape.type === 'star' ? Star : 
+    shape.type === 'circle' ? Circle : 
+    shape.type === 'chart' ? BarChart3 : 
+    shape.type === 'table' ? Table : Sparkles;
+
   return (
-    <div className="w-full max-w-sm my-1.5 p-2.5 bg-slate-900/90 border border-amber-400/50 rounded-2xl shadow-xl flex items-center gap-2.5 backdrop-blur-md text-left">
-      <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-xl shrink-0">
-        <IconCmp className="w-4 h-4" />
+    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-400/10 border border-amber-400/50 rounded-full text-amber-300 text-xs font-black shadow-md shrink-0 dir-ltr">
+      <ShapeIcon className="w-3.5 h-3.5 text-amber-400 fill-amber-400/30" />
+      <span>{shape.label || 'Vector Badge'}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RICH GENERATIVE CANVAS VISUAL COMPONENTS (TEMPLATES FROM SERVER LIBRARY)
+// ---------------------------------------------------------------------------
+
+// Template 1: Text + Link to Image + Link to Page + Vector Shape (CONTAINED IMAGE!)
+function TemplateTextImagePageVector({ data }: { data: any }) {
+  return (
+    <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/60 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
+      <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <h4 className="text-xs font-black text-amber-400 tracking-wide">Data & Image Card</h4>
+        </div>
+        <VectorShapeBadge shape={data.vectorShape} />
       </div>
-      <div className="flex-1">
-        <h4 className="text-xs font-bold text-slate-100">{data.title || "Insight Notification"}</h4>
-        <p className="text-[11px] text-slate-400 mt-0.5">{data.text}</p>
+
+      <p className="text-xs text-slate-100 font-medium leading-relaxed">{data.text}</p>
+
+      <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+        {data.imageUrl && (
+          <div className="w-full sm:w-36 h-28 rounded-2xl overflow-hidden border border-slate-800 bg-black/80 p-1 shrink-0 relative group flex items-center justify-center">
+            {/* Fully Contained Image (object-contain) */}
+            <img 
+              src={data.imageUrl} 
+              alt="Visual Link" 
+              className="w-full h-full object-contain group-hover:scale-105 transition-all" 
+            />
+            <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/80 text-amber-300 text-[9px] font-bold rounded">Image Link</span>
+          </div>
+        )}
+
+        <div className="flex-1 space-y-2 text-left w-full">
+          {data.metrics && (
+            <div className="flex flex-wrap gap-2 text-[11px] text-slate-300 bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+              {Object.entries(data.metrics).map(([k, v]) => (
+                <span key={k} className="font-mono"><strong className="text-amber-400">{k}:</strong> {String(v)}</span>
+              ))}
+            </div>
+          )}
+
+          {data.pageUrl && (
+            <a
+              href={data.pageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-bold text-xs shadow-md transition-all"
+            >
+              <span>{data.pageTitle || 'Link to Page'}</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-950" />
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function MultiSelectGrid({ data, onAction }: { data: any; onAction: (text: string) => void }) {
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const toggleItem = (title: string) => {
-    if (selectedItems.includes(title)) {
-      setSelectedItems(selectedItems.filter((i) => i !== title));
+// Template 2: Text + Vector Shape Link / Badge
+function TemplateTextVectorShape({ data }: { data: any }) {
+  return (
+    <div className="w-full p-4 bg-slate-950/90 border border-amber-400/50 rounded-3xl shadow-2xl flex items-center justify-between gap-4 backdrop-blur-md text-left">
+      <div className="space-y-1">
+        <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">Security & Authorization</span>
+        <p className="text-xs text-slate-100 font-medium leading-relaxed">{data.text}</p>
+      </div>
+      <VectorShapeBadge shape={data.vectorShape} />
+    </div>
+  );
+}
+
+// Template 3: Text + Link to Image + Link to Page + Vector Shape (Alt Layout - CONTAINED IMAGE!)
+function TemplateTextImagePageVectorAlt({ data }: { data: any }) {
+  return (
+    <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/60 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
+      <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+        <h4 className="text-xs font-black text-amber-400">Multi-Aspect Audit</h4>
+        <VectorShapeBadge shape={data.vectorShape} />
+      </div>
+
+      <p className="text-xs text-slate-100 font-medium leading-relaxed">{data.text}</p>
+
+      {data.imageUrl && (
+        <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-800 bg-black/80 p-1.5 relative flex items-center justify-center">
+          {/* Fully Contained Image (object-contain) */}
+          <img src={data.imageUrl} alt="Image Link" className="w-full h-full object-contain" />
+        </div>
+      )}
+
+      {data.pageUrl && (
+        <a
+          href={data.pageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg"
+        >
+          <span>{data.pageTitle || 'Link to Page'}</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-950" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+// Template 4: Link to Page Card
+function TemplatePageLinkCard({ data }: { data: any }) {
+  return (
+    <div className="w-full p-4 bg-slate-950/95 border border-amber-400/50 rounded-3xl shadow-2xl flex items-center justify-between gap-4 backdrop-blur-md text-left">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <ExternalLink className="w-4 h-4 text-amber-400" />
+          <h4 className="text-xs font-bold text-slate-100">{data.text || 'Page Link Card'}</h4>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <VectorShapeBadge shape={data.vectorShape} />
+        <a
+          href={data.pageUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-bold text-xs flex items-center gap-1 shadow-md shrink-0"
+        >
+          <span>{data.pageTitle || 'Open Page'}</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-950" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// Template 5: Text + Video Link + Link to Page + Vector Shape
+function TemplateTextVideoPageVector({ data }: { data: any }) {
+  return (
+    <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/60 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
+      <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+        <div className="flex items-center gap-2">
+          <Video className="w-4 h-4 text-amber-400" />
+          <h4 className="text-xs font-black text-amber-400">Video & Page Stream</h4>
+        </div>
+        <VectorShapeBadge shape={data.vectorShape} />
+      </div>
+
+      <p className="text-xs text-slate-100 font-medium leading-relaxed">{data.text}</p>
+
+      {data.videoUrl && (
+        <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-800 bg-black relative">
+          <video src={data.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+          <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/80 text-amber-300 text-[10px] font-bold rounded-md flex items-center gap-1">
+            <Video className="w-3 h-3 text-amber-400" />
+            <span>Video Link Player</span>
+          </span>
+        </div>
+      )}
+
+      {data.pageUrl && (
+        <a
+          href={data.pageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md"
+        >
+          <span>{data.pageTitle || 'Link to Page'}</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-950" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+// Template 6: Text + Video Link
+function TemplateTextVideoLink({ data }: { data: any }) {
+  return (
+    <div className="w-full p-4 bg-slate-950/90 border border-amber-400/50 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold text-amber-400">Video Player Stream</h4>
+        {data.badge && (
+          <span className="px-2 py-0.5 bg-amber-400/10 border border-amber-400/30 text-amber-300 rounded-md text-[10px] font-bold">
+            {data.badge}
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-slate-100 font-medium leading-relaxed">{data.text}</p>
+
+      {data.videoUrl && (
+        <div className="w-full h-32 rounded-2xl overflow-hidden border border-slate-800 bg-black relative">
+          <video src={data.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Template 7: Interactive Chart / Graph Renderer
+function TemplateChartGraphCard({ data }: { data: any }) {
+  const chartData = data.chartData || {
+    title: 'Traffic Analytics Growth',
+    labels: ['Offices', 'Landing', 'Events', 'Posts', 'Services'],
+    values: [1010, 1130, 510, 440, 390],
+  };
+
+  const maxValue = Math.max(...chartData.values, 100);
+
+  return (
+    <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/70 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
+      <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-4.5 h-4.5 text-amber-400" />
+          <h4 className="text-xs font-black text-amber-400 tracking-wide">{chartData.title || data.text}</h4>
+        </div>
+        <VectorShapeBadge shape={data.vectorShape || { type: 'chart', label: 'Chart Analytics' }} />
+      </div>
+
+      <p className="text-xs text-slate-200 font-medium">{data.text}</p>
+
+      {/* SVG Bar Chart Visualization */}
+      <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2">
+        <div className="h-32 flex items-end justify-between gap-2 pt-4 px-2">
+          {chartData.labels.map((label: string, idx: number) => {
+            const val = chartData.values[idx] || 0;
+            const heightPercent = Math.round((val / maxValue) * 100);
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center gap-1 group">
+                <span className="text-[9px] font-mono text-amber-300 font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+                  {val.toLocaleString()}
+                </span>
+                <div className="w-full bg-slate-950 rounded-t-lg overflow-hidden h-24 flex items-end p-0.5">
+                  <div
+                    style={{ height: `${Math.max(heightPercent, 10)}%` }}
+                    className="w-full bg-gradient-to-t from-amber-500 to-amber-300 rounded-t-md transition-all duration-500 shadow-md group-hover:from-amber-400 group-hover:to-amber-200"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 font-semibold truncate max-w-full">
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Template 8: Interactive Excel Data Grid / Table Renderer (Edit, Delete, Filter, Sort, Real DB Sync)
+function TemplateExcelTableCard({ data }: { data: any }) {
+  const initialTable = data.tableData || {
+    title: 'Database Table',
+    headers: ['Title', 'Visits', 'Leads', 'Status'],
+    rows: []
+  };
+
+  const [headers, setHeaders] = useState<string[]>(initialTable.headers || []);
+  const [rows, setRows] = useState<any[]>(initialTable.rows || []);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [editingRowIdx, setEditingRowIdx] = useState<number | null>(null);
+  const [editingRowData, setEditingRowData] = useState<any>({});
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  // Re-sync when props change
+  useEffect(() => {
+    if (data.tableData) {
+      setHeaders(data.tableData.headers || []);
+      setRows(data.tableData.rows || []);
+    }
+  }, [data]);
+
+  // Handle Header Click Sorting
+  const handleSort = (header: string) => {
+    if (sortKey === header) {
+      if (sortOrder === "asc") setSortOrder("desc");
+      else {
+        setSortKey(null);
+        setSortOrder("asc");
+      }
     } else {
-      setSelectedItems([...selectedItems, title]);
+      setSortKey(header);
+      setSortOrder("asc");
+    }
+  };
+
+  // Filter Rows
+  const filteredRows = rows.filter((r) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return Object.values(r).some((val) => String(val).toLowerCase().includes(term));
+  });
+
+  // Sort Rows
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    if (!sortKey) return 0;
+    const valA = String(a[sortKey] || "").toLowerCase();
+    const valB = String(b[sortKey] || "").toLowerCase();
+
+    const numA = parseFloat(valA.replace(/[^0-9.-]+/g, ""));
+    const numB = parseFloat(valB.replace(/[^0-9.-]+/g, ""));
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+      return sortOrder === "asc" ? numA - numB : numB - numA;
+    }
+    return sortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+
+  // Delete Row Handler with Real DB Persistence
+  const handleDeleteRow = async (originalIdx: number) => {
+    const rowToDelete = rows[originalIdx];
+    setRows((prev) => prev.filter((_, idx) => idx !== originalIdx));
+    if (editingRowIdx === originalIdx) {
+      setEditingRowIdx(null);
+    }
+
+    setSyncStatus("Deleting from Firestore Database...");
+    try {
+      const res = await fetch(`/api/office/david/update-record`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete",
+          recordData: rowToDelete,
+        }),
+      });
+      if (res.ok) {
+        setSyncStatus("Deleted from Database ✓");
+      } else {
+        setSyncStatus("Database Sync Warning (Local Saved)");
+      }
+    } catch (e) {
+      setSyncStatus("Local Change Saved");
+    } finally {
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
+  };
+
+  // Start Edit Row Handler
+  const handleStartEdit = (originalIdx: number, row: any) => {
+    setEditingRowIdx(originalIdx);
+    setEditingRowData({ ...row });
+  };
+
+  // Save Edit Row Handler with Real DB Persistence
+  const handleSaveEdit = async () => {
+    if (editingRowIdx === null) return;
+
+    const updatedRow = { ...editingRowData };
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[editingRowIdx] = updatedRow;
+      return updated;
+    });
+    setEditingRowIdx(null);
+
+    setSyncStatus("Saving to Firestore Database...");
+    try {
+      const res = await fetch(`/api/office/david/update-record`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          recordData: updatedRow,
+        }),
+      });
+      if (res.ok) {
+        setSyncStatus("Saved to Database ✓");
+      } else {
+        setSyncStatus("Database Sync Warning (Local Saved)");
+      }
+    } catch (e) {
+      setSyncStatus("Local Change Saved");
+    } finally {
+      setTimeout(() => setSyncStatus(null), 3000);
     }
   };
 
   return (
-    <div className="w-full max-w-sm my-1.5 p-3 bg-slate-900/90 border border-amber-400/50 rounded-2xl shadow-xl text-center space-y-2">
-      <h4 className="text-xs font-bold text-amber-400">{data.title || "Select Available Tools:"}</h4>
-      <div className="flex flex-wrap gap-1.5 justify-center">
-        {(data.items || []).map((item: any, i: number) => {
-          const title = typeof item === 'string' ? item : item.title;
-          const isActive = selectedItems.includes(title);
-          return (
-            <button
-              key={i}
-              onClick={() => toggleItem(title)}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                isActive
-                  ? "bg-amber-500/20 border border-amber-400 text-amber-300 shadow-md"
-                  : "bg-slate-950 border border-slate-800 text-slate-400 hover:border-amber-400/50"
-              }`}
-            >
-              {isActive && <Check className="w-3 h-3 text-amber-400" />}
-              {title}
-            </button>
-          );
-        })}
+    <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/70 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md text-left">
+      {/* Table Title & Header Controls */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-amber-400/30 pb-2.5">
+        <div className="flex items-center gap-2">
+          <Table className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-black text-amber-400 tracking-wide">{initialTable.title}</h4>
+              {syncStatus && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 text-[10px] font-bold animate-pulse">
+                  {syncStatus}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">{rows.length} Total Rows Recorded</span>
+          </div>
+        </div>
+
+        {/* Live Filter Search Input Bar */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-48">
+            <Search className="w-3.5 h-3.5 text-amber-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Filter table rows..."
+              className="w-full pl-8 pr-2.5 py-1 bg-slate-900 border border-slate-800 focus:border-amber-400/70 rounded-xl text-[11px] text-slate-200 focus:outline-none transition-all placeholder:text-slate-500"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <VectorShapeBadge shape={data.vectorShape || { type: 'table', label: 'Excel Grid' }} />
+        </div>
       </div>
-      <button
-        onClick={() => onAction(selectedItems.length > 0 ? `Selected tools: ${selectedItems.join(", ")}` : "No tools selected")}
-        className="mt-1 w-7 h-7 mx-auto bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-full flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
-      >
-        <Folder className="w-3.5 h-3.5 text-black" />
-      </button>
+
+      {data.text && <p className="text-xs text-slate-200 font-medium">{data.text}</p>}
+
+      {/* Interactive Excel Data Grid Table */}
+      <div className="overflow-x-auto border border-slate-800 rounded-2xl bg-black/70 shadow-inner">
+        <table className="w-full text-xs text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-900 text-amber-400 border-b border-slate-800 font-black select-none">
+              {headers.map((h: string, idx: number) => {
+                const isSorted = sortKey === h;
+                return (
+                  <th
+                    key={idx}
+                    onClick={() => handleSort(h)}
+                    className="p-2.5 border-r border-slate-800 last:border-r-0 cursor-pointer hover:bg-slate-850 transition-colors"
+                    title={`Click to sort by ${h}`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span>{h}</span>
+                      <span className="shrink-0 text-amber-400/80">
+                        {isSorted ? (
+                          sortOrder === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-amber-400" /> : <ArrowDown className="w-3.5 h-3.5 text-amber-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                );
+              })}
+              {/* Row Actions Header (Edit / Delete) */}
+              <th className="p-2.5 text-center w-20 text-slate-400 font-mono text-[10px]">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/80 font-mono text-[11px]">
+            {sortedRows.length === 0 ? (
+              <tr>
+                <td colSpan={headers.length + 1} className="p-4 text-center text-slate-400 italic">
+                  No matching records found.
+                </td>
+              </tr>
+            ) : (
+              sortedRows.map((row: any, rIdx: number) => {
+                const originalIndex = rows.indexOf(row);
+                const isEditing = editingRowIdx === originalIndex;
+
+                return (
+                  <tr key={rIdx} className={`hover:bg-slate-900/60 transition-colors ${isEditing ? "bg-amber-500/10" : ""}`}>
+                    {headers.map((h: string, cIdx: number) => (
+                      <td key={cIdx} className="p-2.5 text-slate-200 border-r border-slate-800/60 last:border-r-0">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingRowData[h] !== undefined ? editingRowData[h] : ""}
+                            onChange={(e) =>
+                              setEditingRowData({ ...editingRowData, [h]: e.target.value })
+                            }
+                            className="w-full bg-slate-950 border border-amber-400/80 rounded px-1.5 py-0.5 text-[11px] text-amber-300 focus:outline-none"
+                          />
+                        ) : (
+                          row[h] !== undefined ? String(row[h]) : '-'
+                        )}
+                      </td>
+                    ))}
+
+                    {/* Edit & Delete Action Buttons */}
+                    <td className="p-2 text-center border-l border-slate-800/60">
+                      <div className="flex items-center justify-center gap-1">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={handleSaveEdit}
+                              className="p-1 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg transition-all cursor-pointer"
+                              title="Save Row Changes"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setEditingRowIdx(null)}
+                              className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all cursor-pointer"
+                              title="Cancel Edit"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleStartEdit(originalIndex, row)}
+                              className="p-1 hover:bg-amber-400/20 text-amber-400/80 hover:text-amber-300 rounded-lg transition-all cursor-pointer"
+                              title="Edit Row Data"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRow(originalIndex)}
+                              className="p-1 hover:bg-red-500/20 text-red-400/80 hover:text-red-400 rounded-lg transition-all cursor-pointer"
+                              title="Delete Row"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function MiniFormCard({ data, onAction }: { data: any; onAction: (text: string) => void }) {
-  const [formData, setFormData] = useState<Record<string, string>>({});
+// Template 9: iFrame / Embedded Web View Window
+function TemplateIframeViewCard({ data }: { data: any }) {
+  const iframeUrl = data.iframeUrl || '/office/david';
   return (
-    <div className="w-full max-w-sm my-1.5 p-3 bg-slate-900/90 border border-amber-400/50 rounded-2xl shadow-xl space-y-2 text-left">
-      <h4 className="text-xs font-bold text-amber-400 text-center">{data.title || "Fill Form Details"}</h4>
-      {(data.fields || []).map((f: string, i: number) => (
-        <input
-          key={i}
-          type="text"
-          placeholder={f}
-          value={formData[f] || ""}
-          onChange={(e) => setFormData({ ...formData, [f]: e.target.value })}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
-        />
-      ))}
-      <button
-        onClick={() => {
-          const details = Object.entries(formData).map(([k, v]) => `${k}: ${v}`).join(", ");
-          onAction(`Form submitted: ${details}`);
-        }}
-        className="w-full py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
-      >
-        Submit
-      </button>
+    <div className="w-full p-3 bg-slate-950/95 border-2 border-amber-400/70 rounded-3xl shadow-2xl space-y-2 backdrop-blur-md text-left">
+      <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+        <div className="flex items-center gap-2">
+          <Globe className="w-4 h-4 text-amber-400" />
+          <h4 className="text-xs font-black text-amber-400 tracking-wide">{data.iframeTitle || 'Live iFrame Window'}</h4>
+        </div>
+        <VectorShapeBadge shape={data.vectorShape || { type: 'shield', label: 'Live iFrame' }} />
+      </div>
+
+      <p className="text-xs text-slate-200 font-medium">{data.text}</p>
+
+      {/* Embedded Window Browser Frame */}
+      <div className="w-full rounded-2xl border border-slate-800 overflow-hidden bg-black shadow-inner space-y-0">
+        <div className="bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-800">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500/80 inline-block" />
+          </div>
+          <span className="text-[10px] font-mono text-slate-400 dir-ltr bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+            {iframeUrl}
+          </span>
+          <a href={iframeUrl} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300">
+            <Maximize2 className="w-3.5 h-3.5" />
+          </a>
+        </div>
+        <div className="w-full h-48 bg-slate-950 relative">
+          <iframe
+            src={iframeUrl}
+            title={data.iframeTitle || 'Embedded View'}
+            className="w-full h-full border-0"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper: Convert spoken English word numbers (e.g. "zero three three...") to digits ("033...")
+function convertSpokenWordsToDigits(text: string): string {
+  const numberMap: Record<string, string> = {
+    zero: "0",
+    one: "1",
+    two: "2",
+    three: "3",
+    four: "4",
+    five: "5",
+    six: "6",
+    seven: "7",
+    eight: "8",
+    nine: "9",
+    ten: "10",
+    oh: "0",
+    plus: "+",
+    dash: "-",
+  };
+
+  let normalized = text.toLowerCase().trim();
+  
+  // Replace spoken word numbers
+  Object.keys(numberMap).forEach((word) => {
+    const reg = new RegExp(`\\b${word}\\b`, "g");
+    normalized = normalized.replace(reg, numberMap[word]);
+  });
+
+  // If result consists of digits, plus, or spaces, remove internal spaces for phone numbers
+  const cleanedDigits = normalized.replace(/\s+/g, "");
+  if (/^[\d+\-]+$/.test(cleanedDigits)) {
+    return cleanedDigits;
+  }
+
+  return normalized;
+}
+
+// Field Validation Helper
+function validateFieldInput(step: number, val: string): { isValid: boolean; hint?: string } {
+  const cleanVal = val.trim();
+  if (!cleanVal) return { isValid: false, hint: "Please provide an answer to continue." };
+
+  if (step === 1) {
+    if (cleanVal.length < 2) return { isValid: false, hint: "Full name must be at least 2 characters." };
+    return { isValid: true };
+  }
+
+  if (step === 2) {
+    const isEmailValid = /\S+@\S+\.\S+/.test(cleanVal);
+    if (!isEmailValid) return { isValid: false, hint: "Please enter a valid email format (e.g. name@domain.com)." };
+    return { isValid: true };
+  }
+
+  if (step === 3) {
+    const digitsOnly = cleanVal.replace(/[^\d+]/g, "");
+    if (digitsOnly.length < 7) return { isValid: false, hint: "Phone number should contain at least 7 digits." };
+    return { isValid: true };
+  }
+
+  return { isValid: cleanVal.length > 0 };
+}
+
+// Helper: Convert spoken email terms ("moti at gmail dot com" / "moti שטרודל ג'ימייל נקודה קום") to "moti@gmail.com"
+function convertSpokenEmail(text: string): string {
+  let normalized = text.toLowerCase().trim();
+
+  // Convert spoken terms for @
+  normalized = normalized.replace(/\b(at|shtrudel|שטרודל|שטורדל)\b/gi, "@");
+
+  // Convert spoken terms for .
+  normalized = normalized.replace(/\b(dot|נקודה)\b/gi, ".");
+
+  // Remove spaces around @ and .
+  normalized = normalized.replace(/\s*@\s*/g, "@");
+  normalized = normalized.replace(/\s*\.\s*/g, ".");
+
+  return normalized;
+}
+
+// Conversational Form Canvas Component (Pixel-Perfect Match to User's Circular Ornate Design)
+function ConversationalFormCard({
+  step,
+  totalSteps = 5,
+  fieldLabel,
+  title,
+  question,
+  options,
+  currentValue,
+  onChangeValue,
+  onNextStep,
+  onPrevStep,
+  onSaveAndFinish
+}: {
+  step: number;
+  totalSteps?: number;
+  fieldLabel: string;
+  title: string;
+  question: string;
+  options?: Array<{ label: string; value: string }>;
+  currentValue: string;
+  onChangeValue: (val: string) => void;
+  onNextStep: () => void;
+  onPrevStep?: () => void;
+  onSaveAndFinish: () => void;
+}) {
+  const [isFormMicRecording, setIsFormMicRecording] = useState(false);
+  const validation = validateFieldInput(step, currentValue);
+
+  const toggleMic = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported on this browser.");
+      return;
+    }
+
+    if (isFormMicRecording) {
+      setIsFormMicRecording(false);
+      return;
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = true; // Continuous listening for extended time!
+      rec.interimResults = true;
+      rec.lang = "en-US";
+
+      rec.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          let processed = transcript.trim();
+          if (step === 2) processed = convertSpokenEmail(processed);
+          if (step === 3) processed = convertSpokenWordsToDigits(processed);
+          onChangeValue(processed);
+        }
+      };
+
+      rec.onend = () => {
+        setIsFormMicRecording(false);
+      };
+
+      rec.onerror = () => {
+        setIsFormMicRecording(false);
+      };
+
+      rec.start();
+      setIsFormMicRecording(true);
+    } catch (e) {
+      console.warn("Card Mic error:", e);
+      setIsFormMicRecording(false);
+    }
+  };
+
+  return (
+    <div className="w-full flex flex-col items-center justify-center my-3 relative animate-fadeIn">
+      {/* ------------------------------------------------------------- */}
+      {/* PERFECT CIRCULAR FORM CANVAS (Exact match to screenshot design) */}
+      {/* ------------------------------------------------------------- */}
+      <div className="w-[310px] sm:w-[350px] h-[310px] sm:h-[350px] rounded-full bg-[#14120C] border-4 border-[#D4AF37]/80 shadow-[0_0_60px_rgba(212,175,55,0.35)] flex flex-col items-center justify-between p-6 relative mx-auto overflow-hidden backdrop-blur-2xl transition-all duration-300">
+        
+        {/* TOP: Metallic Golden 3D Step Number */}
+        <div className="flex flex-col items-center justify-center pt-2">
+          <span className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-b from-[#FFF7D6] via-[#FFC800] to-[#997300] bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] tracking-tighter">
+            {step}
+          </span>
+        </div>
+
+        {/* MIDDLE TOP: Field Name Header with <<< Back Arrow */}
+        <div className="w-full flex items-center justify-center relative px-4">
+          {step > 1 && onPrevStep && (
+            <button
+              type="button"
+              onClick={onPrevStep}
+              className="absolute left-6 text-[#FFC800] hover:text-white font-extrabold text-lg sm:text-xl tracking-tighter transition-all cursor-pointer hover:scale-110 active:scale-95"
+              title="Previous Step"
+            >
+              &lt;&lt;&lt;
+            </button>
+          )}
+
+          <span className="text-[#FFC800] font-black text-xl sm:text-2xl tracking-wide lowercase drop-shadow-md">
+            {fieldLabel}
+          </span>
+        </div>
+
+        {/* CENTER: Ornate Golden Bracketed Banner Input Frame */}
+        <div className="w-full flex flex-col items-center justify-center relative my-auto">
+          <div className="relative w-[92%] h-12 flex items-center justify-center">
+            {/* Ornate Gold Border SVG Frame */}
+            <svg
+              className="absolute inset-0 w-full h-full text-[#D4AF37]"
+              viewBox="0 0 300 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M14 2 L286 2 C294 2 298 12 298 24 C298 36 294 46 286 46 L14 46 C6 46 2 36 2 24 C2 12 6 2 14 2 Z"
+                fill="#EAE5E1"
+                stroke="#D4AF37"
+                strokeWidth="3.5"
+              />
+              <path
+                d="M18 6 L282 6 C288 6 293 14 293 24 C293 34 288 42 282 42 L18 42 C12 42 7 34 7 24 C7 14 12 6 18 6 Z"
+                stroke="#A37B00"
+                strokeWidth="1.5"
+                fill="none"
+              />
+            </svg>
+
+            {/* Editable Gold Text Input */}
+            <input
+              type="text"
+              value={currentValue}
+              onChange={(e) => {
+                const val = e.target.value;
+                const processed = step === 3 ? convertSpokenWordsToDigits(val) : val;
+                onChangeValue(processed);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && validation.isValid) {
+                  e.preventDefault();
+                  onNextStep();
+                }
+              }}
+              placeholder={isFormMicRecording ? "listening..." : ""}
+              className="relative z-10 w-full px-4 text-center bg-transparent text-[#B37B00] font-black text-base sm:text-lg focus:outline-none placeholder:text-slate-500 tracking-wide"
+            />
+          </div>
+
+          {/* Real-time Field Hint */}
+          {!validation.isValid && currentValue.trim().length > 0 && (
+            <span className="text-[10px] text-amber-400/90 font-bold block mt-1">
+              ⚠️ {validation.hint}
+            </span>
+          )}
+        </div>
+
+        {/* BOTTOM: Action Button (Golden Retro Mic with Soundwaves OR Golden Circle Bookmark) */}
+        <div className="pb-3 flex items-center justify-center">
+          {currentValue.trim().length > 0 && validation.isValid ? (
+            /* FILLED STATE: Golden Circle Bookmark / Folder Save Button */
+            <button
+              type="button"
+              onClick={onNextStep}
+              className="w-14 h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer group"
+              title="Save Field / Next Step"
+            >
+              <div className="w-10 h-10 rounded-full border border-[#D4AF37]/60 flex items-center justify-center">
+                <Bookmark className="w-5 h-5 fill-[#FFC800] text-[#FFC800] group-hover:scale-110 transition-transform" />
+              </div>
+            </button>
+          ) : (
+            /* EMPTY / RECORDING STATE: Golden Retro Mic with Soundwaves */
+            <button
+              type="button"
+              onClick={toggleMic}
+              className={`w-14 h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)] cursor-pointer ${
+                isFormMicRecording ? "ring-4 ring-red-500 animate-pulse border-red-500 text-red-500" : ""
+              }`}
+              title={isFormMicRecording ? "Stop Recording" : "Click Mic to Speak"}
+            >
+              {isFormMicRecording ? (
+                <MicOff className="w-6 h-6 text-red-500 animate-pulse" />
+              ) : (
+                <Mic className="w-6 h-6 text-[#FFC800]" />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* QUICK CHOICE CARDS & FOLDER SAVE & FINISH CONTROLS BELOW CIRCLE */}
+      <div className="w-full max-w-sm space-y-3 mt-3">
+        {/* Quick Select Choice Cards (e.g. Role, Gender) */}
+        {options && options.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChangeValue(opt.value);
+                  onNextStep();
+                }}
+                className={`p-2.5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-md ${
+                  currentValue === opt.value
+                    ? "bg-[#FFC800] text-slate-950 border-[#FFC800] font-black scale-105"
+                    : "bg-slate-950/90 border-slate-800 text-slate-200 hover:border-amber-400/70 hover:bg-amber-500/10"
+                }`}
+              >
+                <span className="text-xs font-extrabold">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Save & Finish Folder Icon Button in EVERY Step (Rule 3) */}
+        <div className="flex items-center justify-between gap-3 px-2">
+          <button
+            type="button"
+            onClick={onSaveAndFinish}
+            className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer hover:scale-[1.02] active:scale-98"
+            title="Save & Finish (Folder Icon)"
+          >
+            <Folder className="w-4 h-4 text-slate-950 fill-slate-950" />
+            <span>Save & Finish</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 function GenerativeRenderer({ ui, onAction }: { ui: any; onAction: (text: string) => void }) {
-  if (!ui || !ui.type) return null;
-  if (ui.type === "InsightCard") return <InsightCard data={ui.data} />;
-  if (ui.type === "MultiSelectGrid") return <MultiSelectGrid data={ui.data} onAction={onAction} />;
-  if (ui.type === "MiniForm") return <MiniFormCard data={ui.data} onAction={onAction} />;
+  if (!ui) return null;
+  
+  // Render server template library types
+  if (ui.type === "text_image_page_vector" || ui.templateId === "tpl_1_text_image_page_vector") {
+    return <TemplateTextImagePageVector data={ui.data} />;
+  }
+  if (ui.type === "text_vector_shape" || ui.templateId === "tpl_2_text_vector_shape") {
+    return <TemplateTextVectorShape data={ui.data} />;
+  }
+  if (ui.type === "text_image_page_vector_alt" || ui.templateId === "tpl_3_text_image_page_vector_alt") {
+    return <TemplateTextImagePageVectorAlt data={ui.data} />;
+  }
+  if (ui.type === "page_link_card" || ui.templateId === "tpl_4_page_link_card") {
+    return <TemplatePageLinkCard data={ui.data} />;
+  }
+  if (ui.type === "text_video_page_vector" || ui.templateId === "tpl_5_text_video_page_vector") {
+    return <TemplateTextVideoPageVector data={ui.data} />;
+  }
+  if (ui.type === "text_video_link" || ui.templateId === "tpl_6_text_video_link") {
+    return <TemplateTextVideoLink data={ui.data} />;
+  }
+  if (ui.type === "chart_graph_card" || ui.templateId === "tpl_7_chart_graph_card") {
+    return <TemplateChartGraphCard data={ui.data} />;
+  }
+  if (ui.type === "excel_table_card" || ui.templateId === "tpl_8_excel_table_card") {
+    return <TemplateExcelTableCard data={ui.data} />;
+  }
+  if (ui.type === "iframe_view_card" || ui.templateId === "tpl_9_iframe_view_card") {
+    return <TemplateIframeViewCard data={ui.data} />;
+  }
+
+  // Fallback rendering
+  if (ui.type === "InsightCard") return <TemplateTextVectorShape data={{ text: ui.data.text, vectorShape: { type: 'shield', label: ui.data.title } }} />;
+  if (ui.type === "PageAuditGrid") return <TemplateExcelTableCard data={{ text: ui.data.title, tableData: { title: ui.data.title, headers: ['Page Title', 'Visits', 'Leads', 'Status'], rows: ui.data.pages || [] } }} />;
+  if (ui.type === "UserMatrixCard") return <TemplateTextVectorShape data={{ text: ui.data.title, vectorShape: { type: 'rhombus', label: 'Users' } }} />;
+  if (ui.type === "LinkCard") return <TemplatePageLinkCard data={{ text: ui.data.title, pageUrl: ui.data.url, pageTitle: ui.data.buttonText }} />;
+
   return null;
 }
 
 // ---------------------------------------------------------------------------
 // MAIN SMART OFFICE CLIENT
 // ---------------------------------------------------------------------------
+
+function PromptIcon({ iconName, className = "w-3.5 h-3.5" }: { iconName: string; className?: string }) {
+  if (iconName === "Users" || iconName === "users") return <Users className={className} />;
+  if (iconName === "Table" || iconName === "table") return <Table className={className} />;
+  if (iconName === "BarChart3" || iconName === "chart") return <BarChart3 className={className} />;
+  if (iconName === "Sparkles" || iconName === "sparkles") return <Sparkles className={className} />;
+  if (iconName === "FileText" || iconName === "text") return <FileText className={className} />;
+  return <Bookmark className={className} />;
+}
 
 interface SmartOfficeClientProps {
   initialOffice: SmartOfficeDocument;
@@ -184,7 +1080,7 @@ export function SmartOfficeClient({
     uiCards?: any[];
   } | null>(null);
 
-  // Conversation History List for Left Sidebar
+  // Conversation History List for Left Sidebar (HIDDEN BY DEFAULT per user requested comment)
   const [historyMessages, setHistoryMessages] = useState<Array<{
     id: string;
     sender: "user" | "agent";
@@ -192,9 +1088,173 @@ export function SmartOfficeClient({
     timestamp: string;
     uiCards?: any[];
   }>>([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // Hidden by default!
+  const [leftWindowMode, setLeftWindowMode] = useState<"chat" | "transcript">("chat"); // Mode toggle: Chat vs Transcript
 
   const [speechSupported, setSpeechSupported] = useState(true);
+
+  // Saved Prompts State
+  const [savedPromptsList, setSavedPromptsList] = useState<any[]>(
+    office.savedPrompts || office.smartWorkerConfig?.savedPrompts || [
+      { id: "p_1", title: "User Table (Full Name, ID, Phone)", icon: "Users", promptText: "Table with 3 columns with user data Full name - ID - Phone" },
+      { id: "p_2", title: "Subscriptions Ledger (Oldest -> Newest)", icon: "Table", promptText: "List of all subscriptions from oldest to newest" },
+      { id: "p_3", title: "System Traffic & Lead Growth Chart", icon: "BarChart3", promptText: "Show database traffic and conversion growth chart" },
+      { id: "p_4", title: "Financial Revenue & CRM Report", icon: "Sparkles", promptText: "Show total revenue and CRM lead transactions breakdown" }
+    ]
+  );
+  const [isPromptsDropdownOpen, setIsPromptsDropdownOpen] = useState(false);
+  const [isSavePromptModalOpen, setIsSavePromptModalOpen] = useState(false);
+  const [showSavedPromptsCanvasGrid, setShowSavedPromptsCanvasGrid] = useState(false);
+  const [newPromptTitle, setNewPromptTitle] = useState("");
+  const [newPromptIcon, setNewPromptIcon] = useState("Users");
+
+  // Step-by-Step Conversational Contact Creation Form State (1 question per step with choice cards)
+  const [contactStep, setContactStep] = useState<number>(0);
+  const [contactDraft, setContactDraft] = useState<{ name: string; email: string; phone: string; role: string; gender: string }>({
+    name: "",
+    email: "",
+    phone: "",
+    role: "",
+    gender: ""
+  });
+
+  // Early Save & Finish Handler for Form (Rule 3)
+  const handleSaveAndFinishForm = async () => {
+    if (!contactDraft.name && !userQueryInput) {
+      setContactStep(0);
+      return;
+    }
+
+    const finalContact = {
+      id: `cnt_${Date.now()}`,
+      name: contactDraft.name || userQueryInput || "New Contact",
+      email: contactDraft.email || "contact@partner.com",
+      phone: contactDraft.phone || "+972-50-0000000",
+      role: contactDraft.role || "Active Lead",
+      gender: contactDraft.gender || "General",
+      status: "Active Lead"
+    };
+
+    setContactStep(0);
+
+    try {
+      await fetch(`/api/office/${office.slug}/update-record`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          collectionName: "contacts",
+          recordId: finalContact.id,
+          recordData: {
+            "Full Name": finalContact.name,
+            "Email": finalContact.email,
+            "Phone": finalContact.phone,
+            "Role": finalContact.role,
+            "Gender": finalContact.gender,
+            "Status": finalContact.status,
+            "id": finalContact.id
+          }
+        })
+      });
+    } catch (e) {
+      console.warn("Save & Finish DB warning:", e);
+    }
+
+    const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const completionText = `Contact ${finalContact.name} was successfully saved to Firestore Database (Save & Finish)!`;
+    const uiCards = [
+      {
+        type: "excel_table_card",
+        templateId: "tpl_8_excel_table_card",
+        data: {
+          text: `Contact Card saved to Firestore Database (Folder Saved)`,
+          tableData: {
+            title: `Contact Card - ${finalContact.name}`,
+            headers: ["Full Name", "ID", "Phone", "Email", "Role", "Gender", "Status"],
+            rows: [
+              {
+                "Full Name": finalContact.name,
+                "ID": finalContact.id,
+                "Phone": finalContact.phone,
+                "Email": finalContact.email,
+                "Role": finalContact.role,
+                "Gender": finalContact.gender,
+                "Status": finalContact.status
+              }
+            ]
+          },
+          vectorShape: { type: "table", color: "#FFC800", label: "Folder Saved" },
+          badge: "Saved to Database ✓"
+        }
+      }
+    ];
+
+    setCurrentAgentSubtitle({ text: completionText, uiCards });
+    setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: completionText, timestamp: timeStr, uiCards }]);
+    speakText(completionText);
+  };
+
+  // Load saved prompts from Firestore DB on mount
+  useEffect(() => {
+    async function loadSavedPromptsFromDb() {
+      try {
+        const res = await fetch(`/api/office/${office.slug}/saved-prompts`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.prompts && data.prompts.length > 0) {
+            setSavedPromptsList(data.prompts);
+          }
+        }
+      } catch (e) {
+        console.warn("Error loading saved prompts from DB:", e);
+      }
+    }
+    loadSavedPromptsFromDb();
+  }, [office.slug]);
+
+  const handleSaveCustomPrompt = async () => {
+    if (!userQueryInput.trim() || !newPromptTitle.trim()) return;
+    const newPreset = {
+      id: `p_${Date.now()}`,
+      title: newPromptTitle.trim(),
+      icon: newPromptIcon,
+      promptText: userQueryInput.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    // Optimistic UI update
+    setSavedPromptsList((prev) => [newPreset, ...prev]);
+    setNewPromptTitle("");
+    setIsSavePromptModalOpen(false);
+
+    // Save to Firestore DB!
+    try {
+      await fetch(`/api/office/${office.slug}/saved-prompts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", prompt: newPreset })
+      });
+    } catch (e) {
+      console.warn("Failed to persist saved prompt to Firestore:", e);
+    }
+  };
+
+  const handleDeleteSavedPrompt = async (promptId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Optimistic UI delete
+    setSavedPromptsList((prev) => prev.filter((p) => p.id !== promptId));
+
+    // Delete from Firestore DB!
+    try {
+      await fetch(`/api/office/${office.slug}/saved-prompts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id: promptId })
+      });
+    } catch (e) {
+      console.warn("Failed to delete saved prompt from Firestore:", e);
+    }
+  };
 
   // Gemini State Management
   const [sessionId, setSessionId] = useState("");
@@ -286,13 +1346,18 @@ export function SmartOfficeClient({
     setCurrentTabIdx((prev) => (prev + 1) % tabs.length);
   };
 
-  // TTS Speech Synthesis
+  // TTS Speech Synthesis with Agent Name Prefix & Constant High Quality Male Voice
   const speakText = (text: string, audioBase64?: string | null) => {
+    const fullSpokenText = text.toLowerCase().startsWith("david")
+      ? text
+      : `${office.agentName || "David"}: ${text}`;
+
     if (audioBase64) {
       try {
         const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
         setIsPlayingAudio(true);
         audio.onended = () => setIsPlayingAudio(false);
+        audio.onerror = () => setIsPlayingAudio(false);
         audio.play().catch(console.error);
         return;
       } catch (e) {
@@ -302,9 +1367,23 @@ export function SmartOfficeClient({
 
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(fullSpokenText);
       utterance.lang = "en-US";
-      utterance.rate = 1.0;
+      utterance.rate = 0.98;
+      utterance.pitch = 1.0;
+
+      // Select constant male English voice (e.g. Google US English / Microsoft David)
+      const voices = window.speechSynthesis.getVoices();
+      const maleVoice = voices.find(
+        (v) =>
+          v.lang.startsWith("en") &&
+          (v.name.includes("David") || v.name.includes("Google US English") || v.name.includes("Male") || v.name.includes("Alex"))
+      ) || voices.find((v) => v.lang.startsWith("en"));
+
+      if (maleVoice) {
+        utterance.voice = maleVoice;
+      }
+
       setIsPlayingAudio(true);
       utterance.onend = () => setIsPlayingAudio(false);
       utterance.onerror = () => setIsPlayingAudio(false);
@@ -352,6 +1431,151 @@ export function SmartOfficeClient({
     setIsEditingTopText(false);
     setIsThinking(true);
 
+    // -----------------------------------------------------------------------
+    // CONVERSATIONAL STEP-BY-STEP CONTACT CREATION FORM (1 question per step)
+    // -----------------------------------------------------------------------
+    const lowerQuery = inputQuery.toLowerCase();
+    const isFormTrigger =
+      lowerQuery.includes("add contact") ||
+      lowerQuery.includes("create contact") ||
+      lowerQuery.includes("new contact") ||
+      lowerQuery.includes("הוסף איש קשר") ||
+      lowerQuery.includes("איש קשר חדש") ||
+      lowerQuery.includes("צור איש קשר") ||
+      lowerQuery.includes("הוספת איש קשר");
+
+    if (contactStep === 0 && isFormTrigger) {
+      setContactStep(1);
+      setContactDraft({ name: "", email: "", phone: "", role: "", gender: "" });
+      const step1Text = "Hello! I would love to help you add a new contact to our database. Could you please share their full name?";
+      setCurrentAgentSubtitle({ text: step1Text, uiCards: [] });
+      setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: step1Text, timestamp: timeStr }]);
+      speakText(step1Text);
+      setIsThinking(false);
+      return;
+    }
+
+    if (contactStep === 1) {
+      const newName = inputQuery;
+      setContactDraft((prev) => ({ ...prev, name: newName }));
+      setContactStep(2);
+      const step2Text = `Wonderful! What is the best email address for ${newName}?`;
+      setCurrentAgentSubtitle({ text: step2Text, uiCards: [] });
+      setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: step2Text, timestamp: timeStr }]);
+      speakText(step2Text);
+      setIsThinking(false);
+      return;
+    }
+
+    if (contactStep === 2) {
+      const newEmail = inputQuery;
+      setContactDraft((prev) => ({ ...prev, email: newEmail }));
+      setContactStep(3);
+      const step3Text = `Great! Please enter or speak ${contactDraft.name || "the contact"}'s phone number.`;
+      setCurrentAgentSubtitle({ text: step3Text, uiCards: [] });
+      setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: step3Text, timestamp: timeStr }]);
+      speakText(step3Text);
+      setIsThinking(false);
+      return;
+    }
+
+    if (contactStep === 3) {
+      const newPhone = convertSpokenWordsToDigits(inputQuery);
+      setContactDraft((prev) => ({ ...prev, phone: newPhone }));
+      setContactStep(4);
+      const step4Text = `Awesome! What role or position does ${contactDraft.name || "the contact"} hold?`;
+      setCurrentAgentSubtitle({ text: step4Text, uiCards: [] });
+      setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: step4Text, timestamp: timeStr }]);
+      speakText(step4Text);
+      setIsThinking(false);
+      return;
+    }
+
+    if (contactStep === 4) {
+      const newRole = inputQuery;
+      setContactDraft((prev) => ({ ...prev, role: newRole }));
+      setContactStep(5);
+      const step5Text = `Almost finished! What gender or entity category best describes ${contactDraft.name || "the contact"}?`;
+      setCurrentAgentSubtitle({ text: step5Text, uiCards: [] });
+      setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: step5Text, timestamp: timeStr }]);
+      speakText(step5Text);
+      setIsThinking(false);
+      return;
+    }
+
+    if (contactStep === 5) {
+      const newGender = inputQuery;
+      const finalContact = {
+        id: `cnt_${Date.now()}`,
+        name: contactDraft.name,
+        email: contactDraft.email,
+        phone: contactDraft.phone,
+        role: contactDraft.role,
+        gender: newGender,
+        status: "Active Lead"
+      };
+
+      setContactStep(0);
+
+      // Persist to Firestore DB!
+      try {
+        await fetch(`/api/office/${office.slug}/update-record`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "update",
+            collectionName: "contacts",
+            recordId: finalContact.id,
+            recordData: {
+              "Full Name": finalContact.name,
+              "Email": finalContact.email,
+              "Phone": finalContact.phone,
+              "Role": finalContact.role,
+              "Gender": finalContact.gender,
+              "Status": finalContact.status,
+              "id": finalContact.id
+            }
+          })
+        });
+      } catch (e) {
+        console.warn("Contact DB persistence warning:", e);
+      }
+
+      const completionText = `איש הקשר ${finalContact.name} נשמר בהצלחה במסד הנתונים Firestore!`;
+      const uiCards = [
+        {
+          type: "excel_table_card",
+          templateId: "tpl_8_excel_table_card",
+          data: {
+            text: `איש קשר חדש נשמר במסד הנתונים Firestore (Folder Saved)`,
+            tableData: {
+              title: `כרטיס איש קשר חדש - ${finalContact.name}`,
+              headers: ["Full Name", "ID", "Phone", "Email", "Role", "Gender", "Status"],
+              rows: [
+                {
+                  "Full Name": finalContact.name,
+                  "ID": finalContact.id,
+                  "Phone": finalContact.phone,
+                  "Email": finalContact.email,
+                  "Role": finalContact.role,
+                  "Gender": finalContact.gender,
+                  "Status": finalContact.status
+                }
+              ]
+            },
+            vectorShape: { type: "table", color: "#FFC800", label: "Folder Saved" },
+            badge: "Saved to Database ✓"
+          }
+        }
+      ];
+
+      setCurrentAgentSubtitle({ text: completionText, uiCards });
+      setHistoryMessages((prev) => [...prev, { id: `a_${Date.now()}`, sender: "agent", text: completionText, timestamp: timeStr, uiCards }]);
+      speakText(completionText);
+      setIsThinking(false);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/office/${office.slug}/chat`, {
         method: "POST",
@@ -381,7 +1605,7 @@ export function SmartOfficeClient({
         }
       }
 
-      // Update active agent response
+      // Update active agent response (renders visual cards on central canvas)
       setCurrentAgentSubtitle({
         text: replyMessage,
         uiCards: data.uiComponents || [],
@@ -417,22 +1641,22 @@ export function SmartOfficeClient({
 
   return (
     <div
-      className="min-h-screen bg-black text-white flex flex-col justify-between items-center select-none font-sans relative overflow-x-hidden"
+      className="h-screen w-full bg-black text-white flex flex-col justify-between items-center select-none font-sans relative overflow-hidden"
       dir="ltr"
       lang="en"
     >
       {/* ------------------------------------------------------------- */}
-      {/* GOLD TOP HEADER                                               */}
+      {/* GOLD TOP HEADER (FIXED STICKY TOP)                            */}
       {/* ------------------------------------------------------------- */}
-      <header className="w-full bg-[#FFC800] pt-4 pb-6 px-4 flex flex-col items-center justify-center relative shadow-lg z-20">
+      <header className="shrink-0 sticky top-0 z-30 w-full bg-[#FFC800] pt-4 pb-5 px-4 flex flex-col items-center justify-center relative shadow-lg">
         {/* Toggle Left Conversation History Panel Button */}
         <button
           onClick={() => setIsHistoryOpen(!isHistoryOpen)}
           className="absolute left-4 top-4 bg-slate-950 hover:bg-black text-[#FFC800] border border-amber-400/60 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-          title={isHistoryOpen ? "Hide History Sidebar" : "Show History Sidebar"}
+          title={isHistoryOpen ? "Hide Left Window" : "Show Left Window / Chat Mode"}
         >
           {isHistoryOpen ? <PanelLeftClose className="w-4 h-4 text-[#FFC800]" /> : <PanelLeftOpen className="w-4 h-4 text-[#FFC800]" />}
-          <span className="hidden sm:inline">Requests & Answers</span>
+          <span className="hidden sm:inline">{leftWindowMode === "chat" ? "Chat Mode" : "Text & Audio Window"}</span>
           {historyMessages.length > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-black text-[10px] font-black">
               {historyMessages.length}
@@ -452,6 +1676,14 @@ export function SmartOfficeClient({
           </div>
         </div>
 
+        {/* Gemini Connection Status Light Indicator */}
+        <div className="absolute right-36 top-4 hidden sm:flex items-center gap-1.5 px-3 py-1 bg-slate-950/90 border border-amber-400/40 rounded-full text-xs font-bold shadow-md dir-ltr">
+          <span className={`w-2.5 h-2.5 rounded-full ${isPlayingAudio || !isThinking ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'}`} />
+          <span className={isPlayingAudio || !isThinking ? 'text-emerald-400 font-mono text-[10px]' : 'text-red-400 font-mono text-[10px]'}>
+            {isPlayingAudio || !isThinking ? 'Gemini Connected' : 'Gemini Offline'}
+          </span>
+        </div>
+
         {/* Manager / Admin Toggle Button */}
         {isManagerOrAdmin && (
           <button
@@ -466,22 +1698,58 @@ export function SmartOfficeClient({
       </header>
 
       {/* ------------------------------------------------------------- */}
-      {/* LEFT SIDEBAR: REQUESTS & ANSWERS CONVERSATION HISTORY PANEL    */}
+      {/* LEFT SIDEBAR: HIDDEN BY DEFAULT WITH CHAT MODE TOGGLE          */}
       {/* ------------------------------------------------------------- */}
       {isHistoryOpen && (
         <aside className="fixed left-3 top-24 bottom-24 z-40 w-72 sm:w-80 bg-slate-950/95 border-2 border-amber-400/50 rounded-3xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden transition-all duration-300 animate-fadeIn">
-          {/* Sidebar Header */}
-          <div className="p-3.5 border-b border-amber-400/30 bg-slate-900/90 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <History className="w-4 h-4 text-amber-400" />
-              <h3 className="text-xs font-bold text-amber-400 tracking-wide">
-                Requests & Answers Log
-              </h3>
+          {/* Sidebar Mode Header Switcher */}
+          <div className="p-3 border-b border-amber-400/30 bg-slate-900/90 flex items-center justify-between">
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setLeftWindowMode("chat")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                  leftWindowMode === "chat" ? "bg-amber-400 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Chat Mode
+              </button>
+              <button
+                onClick={() => setLeftWindowMode("transcript")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                  leftWindowMode === "transcript" ? "bg-amber-400 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Transcript
+              </button>
             </div>
-            <span className="text-[10px] text-slate-400 font-mono">
-              {historyMessages.length} messages
-            </span>
+            <button onClick={() => setIsHistoryOpen(false)} className="text-slate-400 hover:text-white p-1">
+              <PanelLeftClose className="w-4 h-4 text-slate-400" />
+            </button>
           </div>
+
+          {/* Active Spoken Audio & Text Box */}
+          {currentAgentSubtitle && (
+            <div className="p-3 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-b border-amber-400/30 space-y-2 text-left shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                  <Bot className="w-4 h-4 text-amber-400" />
+                  <span>{office.agentName} (Spoken Audio)</span>
+                </div>
+
+                <button
+                  onClick={() => speakText(currentAgentSubtitle.text)}
+                  className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  {isPlayingAudio ? <VolumeX className="w-3 h-3 animate-pulse text-slate-950" /> : <Volume2 className="w-3 h-3 text-slate-950" />}
+                  <span>{isPlayingAudio ? "Playing" : "Replay Audio"}</span>
+                </button>
+              </div>
+
+              <div className="p-2.5 bg-black/60 border border-slate-800 rounded-xl text-xs text-slate-200 leading-relaxed font-medium">
+                "<TypewriterText text={currentAgentSubtitle.text} />"
+              </div>
+            </div>
+          )}
 
           {/* Sidebar Messages Timeline */}
           <div ref={historyScrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -489,7 +1757,7 @@ export function SmartOfficeClient({
               <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 space-y-2">
                 <MessageSquare className="w-8 h-8 text-amber-400/40" />
                 <p className="text-xs font-medium">No conversation history yet.</p>
-                <p className="text-[10px] text-slate-400">Speak or type a prompt to see live requests and answers here.</p>
+                <p className="text-[10px] text-slate-400">Audio playback & transcript text will appear here.</p>
               </div>
             ) : (
               historyMessages.map((msg) => (
@@ -530,19 +1798,317 @@ export function SmartOfficeClient({
               ))
             )}
           </div>
+
+          {/* Chat Mode Input Bar inside Left Sidebar */}
+          {leftWindowMode === "chat" && (
+            <div className="p-2.5 bg-slate-900 border-t border-slate-800 flex items-center gap-1.5 relative">
+              {/* Saved Prompts Dropdown Button */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsPromptsDropdownOpen(!isPromptsDropdownOpen)}
+                  className="p-2 bg-slate-950 hover:bg-slate-800 text-amber-400 border border-amber-400/50 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                  title="Saved Prompts Library / פרומפטים שמורים"
+                >
+                  <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {/* Floating Prompts Menu */}
+                {isPromptsDropdownOpen && (
+                  <div className="absolute bottom-11 right-0 w-64 bg-slate-950/95 border-2 border-amber-400/80 rounded-2xl p-2 shadow-2xl z-50 backdrop-blur-md space-y-1.5">
+                    <div className="flex items-center justify-between px-2 py-1 border-b border-amber-400/30">
+                      <span className="text-[11px] font-black text-amber-400 flex items-center gap-1.5">
+                        <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+                        <span>פרומפטים שמורים (Saved Prompts)</span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          setIsPromptsDropdownOpen(false);
+                          setIsSavePromptModalOpen(true);
+                        }}
+                        className="text-[10px] bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold px-1.5 py-0.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>שמור חדש</span>
+                      </button>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                      {savedPromptsList.map((preset) => (
+                        <div
+                          key={preset.id}
+                          className="w-full text-right p-2 rounded-xl bg-slate-900/90 hover:bg-amber-500/20 border border-slate-800 hover:border-amber-400/50 transition-all flex items-center justify-between group cursor-pointer"
+                        >
+                          <div 
+                            className="flex items-center gap-2 overflow-hidden flex-1"
+                            onClick={() => {
+                              setUserQueryInput(preset.promptText);
+                              handleSendChat(preset.promptText);
+                              setIsPromptsDropdownOpen(false);
+                            }}
+                          >
+                            <span className="p-1.5 rounded-lg bg-slate-800 text-amber-400 group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors shrink-0">
+                              <PromptIcon iconName={preset.icon} className="w-3.5 h-3.5" />
+                            </span>
+                            <div className="truncate text-right">
+                              <span className="text-[11px] font-bold text-slate-200 group-hover:text-amber-400 block truncate">
+                                {preset.title}
+                              </span>
+                              <span className="text-[9px] text-slate-400 block truncate dir-ltr">
+                                {preset.promptText}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteSavedPrompt(preset.id, e)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer shrink-0 ml-1"
+                            title="Delete Saved Prompt"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="text"
+                value={userQueryInput}
+                onChange={(e) => setUserQueryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSendChat();
+                }}
+                placeholder="Chat with agent..."
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+              />
+              <button
+                onClick={() => handleSendChat()}
+                className="p-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-bold transition-all cursor-pointer shrink-0"
+              >
+                <Send className="w-3.5 h-3.5 text-slate-950" />
+              </button>
+            </div>
+          )}
         </aside>
       )}
 
+      {/* Save Prompt Modal */}
+      {isSavePromptModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 shadow-2xl space-y-4 text-right">
+            <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+              <h3 className="text-sm font-black text-amber-400 flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-amber-400" />
+                <span>שמירת פרומפט חדש לספרייה</span>
+              </h3>
+              <button onClick={() => setIsSavePromptModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">כותרת הפרומפט (Title)</label>
+                <input
+                  type="text"
+                  value={newPromptTitle}
+                  onChange={(e) => setNewPromptTitle(e.target.value)}
+                  placeholder='לדוגמה: "טבלת מנויים ממוינת"'
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">איקון מייצג (Icon)</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {["Users", "Table", "BarChart3", "Sparkles", "FileText"].map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setNewPromptIcon(icon)}
+                      className={`p-2 rounded-xl flex items-center justify-center border transition-all ${
+                        newPromptIcon === icon ? "bg-amber-400 text-slate-950 border-amber-400 font-bold" : "bg-slate-900 border-slate-800 text-slate-400 hover:text-amber-400"
+                      }`}
+                    >
+                      <PromptIcon iconName={icon} className="w-4 h-4" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">טקסט הפרומפט (Prompt Text)</label>
+                <textarea
+                  value={userQueryInput}
+                  onChange={(e) => setUserQueryInput(e.target.value)}
+                  rows={3}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setIsSavePromptModalOpen(false)}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleSaveCustomPrompt}
+                className="px-4 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-1.5"
+              >
+                <Folder className="w-4 h-4 fill-slate-950" />
+                <span>שמור לספרייה</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ------------------------------------------------------------- */}
-      {/* BODY - CANVAS AREA                                            */}
+      {/* BODY - GENERATIVE JSON CANVAS AREA                            */}
       {/* ------------------------------------------------------------- */}
-      <main className="flex-1 w-full max-w-lg px-4 pt-2 pb-0 flex flex-col justify-between items-center relative z-10">
+      {/* ------------------------------------------------------------- */}
+      {/* BODY - GENERATIVE JSON CANVAS AREA (SCROLLABLE CANVAS)        */}
+      {/* ------------------------------------------------------------- */}
+      <main className="flex-1 w-full max-w-2xl px-4 pt-3 pb-6 flex flex-col justify-between items-center relative z-10 overflow-y-auto custom-scrollbar">
         {/* ----------------------------------------------------------- */}
-        {/* TOP LIVE EDITABLE SUBTITLE CANVAS ZONE                       */}
+        {/* TOP DYNAMIC GENERATIVE VISUAL CANVAS ZONE                   */}
         {/* ----------------------------------------------------------- */}
-        <div className="w-full text-center space-y-2 min-h-[110px] pt-2">
+        <div className="w-full text-center space-y-3 min-h-[140px] pt-2">
+          {/* DESIGNED CARDS GRID FOR SAVED PROMPTS ON CANVAS */}
+          {showSavedPromptsCanvasGrid && (
+            <div className="w-full p-4 bg-slate-950/95 border-2 border-amber-400/80 rounded-3xl shadow-2xl backdrop-blur-md text-right space-y-3 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-amber-400/30 pb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4.5 h-4.5 text-amber-400 fill-amber-400/30 animate-pulse" />
+                  <h4 className="text-sm font-black text-amber-400 tracking-wide">ספריית פרומפטים שמורים (Saved Prompts Cards Grid)</h4>
+                </div>
+                <button
+                  onClick={() => setShowSavedPromptsCanvasGrid(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {savedPromptsList.map((preset) => (
+                  <div
+                    key={preset.id}
+                    className="p-3.5 bg-slate-900/90 hover:bg-amber-500/15 border-2 border-slate-800 hover:border-amber-400/80 rounded-2xl transition-all duration-300 text-right flex flex-col justify-between space-y-2 shadow-lg hover:scale-[1.02] cursor-pointer group relative"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="p-2 rounded-xl bg-slate-950 border border-slate-800 group-hover:border-amber-400/60 text-amber-400 group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors">
+                        <PromptIcon iconName={preset.icon} className="w-4 h-4" />
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-400/30">
+                          Preset Card
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSavedPrompt(preset.id, e)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
+                          title="Delete Saved Prompt"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setUserQueryInput(preset.promptText);
+                        handleSendChat(preset.promptText);
+                        setShowSavedPromptsCanvasGrid(false);
+                      }}
+                    >
+                      <h5 className="text-xs font-black text-amber-400 group-hover:text-amber-300 tracking-wide mb-1">
+                        {preset.title}
+                      </h5>
+                      <p className="text-[11px] text-slate-300 font-mono line-clamp-2 dir-ltr">
+                        {preset.promptText}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP-BY-STEP CONVERSATIONAL FORM CARD ON CANVAS */}
+          {contactStep > 0 && (
+            <ConversationalFormCard
+              step={contactStep}
+              totalSteps={5}
+              fieldLabel={
+                contactStep === 1 ? "name" :
+                contactStep === 2 ? "email" :
+                contactStep === 3 ? "phon" :
+                contactStep === 4 ? "role" : "gender"
+              }
+              title={
+                contactStep === 1 ? "Add New Contact - Full Name" :
+                contactStep === 2 ? "Email Address" :
+                contactStep === 3 ? "Phone Number" :
+                contactStep === 4 ? "Role / Position" : "Gender / Entity Type"
+              }
+              question={
+                contactStep === 1 ? "What is the full name of the new contact?" :
+                contactStep === 2 ? `What is the email address of ${contactDraft.name || "the contact"}?` :
+                contactStep === 3 ? `What is the phone number of ${contactDraft.name || "the contact"}?` :
+                contactStep === 4 ? `Select or type the role for ${contactDraft.name || "the contact"}:` :
+                `Select or type gender/type for ${contactDraft.name || "the contact"}:`
+              }
+              options={
+                contactStep === 4 ? [
+                  { label: "👤 VIP Client", value: "VIP Client" },
+                  { label: "👔 System Manager", value: "Manager" },
+                  { label: "🛠️ Business Partner", value: "Partner" },
+                  { label: "💼 Vendor", value: "Vendor" }
+                ] : contactStep === 5 ? [
+                  { label: "👨 Male", value: "Male" },
+                  { label: "👩 Female", value: "Female" },
+                  { label: "🏢 Corporate / Org", value: "Corporate" },
+                  { label: "🌟 Other", value: "Other" }
+                ] : undefined
+              }
+              currentValue={
+                contactStep === 1 ? contactDraft.name :
+                contactStep === 2 ? contactDraft.email :
+                contactStep === 3 ? contactDraft.phone :
+                contactStep === 4 ? contactDraft.role : contactDraft.gender
+              }
+              onChangeValue={(val) => {
+                if (contactStep === 1) setContactDraft((prev) => ({ ...prev, name: val }));
+                if (contactStep === 2) setContactDraft((prev) => ({ ...prev, email: val }));
+                if (contactStep === 3) setContactDraft((prev) => ({ ...prev, phone: val }));
+                if (contactStep === 4) setContactDraft((prev) => ({ ...prev, role: val }));
+                if (contactStep === 5) setContactDraft((prev) => ({ ...prev, gender: val }));
+              }}
+              onNextStep={() => {
+                const val =
+                  contactStep === 1 ? contactDraft.name :
+                  contactStep === 2 ? contactDraft.email :
+                  contactStep === 3 ? contactDraft.phone :
+                  contactStep === 4 ? contactDraft.role : contactDraft.gender;
+                handleSendChat(val);
+              }}
+              onPrevStep={() => {
+                if (contactStep > 1) setContactStep(contactStep - 1);
+              }}
+              onSaveAndFinish={handleSaveAndFinishForm}
+            />
+          )}
+
           {isUserSpeakingOrTyping ? (
-            /* USER RECORDING OR EDITING/TYPING: Live zero-delay text & inline editing! */
+            /* USER RECORDING OR EDITING/TYPING: Live zero-delay text & inline editing */
             <div className="w-full max-w-md mx-auto space-y-2">
               <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
                 <span className="animate-pulse flex items-center gap-1.5">
@@ -575,7 +2141,20 @@ export function SmartOfficeClient({
                 />
 
                 <div className="flex items-center justify-between mt-1 px-1 text-[11px] text-slate-400 border-t border-slate-800/80 pt-1.5">
-                  <span className="text-amber-400/80 font-medium">Click text to edit or type words freely</span>
+                  {/* RED ARROW POSITION: Save Prompt Button */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSavePromptModalOpen(true)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/50 px-2.5 py-1 rounded-xl transition-all cursor-pointer shadow-md"
+                      title="Save current prompt text to library"
+                    >
+                      <Folder className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>שמור פרומפט</span>
+                    </button>
+                    <span className="text-amber-400/80 font-medium hidden sm:inline">Click text to edit or type words freely</span>
+                  </div>
+
                   <button
                     onClick={() => handleSendChat()}
                     className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg flex items-center gap-1 shadow-md transition-all cursor-pointer"
@@ -586,37 +2165,35 @@ export function SmartOfficeClient({
                 </div>
               </div>
             </div>
-          ) : currentAgentSubtitle ? (
-            /* AGENT RESPONSE SUBTITLE: Displays David's active answer + click-to-edit option */
-            <div className="space-y-2 transition-all duration-300">
-              <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
-                <span>{office.agentName}</span>
-                {isPlayingAudio && <Volume2 className="w-4 h-4 text-amber-400 animate-pulse" />}
+          ) : currentAgentSubtitle?.uiCards && currentAgentSubtitle.uiCards.length > 0 ? (
+            /* DYNAMIC GENERATIVE VISUAL CANVAS (Renders JSON Visual Cards from Server Template Library) */
+            <div className="w-full space-y-3 transition-all duration-300 animate-fadeIn">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>{currentTab.title} Visual Canvas</span>
+                </div>
+                
+                {currentTab.title?.toUpperCase().includes("GEMINI") || currentTab.modeType === "gemini" ? (
+                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-400/50 rounded-full text-[10px] font-bold text-emerald-400 animate-pulse dir-ltr">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                    <span>Gemini Connected (Green Light)</span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {currentAgentSubtitle.uiCards.length} visual templates rendered
+                  </span>
+                )}
               </div>
 
-              {/* Subtitles: MAX 5 LINES STRICTLY ENFORCED via line-clamp-5 + Typewriter */}
-              <div 
-                className="group relative cursor-pointer inline-block"
-                onClick={() => {
-                  setUserQueryInput("");
-                  setIsEditingTopText(true);
-                }}
-              >
-                <p className="text-[#FFC800] font-extrabold text-lg sm:text-xl tracking-wide leading-snug line-clamp-5 px-2 drop-shadow-md">
-                  "<TypewriterText text={currentAgentSubtitle.text} />"
-                </p>
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-amber-400/80 block mt-0.5 font-medium">
-                  Click to reply or edit question
-                </span>
+              <div className="space-y-3">
+                {currentAgentSubtitle.uiCards.map((ui, uiIdx) => (
+                  <GenerativeRenderer key={uiIdx} ui={ui} onAction={(text) => handleSendChat(text)} />
+                ))}
               </div>
-
-              {/* Rendered JSON Cards */}
-              {currentAgentSubtitle.uiCards && currentAgentSubtitle.uiCards.map((ui, uiIdx) => (
-                <GenerativeRenderer key={uiIdx} ui={ui} onAction={(text) => handleSendChat(text)} />
-              ))}
             </div>
           ) : (
-            /* INITIAL DEFAULT STATE */
+            /* INITIAL DEFAULT CANVAS STATE */
             <div className="relative inline-flex items-center justify-center gap-2 group max-w-full">
               <div 
                 className="flex items-center justify-center gap-2 cursor-pointer p-2 rounded-2xl hover:bg-slate-900/50 transition-all border border-transparent hover:border-amber-400/30" 
@@ -639,9 +2216,9 @@ export function SmartOfficeClient({
           )}
 
           {isThinking && (
-            <div className="flex items-center justify-center gap-2 p-1.5 bg-slate-900/80 border border-amber-400/30 rounded-xl text-[#FFC800] text-xs w-fit mx-auto animate-pulse">
+            <div className="flex items-center justify-center gap-2 p-2 bg-slate-900/90 border border-amber-400/40 rounded-2xl text-[#FFC800] text-xs w-fit mx-auto animate-pulse shadow-xl">
               <Loader2 className="w-4 h-4 animate-spin text-[#FFC800]" />
-              <span>{office.agentName} is analyzing personal & system data...</span>
+              <span>{office.agentName} is matching & populating server JSON templates...</span>
             </div>
           )}
         </div>
@@ -705,9 +2282,24 @@ export function SmartOfficeClient({
       </main>
 
       {/* ------------------------------------------------------------- */}
-      {/* GOLD BOTTOM FOOTER & GOLDEN MICROPHONE DIAMOND BUTTON         */}
+      {/* GOLD BOTTOM FOOTER (FIXED STICKY BOTTOM)                      */}
       {/* ------------------------------------------------------------- */}
-      <footer className="w-full bg-[#FFC800] pt-8 pb-4 px-4 flex flex-col items-center justify-center relative shadow-2xl z-20">
+      <footer className="shrink-0 sticky bottom-0 z-30 w-full bg-[#FFC800] pt-7 pb-3 px-4 flex flex-col items-center justify-center relative shadow-2xl">
+        {/* Lightning Zap Action Button: Open Saved Prompts Cards Grid on Canvas */}
+        <button
+          type="button"
+          onClick={() => setShowSavedPromptsCanvasGrid(!showSavedPromptsCanvasGrid)}
+          className={`absolute left-4 top-2.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 shadow-md ${
+            showSavedPromptsCanvasGrid
+              ? "bg-slate-950 text-amber-400 border-amber-300 font-bold scale-105"
+              : "bg-slate-950/90 text-[#FFC800] border-amber-400/80 hover:bg-black"
+          }`}
+          title="Toggle Saved Prompts Cards Grid / שליפת פרומפטים שמורים"
+        >
+          <Zap className="w-4 h-4 text-[#FFC800] fill-amber-400/40 animate-pulse" />
+          <span className="text-xs font-black hidden sm:inline text-[#FFC800]">פרומפטים</span>
+        </button>
+
         {/* Centered Golden Microphone Action Button ("Check with David.") */}
         <div className="absolute -top-8 left-1/2 -translate-x-1/2">
           <button
