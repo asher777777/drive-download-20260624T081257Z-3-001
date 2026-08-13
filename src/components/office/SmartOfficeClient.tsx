@@ -1382,12 +1382,24 @@ export function SmartOfficeClient({
     loadSavedPromptsFromDb();
   }, [office.slug]);
 
+  const [saveToastMessage, setSaveToastMessage] = useState("");
+
   const handleSaveCustomPrompt = async () => {
-    if (!userQueryInput.trim() || !newPromptTitle.trim()) return;
+    if (!userQueryInput.trim()) {
+      alert("אנא הקלד או הקלט פרומפט לפני השמירה");
+      return;
+    }
+
+    const generatedTitle =
+      newPromptTitle.trim() ||
+      (userQueryInput.trim().length > 25
+        ? userQueryInput.trim().slice(0, 25) + "..."
+        : userQueryInput.trim());
+
     const newPreset = {
       id: `p_${Date.now()}`,
-      title: newPromptTitle.trim(),
-      icon: newPromptIcon,
+      title: generatedTitle,
+      icon: newPromptIcon || "Table",
       promptText: userQueryInput.trim(),
       createdAt: new Date().toISOString()
     };
@@ -1396,6 +1408,10 @@ export function SmartOfficeClient({
     setSavedPromptsList((prev) => [newPreset, ...prev]);
     setNewPromptTitle("");
     setIsSavePromptModalOpen(false);
+
+    // Instant Visual Feedback Toast
+    setSaveToastMessage("✓ הפרומפט נשמר בהצלחה לספרייה!");
+    setTimeout(() => setSaveToastMessage(""), 3500);
 
     // Save to Firestore DB!
     try {
@@ -2300,61 +2316,85 @@ export function SmartOfficeClient({
           )}
 
           {isUserSpeakingOrTyping ? (
-            /* USER RECORDING OR EDITING/TYPING: Live zero-delay text & inline editing */
-            <div className="w-full max-w-md mx-auto space-y-2">
-              <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
-                <span className="animate-pulse flex items-center gap-1.5">
-                  {isRecording ? (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                      <span>Live Speech Acquisition...</span>
-                    </>
-                  ) : (
-                    <span>Edit / Add Words:</span>
-                  )}
-                </span>
-              </div>
-
-              {/* Interactive Live Editable Subtitle Text Box */}
-              <div className="relative group bg-slate-950/90 border-2 border-amber-400/70 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md">
-                <textarea
-                  ref={topTextareaRef}
-                  value={userQueryInput}
-                  onChange={(e) => setUserQueryInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendChat();
-                    }
-                  }}
-                  placeholder={isRecording ? "Listening to your voice..." : "Type or speak your prompt..."}
-                  rows={3}
-                  className="w-full bg-transparent text-[#FFC800] font-extrabold text-lg sm:text-xl text-center focus:outline-none resize-none leading-snug tracking-wide"
-                />
-
-                <div className="flex items-center justify-between mt-1 px-1 text-[11px] text-slate-400 border-t border-slate-800/80 pt-1.5">
-                  {/* RED ARROW POSITION: Save Prompt Button */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsSavePromptModalOpen(true)}
-                      className="flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/50 px-2.5 py-1 rounded-xl transition-all cursor-pointer shadow-md"
-                      title="Save current prompt text to library"
-                    >
-                      <Folder className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <span>שמור פרומפט</span>
-                    </button>
-                    <span className="text-amber-400/80 font-medium hidden sm:inline">Click text to edit or type words freely</span>
+            /* NEW GOLDEN CIRCULAR PROMPT INPUT CARD (Exact match to User's Right-hand Diagram) */
+            <div className="w-full flex flex-col items-center justify-center my-3 relative animate-fadeIn">
+              {/* Main Golden Circle Canvas */}
+              <div className="w-[320px] sm:w-[360px] h-[320px] sm:h-[360px] rounded-full bg-[#14120C] border-4 border-[#D4AF37]/80 shadow-[0_0_60px_rgba(212,175,55,0.35)] flex flex-col items-center justify-between p-6 relative mx-auto overflow-hidden backdrop-blur-2xl transition-all duration-300">
+                
+                {/* TOP: Bookmark Badge inside double golden circle */}
+                <div className="pt-2 z-10 flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] shadow-[0_0_15px_rgba(212,175,55,0.4)]">
+                    <div className="w-8 h-8 rounded-full border border-[#D4AF37]/60 flex items-center justify-center">
+                      <Bookmark className="w-4 h-4 fill-[#FFC800] text-[#FFC800]" />
+                    </div>
                   </div>
+                </div>
 
+                {/* CENTER: Dark Rectangular Input Frame */}
+                <div className="w-full flex flex-col items-center justify-center relative my-auto px-4 z-10">
+                  <div className="w-full bg-[#0A0906] border-2 border-[#D4AF37]/70 rounded-xl p-3 shadow-inner">
+                    <textarea
+                      ref={topTextareaRef}
+                      value={userQueryInput}
+                      onChange={(e) => setUserQueryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendChat();
+                        }
+                      }}
+                      placeholder={isRecording ? "Listening to your voice..." : "Type or speak your needs..."}
+                      rows={3}
+                      className="w-full bg-transparent text-[#FFC800] font-extrabold text-base sm:text-lg text-center focus:outline-none resize-none leading-snug tracking-wide placeholder:text-slate-500"
+                    />
+                  </div>
+                  {saveToastMessage && (
+                    <span className="text-emerald-400 text-xs font-bold animate-pulse font-mono block mt-1">
+                      {saveToastMessage}
+                    </span>
+                  )}
+                </div>
+
+                {/* BOTTOM CENTER: Large Golden Triangular Play Button */}
+                <div className="pb-3 z-10 flex items-center justify-center">
                   <button
+                    type="button"
                     onClick={() => handleSendChat()}
-                    className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg flex items-center gap-1 shadow-md transition-all cursor-pointer"
+                    className="w-14 h-14 rounded-full border-2 border-[#D4AF37] bg-slate-950/90 flex items-center justify-center text-[#FFC800] hover:scale-110 active:scale-95 transition-all shadow-[0_0_25px_rgba(212,175,55,0.5)] cursor-pointer group"
+                    title="Send Prompt / Run Request"
                   >
-                    <span>Send</span>
-                    <Send className="w-3 h-3 text-slate-950" />
+                    <svg className="w-7 h-7 text-[#FFC800] fill-[#FFC800] group-hover:scale-110 transition-transform ml-1" viewBox="0 0 24 24">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
                   </button>
                 </div>
+              </div>
+
+              {/* OUTSIDE THE CIRCLE (LEFT & RIGHT CONTROLS FROM DIAGRAM) */}
+              <div className="w-[320px] sm:w-[360px] flex items-center justify-between px-2 -mt-10 relative z-20 pointer-events-auto">
+                {/* BOTTOM-LEFT: Folder Pin Badge (Save Prompt) */}
+                <button
+                  type="button"
+                  onClick={handleSaveCustomPrompt}
+                  className="w-12 h-12 rounded-full border-2 border-[#FFC800] bg-[#14120C] flex items-center justify-center text-[#FFC800] hover:scale-115 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,200,0,0.4)] cursor-pointer"
+                  title="Save Prompt to Library (Folder Badge)"
+                >
+                  <Folder className="w-5 h-5 text-[#FFC800] fill-[#FFC800]" />
+                </button>
+
+                {/* BOTTOM-RIGHT: Information (i) Badge */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const guideText = "Type or speak your needs in the box, then click the golden play button to run your request.";
+                    setCurrentAgentSubtitle({ text: guideText, uiCards: [] });
+                    speakText(guideText);
+                  }}
+                  className="w-12 h-12 rounded-full border-2 border-[#FFC800] bg-[#14120C] flex items-center justify-center font-serif text-xl font-black text-[#FFC800] italic shadow-[0_0_20px_rgba(255,200,0,0.4)] hover:scale-115 active:scale-95 transition-all cursor-pointer"
+                  title="David Explains How to Use Prompt Box"
+                >
+                  i
+                </button>
               </div>
             </div>
           ) : currentAgentSubtitle?.uiCards && currentAgentSubtitle.uiCards.length > 0 ? (

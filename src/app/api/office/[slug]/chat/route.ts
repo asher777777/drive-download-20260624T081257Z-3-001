@@ -528,16 +528,16 @@ function generateDeepDatabaseReply(
 
   let spokenText = "";
 
-  if (q.match(/contact|moti|card|lead|person|profile|איש קשר|אנשי קשר|כרטיס/)) {
-    const contactItem = dbData.contactsSummary?.items?.[0] || { name: "Unknown", email: "-", phone: "-", role: "-", status: "-" };
-    spokenText = `Contact Card for ${contactItem.name} (${contactItem.email}, ${contactItem.phone}): ${contactItem.role}, Status: ${contactItem.status || "Active"}.`;
-  } else if (q.match(/sub|order|billing|plan|מנוי|רכישות|הזמנות/)) {
+  if (q.match(/page|pages|viewer|viewers|view|views|traffic|visit|visits|landing|event|post|service|עמוד|דף|צפיות/)) {
+    spokenText = `System pages database table: ${pages.totalPages} total pages tracked with ${pages.totalPageViews.toLocaleString()} total visits and ${pages.totalConversions} leads.`;
+  } else if (q.match(/\b(contact|contacts|moti|card|person|profile|איש קשר|אנשי קשר|כרטיס)\b/)) {
+    const contactItem = dbData.contactsSummary?.items?.[0] || { name: "Contact Record", email: "-", phone: "-", role: "-", status: "-" };
+    spokenText = `Contact details for ${contactItem.name}: Role: ${contactItem.role}, Status: ${contactItem.status || "Active"}.`;
+  } else if (q.match(/\b(sub|subscription|subscriptions|order|orders|billing|plan|מנוי|מנויים|רכישות|הזמנות)\b/)) {
     const subCount = dbData.subscriptionsSummary?.totalSubscriptions || 0;
     spokenText = `Found ${subCount} subscriptions.`;
-  } else if (q.match(/user|member|role|admin|client|משתמש/)) {
+  } else if (q.match(/\b(user|users|member|members|registered|role|admin|manager|client|משתמש|משתמשים)\b/)) {
     spokenText = `Tracks ${users.totalUsers} registered members: ${users.adminsCount} Admins, ${users.managersCount} Managers, and ${users.clientsCount} Clients.`;
-  } else if (q.match(/page|landing|event|post|service|traffic|visit|עמוד|דף/)) {
-    spokenText = `${pages.totalPages} total pages registered with ${pages.totalPageViews.toLocaleString()} visits and ${pages.totalConversions} leads.`;
   } else if (q.match(/revenue|money|sale|income|transaction|הכנסות|כסף/)) {
     spokenText = `Total revenue is ₪${crm.totalRevenueILS.toLocaleString()} across ${crm.paidTransactionsCount} paid orders averaging ₪${crm.avgOrderValueILS.toLocaleString()} per order.`;
   } else {
