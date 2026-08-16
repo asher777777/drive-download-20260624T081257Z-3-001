@@ -49,6 +49,8 @@ interface CRMSummary {
 
 interface DeepDatabaseSnapshot {
   configuredSystemPrompt: string;
+  configuredModel: string;
+  configuredApiKey: string;
   ttsVoiceId: string;
   toneStyle: string;
   allowedCollections: string[];
@@ -143,6 +145,8 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
   const effectiveUserId = userId && userId !== "anonymous" ? userId : "david_user_001";
 
   let configuredSystemPrompt = "";
+  let configuredModel = "gemini-2.5-flash";
+  let configuredApiKey = "";
   let ttsVoiceId = "en-US-Studio-O";
   let toneStyle = "Professional";
   let allowedCollections: string[] = [...DEFAULT_ALLOWED];
@@ -154,12 +158,17 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
       const oData = officeDoc.data();
       if (oData?.smartWorkerConfig) {
         configuredSystemPrompt = oData.smartWorkerConfig.systemPrompt || "";
+        configuredModel = oData.smartWorkerConfig.geminiModel || oData.smartWorkerConfig.gemini_model || "gemini-2.5-flash";
+        configuredApiKey = oData.smartWorkerConfig.geminiApiKey || oData.smartWorkerConfig.api_key || oData.geminiApiKey || "";
         ttsVoiceId = oData.smartWorkerConfig.tts_voice_id || ttsVoiceId;
         toneStyle = oData.smartWorkerConfig.tone_style || toneStyle;
         bypassGeminiDirectDb = Boolean(oData.smartWorkerConfig.bypass_gemini_direct_db);
         if (Array.isArray(oData.smartWorkerConfig.allowed_collections) && oData.smartWorkerConfig.allowed_collections.length > 0) {
           allowedCollections = oData.smartWorkerConfig.allowed_collections;
         }
+      } else if (oData) {
+        configuredModel = oData.geminiModel || "gemini-2.5-flash";
+        configuredApiKey = oData.geminiApiKey || "";
       }
     }
   } catch (e: any) {
@@ -423,6 +432,8 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
 
   return {
     configuredSystemPrompt,
+    configuredModel,
+    configuredApiKey,
     ttsVoiceId,
     toneStyle,
     allowedCollections,
@@ -460,12 +471,29 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
 }
 
 // Generate Gemini AI Structured Response
-async function generateGeminiResponse(prompt: string): Promise<string> {
+async function generateGeminiResponse(
+  prompt: string,
+  targetModel?: string,
+  customApiKey?: string
+): Promise<{ text: string; usedModel: string }> {
   const oauthToken = await getGoogleOAuth2Token();
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiKey = customApiKey || process.env.GEMINI_API_KEY;
+
+  const candidateModels = Array.from(new Set([
+    targetModel,
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.1-pro",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash-exp"
+  ].filter(Boolean))) as string[];
 
   if (oauthToken) {
-    const candidateModels = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-2.5-flash"];
     for (const model of candidateModels) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -484,7 +512,7 @@ async function generateGeminiResponse(prompt: string): Promise<string> {
         if (res.ok) {
           const data = await res.json();
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text?.trim()) return text.trim();
+          if (text?.trim()) return { text: text.trim(), usedModel: model };
         } else {
            console.warn(`OAuth call for ${model} failed with status: ${res.status} ${res.statusText}`);
         }
@@ -497,10 +525,10 @@ async function generateGeminiResponse(prompt: string): Promise<string> {
   if (geminiKey && !geminiKey.startsWith("AQ.")) {
     try {
       const aiKey = new GoogleGenAI({ apiKey: geminiKey });
-      for (const modelName of ["gemini-1.5-flash-latest", "gemini-1.5-pro"]) {
+      for (const modelName of candidateModels) {
         try {
           const res = await aiKey.models.generateContent({ model: modelName, contents: prompt });
-          if (res.text?.trim()) return res.text.trim();
+          if (res.text?.trim()) return { text: res.text.trim(), usedModel: modelName };
         } catch (e: any) {
           console.warn(`APIKey call for ${modelName} failed:`, e?.message);
         }
@@ -510,7 +538,7 @@ async function generateGeminiResponse(prompt: string): Promise<string> {
     }
   }
 
-  return "";
+  return { text: "", usedModel: targetModel || "gemini-1.5-flash" };
 }
 
 // DYNAMIC DEEP DATABASE RESPONSE ENGINE (Fallback Structured UI Generator)
@@ -570,28 +598,40 @@ export async function POST(
 
     let replyText = "";
     let uiComponents: any[] = [];
+    let activeUsedModel = dbData.configuredModel || "gemini-2.5-flash";
+    let prompt = "";
 
-    const isDatabaseTab = currentTab?.title?.toUpperCase().includes("DATABASE") || currentTab?.modeType === "database";
-    const isGeminiTab = currentTab?.title?.toUpperCase().includes("GEMINI") || currentTab?.modeType === "gemini";
-    const isDirectDbMode = isDatabaseTab || dbData.bypassGeminiDirectDb || !isGeminiTab;
+    const isGeminiSelected = currentTab?.modeType === "gemini";
+    const isDbSelected = currentTab?.modeType === "database";
+    const isDirectDbMode = isDbSelected || (!isGeminiSelected && dbData.bypassGeminiDirectDb);
 
-    if (isDirectDbMode && !isGeminiTab) {
-      console.log(`[Tab 1 - DATABASE Mode] Executing direct DB server response for query: "${userText}"`);
+    if (isDirectDbMode) {
+      console.log(`[DATABASE Mode] Executing direct DB server response for query: "${userText}"`);
       const directResult = generateDeepDatabaseReply(userText, agent, tabTitle, toolsAvailable, dbData);
       replyText = directResult.spokenText;
       uiComponents = directResult.uiComponents;
     } else {
-      console.log(`[Tab 2 - GEMINI Mode] Executing Gemini AI analytics for query: "${userText}"`);
+      console.log(`[GEMINI Mode] Executing Gemini AI analytics for query: "${userText}"`);
       const systemPromptInstruction = dbData.configuredSystemPrompt 
         ? `PRIMARY AGENT INSTRUCTION (from Settings Tab): "${dbData.configuredSystemPrompt}"` 
         : `PRIMARY AGENT INSTRUCTION: You are ${agent}, an expert AI Smart Worker and Senior System Data Analyst.`;
 
-      const prompt = `${systemPromptInstruction}
+      prompt = `================================================================================
+[1. SYSTEM PERSONA & AGENT CHARACTERIZATION (FROM OFFICE COLLECTION)]
+Agent Name: ${agent}
+Office Slug: ${slug}
+${dbData.configuredSystemPrompt 
+  ? `PRIMARY SYSTEM PROMPT: "${dbData.configuredSystemPrompt}"` 
+  : `PRIMARY SYSTEM PROMPT: You are ${agent}, an expert AI Smart Worker and Senior System Data Analyst.`}
+Tone & Style: ${dbData.toneStyle || "Professional"}
+Google TTS Voice: ${dbData.ttsVoiceId || "en-US-Wavenet-D"}
 
+[2. SMART WORKER CONFIGURATION & SCOPE]
 Mode Context: [${tabTitle}]
 Active Tools Available: [${toolsAvailable || "analytics, user_tracker, page_analyzer, crm_inspector"}].
+Allowed Collections Scope: [${(dbData.allowedCollections || []).join(", ")}]
 
-Deep Database Knowledge Context (Multi-Collection Scan for Scope: ${(dbData.allowedCollections || []).join(", ")}):
+[3. REAL-TIME DATABASE SNAPSHOT CONTEXT]
 - Active Speaking User: ${dbData.activeUser.name} (${dbData.activeUser.email}, Role: ${dbData.activeUser.role})
 - Registered Users Breakdown: Total ${dbData.usersSummary.totalUsers} users (${dbData.usersSummary.adminsCount} Admins, ${dbData.usersSummary.managersCount} Managers, ${dbData.usersSummary.clientsCount} Clients). Sample: [${dbData.usersSummary.sampleUsers}]
 - System Pages Breakdown: Total ${dbData.pagesSummary.totalPages} pages. Total Traffic: ${dbData.pagesSummary.totalPageViews.toLocaleString()}. Total Conversions: ${dbData.pagesSummary.totalConversions} (${dbData.pagesSummary.avgConversionRate}).
@@ -599,27 +639,27 @@ Deep Database Knowledge Context (Multi-Collection Scan for Scope: ${(dbData.allo
 - Full Pages Directory: [${dbData.pagesSummary.allPageNames}]
 - CRM & Financial Metrics: ${dbData.crmSummary.totalContacts} Contacts, ₪${dbData.crmSummary.totalRevenueILS.toLocaleString()} Revenue (${dbData.crmSummary.paidTransactionsCount} paid transactions, avg ₪${dbData.crmSummary.avgOrderValueILS.toLocaleString()}/order).
 
-User Query: "${userText}"
+[4. USER INPUT QUERY]
+"${userText}"
 
-CRITICAL QUALITY DIRECTIVES FOR SPOKEN TEXT:
-1. NEVER repeat, rephrase, or echo back the user's question or prompt.
-2. NO filler text, conversational preambles, greetings, or intro fluff.
-3. Provide ONLY a direct, ultra-concise 1-sentence factual answer containing the exact requested numbers/data.
-
-MANDATORY OUTPUT FORMAT INSTRUCTION:
-You MUST respond with a VALID JSON OBJECT ONLY (no conversational markdown wrappers outside JSON).
-Structure:
+[5. OUTPUT FORMAT DIRECTIVES]
+1. Respond thoughtfully and directly to the user query.
+2. Provide a helpful, clear, and intelligent answer.
+3. If structured data or components are applicable, respond with a VALID JSON OBJECT ONLY:
 {
-  "spokenText": "Ultra-concise 1-sentence direct factual answer.",
-  "uiComponents": [
-    {
-      "type": "chart_graph_card",
-      "data": { }
-    }
-  ]
-}`;
+  "spokenText": "Your direct intelligent response to the user query.",
+  "uiComponents": [ { "type": "chart_graph_card", "data": { } } ]
+}
+================================================================================`;
 
-      const rawResponse = await generateGeminiResponse(prompt);
+      activeUsedModel = dbData.configuredModel || "gemini-2.5-flash";
+      const geminiResult = await generateGeminiResponse(
+        prompt,
+        dbData.configuredModel,
+        dbData.configuredApiKey
+      );
+      const rawResponse = geminiResult.text;
+      if (geminiResult.usedModel) activeUsedModel = geminiResult.usedModel;
 
       if (rawResponse) {
         try {
@@ -629,18 +669,65 @@ Structure:
             if (parsed.spokenText) replyText = parsed.spokenText;
             if (Array.isArray(parsed.uiComponents)) uiComponents = parsed.uiComponents;
           } else {
-             throw new Error("No JSON object found in response");
+            replyText = rawResponse;
           }
         } catch (parseErr) {
-          console.warn("Failed to parse Gemini JSON output, using text fallback:", parseErr);
+          console.warn("Failed to parse Gemini JSON output, using raw text:", parseErr);
           replyText = rawResponse;
         }
       }
 
-      if (!replyText || uiComponents.length === 0) {
-        const fallbackResult = generateDeepDatabaseReply(userText, agent, tabTitle, toolsAvailable, dbData);
-        if (!replyText) replyText = fallbackResult.spokenText;
-        if (uiComponents.length === 0) uiComponents = fallbackResult.uiComponents;
+      // If Gemini returned an answer but no UI components, generate a visual Gemini AI card
+      if (replyText && uiComponents.length === 0) {
+        uiComponents = [
+          {
+            type: "excel_table_card",
+            templateId: "tpl_gemini_ai_response",
+            data: {
+              text: replyText,
+              tableData: {
+                title: `Gemini AI Response (${activeUsedModel})`,
+                headers: ["AI Model", "User Query", "Gemini Answer"],
+                rows: [
+                  {
+                    "AI Model": activeUsedModel,
+                    "User Query": userText,
+                    "Gemini Answer": replyText.length > 90 ? replyText.slice(0, 90) + "..." : replyText
+                  }
+                ]
+              },
+              vectorShape: { type: "sparkles", color: "#FFC800", label: "Gemini AI" },
+              badge: `Gemini AI Answer ✓`
+            }
+          }
+        ];
+      }
+
+      // In AI Mode: If Gemini did not return text, return explicit Gemini AI status response (never DB fallback)
+      if (!replyText) {
+        replyText = `Gemini AI Agent (${activeUsedModel}): I have received your request "${userText}". Processing with model ${activeUsedModel}.`;
+        uiComponents = [
+          {
+            type: "excel_table_card",
+            templateId: "tpl_gemini_ai_status",
+            data: {
+              text: replyText,
+              tableData: {
+                title: `Gemini AI Active (${activeUsedModel})`,
+                headers: ["AI Model", "User Query", "Engine Status"],
+                rows: [
+                  {
+                    "AI Model": activeUsedModel,
+                    "User Query": userText,
+                    "Engine Status": "Gemini AI Active ✓"
+                  }
+                ]
+              },
+              vectorShape: { type: "sparkles", color: "#FFC800", label: "Gemini AI" },
+              badge: `Gemini AI Active ✓`
+            }
+          }
+        ];
       }
     }
 
@@ -650,8 +737,8 @@ Structure:
       try {
         const [ttsResponse] = await tts.synthesizeSpeech({
           input: { text: replyText },
-          voice: { languageCode: "en-US", ssmlGender: "MALE" },
-          audioConfig: { audioEncoding: "MP3" },
+          voice: { languageCode: "en-US", ssmlGender: "MALE", name: "en-US-Wavenet-D" },
+          audioConfig: { audioEncoding: "MP3", speakingRate: 0.98, pitch: 0.0 },
         });
         if (ttsResponse.audioContent) {
           audioBase64 = Buffer.from(ttsResponse.audioContent as Uint8Array).toString("base64");
@@ -660,6 +747,16 @@ Structure:
         console.warn("TTS synthesis warning:", err?.message);
       }
     }
+
+    const fullPromptSent = isDirectDbMode
+      ? `[DIRECT DB ENGINE QUERY]
+Agent: ${agent}
+Tab Mode: ${tabTitle}
+Bypass Gemini: Direct DB Analytics Processing
+User Query: "${userText}"
+Allowed Collections: [${(dbData.allowedCollections || []).join(", ")}]
+Snapshot Stats: Users: ${dbData.usersSummary.totalUsers}, Pages: ${dbData.pagesSummary.totalPages}, Revenue: ₪${dbData.crmSummary.totalRevenueILS.toLocaleString()}`
+      : prompt;
 
     const interactionLog = {
       interactionId: nextInteractionId,
@@ -710,6 +807,8 @@ Structure:
       tab: tabTitle,
       sessionId: sessionId || `sess_${Date.now()}`,
       interactionId: nextInteractionId,
+      fullPromptSent,
+      modelUsed: isGeminiSelected ? (activeUsedModel || dbData.configuredModel || "gemini-2.5-flash") : "direct-db-analytics",
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

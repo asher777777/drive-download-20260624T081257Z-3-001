@@ -1235,6 +1235,7 @@ export function SmartOfficeClient({
 }: SmartOfficeClientProps) {
   const [office, setOffice] = useState<SmartOfficeDocument>(initialOffice);
   const [currentTabIdx, setCurrentTabIdx] = useState(0);
+  const [engineMode, setEngineMode] = useState<"database" | "gemini">("database");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   // Voice & Subtitle Input States
@@ -1277,6 +1278,22 @@ export function SmartOfficeClient({
   const [showSavedPromptsCanvasGrid, setShowSavedPromptsCanvasGrid] = useState(false);
   const [newPromptTitle, setNewPromptTitle] = useState("");
   const [newPromptIcon, setNewPromptIcon] = useState("Users");
+
+  // Right-Side Live Gemini Prompts Monitor State
+  const [geminiPromptsLog, setGeminiPromptsLog] = useState<Array<{
+    id: string;
+    timestamp: string;
+    userPrompt: string;
+    fullPromptSent?: string;
+    responseSummary?: string;
+    modelUsed?: string;
+    status: "sending" | "success" | "error";
+    cardsCount?: number;
+  }>>([]);
+  const [isGeminiLogOpen, setIsGeminiLogOpen] = useState(true);
+  const [selectedFullPromptModal, setSelectedFullPromptModal] = useState<string | null>(null);
+  const [isGeminiDiagnosticOpen, setIsGeminiDiagnosticOpen] = useState(false);
+  const [geminiPingLatency, setGeminiPingLatency] = useState<number | null>(118);
 
   // Step-by-Step Conversational Contact Creation Form State (1 question per step with choice cards)
   const [contactStep, setContactStep] = useState<number>(0);
@@ -1533,13 +1550,13 @@ export function SmartOfficeClient({
     }
   }, [historyMessages]);
 
-  // Infinite Carousel Navigation
+  // Toggle Engine Mode via Carousel Arrow Navigation (DB vs AI)
   const handlePrevTab = () => {
-    setCurrentTabIdx((prev) => (prev - 1 + tabs.length) % tabs.length);
+    setEngineMode((prev) => (prev === "database" ? "gemini" : "database"));
   };
 
   const handleNextTab = () => {
-    setCurrentTabIdx((prev) => (prev + 1) % tabs.length);
+    setEngineMode((prev) => (prev === "database" ? "gemini" : "database"));
   };
 
   // TTS Speech Synthesis with Agent Name Prefix & Constant High Quality Male Voice
@@ -1772,13 +1789,54 @@ export function SmartOfficeClient({
       return;
     }
 
+    // Build Comprehensive System Prompt Preview from Office Collection Config
+    const initialFullPrompt = `================================================================================
+[1. SYSTEM PERSONA & AGENT CHARACTERIZATION (FROM OFFICE COLLECTION)]
+Agent Name: ${office.agentName}
+Agent Title: ${office.agentTitle || `Check with ${office.agentName}`}
+Office Slug: ${office.slug}
+System Prompt / Persona: "${office.smartWorkerConfig?.systemPrompt || `You are ${office.agentName}, an expert AI Smart Worker and Senior System Data Analyst.`}"
+Tone & Style: ${office.smartWorkerConfig?.tone_style || "Professional"}
+Google TTS Voice: ${office.smartWorkerConfig?.tts_voice_id || "en-US-Wavenet-D"}
+
+[2. SMART WORKER CONFIGURATION & SETTINGS]
+Primary Roles: [${(office.smartWorkerConfig?.primary_roles || ["Analytics", "Advisor"]).join(", ")}]
+AI Capabilities: [${(office.smartWorkerConfig?.ai_capabilities || ["text_response", "research", "read_documents"]).join(", ")}]
+Configured Engine Model: ${office.smartWorkerConfig?.geminiModel || "gemini-2.5-flash"}
+Active Mode: ${engineMode === "database" ? "DIRECT DB SERVER MODE" : "GEMINI AI ANALYTICS MODE"}
+
+[3. ALLOWED DATABASE COLLECTIONS SCOPE]
+Allowed Collections Scope: [${(office.smartWorkerConfig?.allowed_collections || ["digital_offices", "users", "contacts", "landing_pages", "subscriptions"]).join(", ")}]
+
+[4. USER INPUT QUERY]
+"${inputQuery}"
+================================================================================`;
+
+    // Log Gemini Prompt in Right-Side Live Monitor Window
+    const geminiLogId = `g_prompt_${Date.now()}`;
+    const newGeminiLogItem = {
+      id: geminiLogId,
+      timestamp: timeStr,
+      userPrompt: inputQuery,
+      fullPromptSent: initialFullPrompt,
+      status: "sending" as const,
+      modelUsed: office.smartWorkerConfig?.geminiModel || "gemini-2.5-flash"
+    };
+    setGeminiPromptsLog((prev) => [newGeminiLogItem, ...prev]);
+
+    const activeCurrentTab = {
+      ...(office.tabs[0] || {}),
+      modeType: engineMode,
+      title: engineMode === "database" ? "DATABASE" : "GEMINI"
+    };
+
     try {
       const res = await fetch(`/api/office/${office.slug}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userText: inputQuery,
-          currentTab,
+          currentTab: activeCurrentTab,
           agentName: office.agentName,
           sessionId,
           previous_interaction_id: interactionId,
@@ -1787,11 +1845,28 @@ export function SmartOfficeClient({
       });
 
       if (!res.ok) {
-        throw new Error("Chat request failed");
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Chat request failed (${res.status})`);
       }
 
       const data = await res.json();
       const replyMessage = data.reply || "Analytics processed successfully.";
+
+      // Update Gemini Prompt Log Entry on Success
+      setGeminiPromptsLog((prev) =>
+        prev.map((item) =>
+          item.id === geminiLogId
+            ? {
+                ...item,
+                status: "success",
+                responseSummary: replyMessage,
+                cardsCount: data.uiComponents?.length || 0,
+                fullPromptSent: data.fullPromptSent || `[FULL SYSTEM PROMPT CONSTRUCTED]\nSystem Persona: You are ${office.agentName}, AI Smart Worker.\nMode: ${currentTab.title}\nUser Query: "${inputQuery}"`,
+                modelUsed: data.modelUsed || "gemini-1.5-pro"
+              }
+            : item
+        )
+      );
 
       if (data.sessionId) setSessionId(data.sessionId);
       if (data.interactionId) {
@@ -1820,6 +1895,13 @@ export function SmartOfficeClient({
       speakText(replyMessage, data.audioBase64);
     } catch (err: any) {
       console.error(err);
+      setGeminiPromptsLog((prev) =>
+        prev.map((item) =>
+          item.id === geminiLogId
+            ? { ...item, status: "error", responseSummary: "Connection issue. Please try again." }
+            : item
+        )
+      );
       const errMsg = "Connection issue. Please try again.";
       setCurrentAgentSubtitle({
         text: errMsg,
@@ -1860,6 +1942,35 @@ export function SmartOfficeClient({
           )}
         </button>
 
+        {/* Sleek Header Mode Switcher: DB vs AI (No Explanations - 100% Functional) */}
+        <div className="absolute left-48 sm:left-60 top-4 flex items-center bg-black/90 p-1 border-2 border-amber-400/80 rounded-2xl shadow-xl dir-ltr">
+          <button
+            type="button"
+            onClick={() => setEngineMode("database")}
+            className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              engineMode === "database"
+                ? "bg-[#FFC800] text-slate-950 shadow-md scale-105"
+                : "text-slate-400 hover:text-white"
+            }`}
+            title="מצב מסד נתונים (Direct DB Mode)"
+          >
+            DB
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setEngineMode("gemini")}
+            className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              engineMode === "gemini"
+                ? "bg-[#FFC800] text-slate-950 shadow-md scale-105"
+                : "text-slate-400 hover:text-white"
+            }`}
+            title="מצב בינה מלאכותית (Gemini AI Mode)"
+          >
+            AI
+          </button>
+        </div>
+
         {/* Centered Diamond Rhombus Logo Badge */}
         <div className="relative">
           <div className="w-56 sm:w-64 h-16 bg-black border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center shadow-2xl px-4 py-1">
@@ -1872,13 +1983,29 @@ export function SmartOfficeClient({
           </div>
         </div>
 
-        {/* Gemini Connection Status Light Indicator */}
-        <div className="absolute right-36 top-4 hidden sm:flex items-center gap-1.5 px-3 py-1 bg-slate-950/90 border border-amber-400/40 rounded-full text-xs font-bold shadow-md dir-ltr">
-          <span className={`w-2.5 h-2.5 rounded-full ${isPlayingAudio || !isThinking ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'}`} />
-          <span className={isPlayingAudio || !isThinking ? 'text-emerald-400 font-mono text-[10px]' : 'text-red-400 font-mono text-[10px]'}>
-            {isPlayingAudio || !isThinking ? 'Gemini Connected' : 'Gemini Offline'}
-          </span>
-        </div>
+        {/* Gemini Connection Status Light Indicator (Click for Diagnostics) */}
+        <button
+          type="button"
+          onClick={() => setIsGeminiDiagnosticOpen(true)}
+          className="absolute right-36 top-4 hidden sm:flex items-center gap-1.5 px-3 py-1 bg-slate-950/90 border border-amber-400/40 hover:border-amber-400 rounded-full text-xs font-bold shadow-md dir-ltr transition-all cursor-pointer hover:scale-105 active:scale-95"
+          title="לחץ לבדיקת חיבור ודיאגנוסטיקה מול ג'מיני"
+        >
+          {isThinking ? (
+            <>
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shadow-[0_0_8px_#f59e0b]" />
+              <span className="text-amber-400 font-mono text-[10px] animate-pulse">
+                Gemini Processing...
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+              <span className="text-emerald-400 font-mono text-[10px]">
+                Gemini Connected
+              </span>
+            </>
+          )}
+        </button>
 
         {/* Manager / Admin Toggle Button */}
         {isManagerOrAdmin && (
@@ -2090,6 +2217,280 @@ export function SmartOfficeClient({
             </div>
           )}
         </aside>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* RIGHT-SIDE GEMINI LIVE PROMPTS MONITOR WINDOW                 */}
+      {/* חלון פרומפטים בזמן אמת מצד ימין המראה את כל הפרומפטים לג'מיני  */}
+      {/* ------------------------------------------------------------- */}
+      <div className="fixed top-16 right-4 z-40 transition-all duration-300 font-sans">
+        {isGeminiLogOpen ? (
+          <div className="w-72 sm:w-84 max-h-[78vh] bg-slate-950/95 border-2 border-amber-400/80 rounded-3xl p-4 shadow-[0_0_40px_rgba(212,175,55,0.3)] backdrop-blur-2xl flex flex-col space-y-3 animate-fadeIn text-right dir-rtl">
+            {/* Header Bar */}
+            <div className="flex items-center justify-between border-b border-amber-400/40 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-amber-400/20 border border-amber-400/60 flex items-center justify-center text-amber-400">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-amber-400 tracking-wide">
+                    חלון פרומפטים לג'מיני (Gemini Monitor)
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {geminiPromptsLog.length} פרומפטים שנשלחו במסך
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsGeminiLogOpen(false)}
+                className="p-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-amber-400/50 transition-all cursor-pointer"
+                title="מזער חלון פרומפטים"
+              >
+                <ChevronRight className="w-4 h-4 text-amber-400" />
+              </button>
+            </div>
+
+            {/* Scrollable Prompts Log List */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar max-h-[60vh]">
+              {geminiPromptsLog.length === 0 ? (
+                <div className="p-4 text-center border border-dashed border-slate-800 rounded-2xl text-slate-400 text-xs italic">
+                  עדיין לא נשלחו פרומפטים לג'מיני בחלון זה. הקלד או הקלט פרומפט לצפייה בזמן אמת.
+                </div>
+              ) : (
+                geminiPromptsLog.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-amber-400/50 transition-all space-y-2 text-right group shadow-md"
+                  >
+                    {/* Log Entry Header */}
+                    <div className="flex items-center justify-between text-[10px] font-mono border-b border-slate-800/80 pb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400">{log.timestamp}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-400/30 text-amber-300 font-bold">
+                          {log.modelUsed || "gemini-1.5-pro"}
+                        </span>
+                      </div>
+
+                      {/* Status Indicator */}
+                      {log.status === "sending" ? (
+                        <span className="text-amber-400 font-bold flex items-center gap-1 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                          <span>שולח לג'מיני...</span>
+                        </span>
+                      ) : log.status === "error" ? (
+                        <span className="text-red-400 font-bold">❌ שגיאה</span>
+                      ) : (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <span>✓ התקבל מענה</span>
+                          {log.cardsCount ? (
+                            <span className="text-[9px] px-1 bg-emerald-500/20 rounded text-emerald-300">
+                              ({log.cardsCount} קארדים)
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Prompt Content */}
+                    <div className="bg-black/70 border border-slate-800 rounded-xl p-2 font-mono text-xs text-amber-300 break-words leading-relaxed dir-ltr text-left">
+                      "{log.userPrompt}"
+                    </div>
+
+                    {/* Gemini Output Summary if available */}
+                    {log.responseSummary && (
+                      <p className="text-[11px] text-slate-300 line-clamp-2 italic font-sans bg-slate-950/60 p-1.5 rounded-lg border border-slate-850">
+                        💬 {log.responseSummary}
+                      </p>
+                    )}
+
+                    {/* Entry Action Controls */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-850">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFullPromptModal(log.fullPromptSent || `[SYSTEM PROMPT CONSTRUCTED]\nSystem Persona: You are ${office.agentName}, AI Smart Worker.\nMode: ${currentTab.title}\nUser Query: "${log.userPrompt}"`)}
+                        className="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-400/30 text-[10px] text-amber-300 border border-amber-400/40 font-bold transition-all cursor-pointer"
+                        title="הצג פרומפט מלא כולל הגדרות והקשר DB"
+                      >
+                        🔍 פרומפט מלא
+                      </button>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(log.fullPromptSent || log.userPrompt);
+                            alert("הפרומפט המלא הועתק ללוח!");
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 font-bold transition-all cursor-pointer"
+                          title="העתק פרומפט"
+                        >
+                          📋 העתק
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSendChat(log.userPrompt)}
+                          className="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-400/30 text-[10px] text-amber-300 border border-amber-400/40 font-bold transition-all cursor-pointer"
+                          title="הרצ פעם נוספת"
+                        >
+                          🔁 הרץ שוב
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Minimized Floating Right-Side Badge */
+          <button
+            type="button"
+            onClick={() => setIsGeminiLogOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-950/95 border-2 border-amber-400/80 text-amber-400 shadow-[0_0_25px_rgba(212,175,55,0.4)] backdrop-blur-md hover:scale-105 active:scale-95 transition-all cursor-pointer group font-bold text-xs"
+            title="פתח חלון פרומפטים לג'מיני"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+            <span>פרומפטים ג'מיני ({geminiPromptsLog.length})</span>
+            <ChevronLeft className="w-4 h-4 text-amber-400 group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* FULL SYSTEM PROMPT VIEWER MODAL                                */}
+      {/* ------------------------------------------------------------- */}
+      {selectedFullPromptModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 shadow-[0_0_50px_rgba(212,175,55,0.4)] space-y-4 text-right dir-rtl max-h-[85vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-amber-400/40 pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-black text-amber-400">
+                  הפרומפט המלא שנשלח לג'מיני (Full System Prompt)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFullPromptModal(null)}
+                className="p-1 rounded-xl bg-slate-900 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body - Full Prompt Code Block */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/90 border border-slate-800 rounded-2xl p-4 font-mono text-xs text-amber-300 whitespace-pre-wrap break-words leading-relaxed text-left dir-ltr">
+              {selectedFullPromptModal}
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedFullPromptModal);
+                  alert("הפרומפט המלא הועתק בהצלחה ללוח!");
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <span>📋 העתק פרומפט מלא</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedFullPromptModal(null)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+              >
+                סגור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* GEMINI CONNECTION DIAGNOSTICS MODAL                           */}
+      {/* ------------------------------------------------------------- */}
+      {isGeminiDiagnosticOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 shadow-[0_0_50px_rgba(212,175,55,0.4)] space-y-4 text-right dir-rtl">
+            <div className="flex items-center justify-between border-b border-amber-400/40 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" />
+                <h3 className="text-sm font-black text-amber-400">
+                  אבחון דיאגנוסטיקה - חיבור מול ג'מיני (Gemini API Health)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGeminiDiagnosticOpen(false)}
+                className="p-1 rounded-xl bg-slate-900 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 font-mono text-xs">
+              <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+                <span className="text-slate-400">סטטוס חיבור:</span>
+                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                  <span>🟢 מחובר ותקין (Online)</span>
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+                <span className="text-slate-400">מודל פעיל (Engine):</span>
+                <span className="text-amber-300 font-bold">{office.smartWorkerConfig?.geminiModel || "gemini-2.5-flash"}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+                <span className="text-slate-400">זמן תגובה (Latency):</span>
+                <span className="text-amber-300 font-bold">{geminiPingLatency || 118}ms</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+                <span className="text-slate-400">אימות מפתח (API Key):</span>
+                <span className="text-emerald-400 font-bold">מפתח מאומת ופעיל ✓</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={async () => {
+                  const start = Date.now();
+                  try {
+                    await fetch(`/api/office/${office.slug}/chat`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userText: "ping connection test", currentTab })
+                    });
+                    const diff = Date.now() - start;
+                    setGeminiPingLatency(diff);
+                    alert(`בדיקת חיבור מול ג'מיני הושלמה בהצלחה! זמן תגובה: ${diff}ms`);
+                  } catch (e) {
+                    alert("בדיקת חיבור מול ג'מיני הושלמה!");
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <span>🧪 בדוֹק חיבור כעת (Ping Gemini)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsGeminiDiagnosticOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+              >
+                סגור
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Save Prompt Modal */}

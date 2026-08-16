@@ -47,6 +47,8 @@ export interface SmartWorkerConfig {
   tone_style?: string;
   bypass_gemini_direct_db?: boolean;
   savedPrompts?: SavedPromptPreset[];
+  geminiModel?: string;
+  geminiApiKey?: string;
 }
 
 export interface SmartOfficeDocument {

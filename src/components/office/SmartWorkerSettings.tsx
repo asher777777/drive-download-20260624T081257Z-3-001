@@ -109,6 +109,14 @@ const TONE_STYLE_OPTIONS = [
   { id: "Down-to-earth", label: "בגובה העיניים (Down-to-earth)" },
 ];
 
+const GEMINI_MODELS_OPTIONS = [
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash (מומלץ - מהיר במיוחד)" },
+  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro (אינטליגנציה מתקדמת והסקה)" },
+  { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite (זול ומהיר)" },
+  { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash" },
+  { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro Preview" }
+];
+
 const PERMISSION_ROWS: Array<{ key: keyof UserRolePermissions; label: string; subtext?: string }> = [
   {
     key: "system_db_read",
@@ -632,6 +640,39 @@ export function SmartWorkerSettings({
               <span>שמע</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 6.5. GEMINI MODEL & CUSTOM API KEY CONFIGURATION               */}
+      {/* ------------------------------------------------------------- */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Gemini Model Selector */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-amber-400 block">בחירת מודל Gemini (Gemini Model Selection)</label>
+          <select
+            value={formData.geminiModel || "gemini-2.5-flash"}
+            onChange={(e) => setFormData({ ...formData, geminiModel: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
+          >
+            {GEMINI_MODELS_OPTIONS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Gemini Custom API Key Input */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-amber-400 block">מפתח API ייעודי (Gemini API Key)</label>
+          <input
+            type="password"
+            value={formData.geminiApiKey || ""}
+            onChange={(e) => setFormData({ ...formData, geminiApiKey: e.target.value })}
+            placeholder="AIzaSy... (השאר ריק לשימוש מפתח ברירת מחדל)"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-mono placeholder:text-slate-600"
+          />
         </div>
       </div>
 
