@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "c-g-ltd"
+  },
+  "targets": {
+    "c-g-ltd": {
+      "hosting": {
+        "hakel": [
+          "c-g-ltd"
+        ]
+      }
+    }
+  }
+}

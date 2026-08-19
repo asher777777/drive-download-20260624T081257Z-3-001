@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "c-g-ltd",
     "source": ".",
     "ignore": [
       "firebase.json",

@@ -109,16 +109,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return null;
       }
     }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      checks: ["none"],
-      authorization: {
-        params: {
-          prompt: "select_account"
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        checks: ["none"],
+        authorization: {
+          params: {
+            prompt: "select_account"
+          }
         }
-      }
-    })
+      })
+    ] : [])
   ],
   callbacks: {
     async jwt({ token, user, account }) {
@@ -246,6 +248,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false;
       }
       return true;
+    },
+    async redirect({ url, baseUrl }) {
+      const canonicalBase = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "https://hakel.club";
+      if (url.startsWith("/")) return `${canonicalBase}${url}`;
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname === "0.0.0.0" || parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
+          return `${canonicalBase}${parsed.pathname}${parsed.search}`;
+        }
+        if (parsed.origin === new URL(canonicalBase).origin) return url;
+      } catch (e) {}
+      return canonicalBase;
     },
   },
 });
