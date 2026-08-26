@@ -1802,7 +1802,7 @@ Google TTS Voice: ${office.smartWorkerConfig?.tts_voice_id || "en-US-Wavenet-D"}
 [2. SMART WORKER CONFIGURATION & SETTINGS]
 Primary Roles: [${(office.smartWorkerConfig?.primary_roles || ["Analytics", "Advisor"]).join(", ")}]
 AI Capabilities: [${(office.smartWorkerConfig?.ai_capabilities || ["text_response", "research", "read_documents"]).join(", ")}]
-Configured Engine Model: ${office.smartWorkerConfig?.geminiModel || "gemini-2.5-flash"}
+Configured Engine Model: ${office.smartWorkerConfig?.geminiModel || "gemini-3.6-flash"}
 Active Mode: ${engineMode === "database" ? "DIRECT DB SERVER MODE" : "GEMINI AI ANALYTICS MODE"}
 
 [3. ALLOWED DATABASE COLLECTIONS SCOPE]
@@ -2444,7 +2444,7 @@ Allowed Collections Scope: [${(office.smartWorkerConfig?.allowed_collections || 
 
               <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
                 <span className="text-slate-400">מודל פעיל (Engine):</span>
-                <span className="text-amber-300 font-bold">{office.smartWorkerConfig?.geminiModel || "gemini-2.5-flash"}</span>
+                <span className="text-amber-300 font-bold">{office.smartWorkerConfig?.geminiModel || "gemini-3.6-flash"}</span>
               </div>
 
               <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">

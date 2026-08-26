@@ -158,7 +158,10 @@ export async function POST(req: NextRequest) {
 
     // 2. EXECUTE API ROUTE
     else if (type === 'api' || endpoint) {
-      const url = new URL(endpoint, req.url).toString();
+      const hostHeader = req.headers.get("x-forwarded-host") || req.headers.get("host");
+      const protoHeader = req.headers.get("x-forwarded-proto") || (hostHeader?.includes("localhost") ? "http" : "https");
+      const baseUrl = hostHeader ? `${protoHeader}://${hostHeader}` : (req.url ? new URL(req.url).origin : "http://localhost:3000");
+      const url = new URL(endpoint, baseUrl).toString();
       const fetchOptions: RequestInit = {
         method: method.toUpperCase(),
         headers: {

@@ -69,7 +69,7 @@ export function ExecutiveInterview({ userName = "אורח", userId = "mock-user-
 
   const playEdAudio = async (text: string) => {
     try {
-      const res = await fetch('http://localhost:8080/api/speak', {
+      const res = await fetch('/api/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })

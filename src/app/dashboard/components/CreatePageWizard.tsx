@@ -161,7 +161,7 @@ export function CreatePageWizard({ isOpen, onClose, audiences = [], services = [
         if (backendType === 'post') {
           router.push(`/post/${result.slug}`);
         } else if (backendType === 'landing') {
-          router.push(`/landing/${result.slug}`);
+          router.push(`/${result.slug}`);
         } else {
           router.push(`/service/${result.slug}`);
         }

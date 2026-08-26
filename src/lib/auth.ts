@@ -250,16 +250,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async redirect({ url, baseUrl }) {
-      const canonicalBase = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "https://hakel.club";
-      if (url.startsWith("/")) return `${canonicalBase}${url}`;
+      // 1. If relative path, resolve against current baseUrl
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+
       try {
         const parsed = new URL(url);
-        if (parsed.hostname === "0.0.0.0" || parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
-          return `${canonicalBase}${parsed.pathname}${parsed.search}`;
+        const baseParsed = new URL(baseUrl);
+
+        // 2. If same origin as baseUrl, allow directly
+        if (parsed.origin === baseParsed.origin) {
+          return url;
         }
-        if (parsed.origin === new URL(canonicalBase).origin) return url;
+
+        // 3. In local development, maintain local port and path
+        if (baseParsed.hostname === "localhost" || baseParsed.hostname === "127.0.0.1") {
+          if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "0.0.0.0") {
+            return `${baseUrl}${parsed.pathname}${parsed.search}`;
+          }
+        }
+
+        // 4. Allowed production domains
+        const allowedHosts = [
+          "hakel.club",
+          "www.hakel.club",
+          "c-g-ltd.web.app",
+          "c-g-ltd.firebaseapp.com",
+          "localhost",
+          "127.0.0.1"
+        ];
+        if (allowedHosts.includes(parsed.hostname)) {
+          return url;
+        }
       } catch (e) {}
-      return canonicalBase;
+
+      return baseUrl;
     },
   },
 });

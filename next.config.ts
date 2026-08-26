@@ -9,7 +9,9 @@ const nextConfig: NextConfig = {
         "hakel.club",
         "www.hakel.club",
         "c-g-ltd.web.app",
-        "c-g-ltd.firebaseapp.com"
+        "c-g-ltd.firebaseapp.com",
+        "localhost:3000",
+        "127.0.0.1:3000"
       ]
     }
   },

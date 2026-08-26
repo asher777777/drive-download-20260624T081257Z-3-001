@@ -52,12 +52,12 @@ async function handleGenerateImage(prompt: string) {
 }
 
 // 2. נתיב ליצירת קוד (Code Generation)
-// משתמש במודל gemini-3.1-pro (או 2.5-pro)
+// משתמש במודל gemini-3.6-flash / gemini-3.1-pro-preview
 async function handleGenerateCode(prompt: string) {
   if (!prompt) return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
   
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-pro', // ניתן לשנות ל- 'gemini-2.5-pro' במידת הצורך
+    model: 'gemini-3.6-flash',
     contents: prompt,
     config: {
       systemInstruction: 'You are an expert software developer. Generate clean, efficient, well-documented, and production-ready code. Output only the code with necessary brief explanations.',
@@ -69,12 +69,12 @@ async function handleGenerateCode(prompt: string) {
 }
 
 // 3. נתיב לסריקת אתרים וליקוט מידע (Web Search / Information Gathering)
-// משתמש ב- gemini-2.5-pro עם יכולות חיפוש מובנות של Google
+// משתמש ב- gemini-3.6-flash עם יכולות חיפוש מובנות של Google
 async function handleWebSearch(prompt: string) {
   if (!prompt) return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3.6-flash',
     contents: prompt,
     config: {
       // הפעלת חיפוש מובנה של גוגל בזמן אמת
@@ -93,7 +93,7 @@ async function handleWebSearch(prompt: string) {
 }
 
 // 4. נתיב לקריאת מסמכים (Document Reading)
-// משתמש ב- gemini-2.5-flash המהיר לקריאת קבצים ומסמכים
+// משתמש ב- gemini-3.6-flash המהיר לקריאת קבצים ומסמכים
 async function handleReadDocument(prompt: string, fileBase64: string, mimeType: string) {
   if (!fileBase64 || !mimeType) {
     return NextResponse.json({ error: 'fileBase64 and mimeType are required for reading documents' }, { status: 400 });
@@ -102,7 +102,7 @@ async function handleReadDocument(prompt: string, fileBase64: string, mimeType: 
   const textPrompt = prompt || 'Please analyze this document and summarize its key points.';
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [
       {
         role: 'user',

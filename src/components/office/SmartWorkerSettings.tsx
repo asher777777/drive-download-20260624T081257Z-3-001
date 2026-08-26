@@ -110,11 +110,9 @@ const TONE_STYLE_OPTIONS = [
 ];
 
 const GEMINI_MODELS_OPTIONS = [
-  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash (מומלץ - מהיר במיוחד)" },
-  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro (אינטליגנציה מתקדמת והסקה)" },
-  { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite (זול ומהיר)" },
-  { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash" },
-  { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro Preview" }
+  { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash (מומלץ - הדור החדש, מהיר ועוצמתי)" },
+  { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash (מהיר במיוחד)" },
+  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview (אינטליגנציה והסקה מתקדמת)" }
 ];
 
 const PERMISSION_ROWS: Array<{ key: keyof UserRolePermissions; label: string; subtext?: string }> = [
@@ -651,7 +649,7 @@ export function SmartWorkerSettings({
         <div className="space-y-2">
           <label className="text-xs font-bold text-amber-400 block">בחירת מודל Gemini (Gemini Model Selection)</label>
           <select
-            value={formData.geminiModel || "gemini-2.5-flash"}
+            value={formData.geminiModel || "gemini-3.6-flash"}
             onChange={(e) => setFormData({ ...formData, geminiModel: e.target.value })}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
           >

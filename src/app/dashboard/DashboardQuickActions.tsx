@@ -127,7 +127,7 @@ export function DashboardQuickActions() {
         if (serviceType === 'post') {
           router.push(`/post/${result.slug}`);
         } else if (serviceType === 'landing') {
-          router.push(`/landing/${result.slug}`);
+          router.push(`/${result.slug}`);
         } else {
           router.push(`/service/${result.slug}`);
         }

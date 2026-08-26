@@ -145,7 +145,7 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
   const effectiveUserId = userId && userId !== "anonymous" ? userId : "david_user_001";
 
   let configuredSystemPrompt = "";
-  let configuredModel = "gemini-2.5-flash";
+  let configuredModel = "gemini-3.6-flash";
   let configuredApiKey = "";
   let ttsVoiceId = "en-US-Studio-O";
   let toneStyle = "Professional";
@@ -158,7 +158,7 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
       const oData = officeDoc.data();
       if (oData?.smartWorkerConfig) {
         configuredSystemPrompt = oData.smartWorkerConfig.systemPrompt || "";
-        configuredModel = oData.smartWorkerConfig.geminiModel || oData.smartWorkerConfig.gemini_model || "gemini-2.5-flash";
+        configuredModel = oData.smartWorkerConfig.geminiModel || oData.smartWorkerConfig.gemini_model || "gemini-3.6-flash";
         configuredApiKey = oData.smartWorkerConfig.geminiApiKey || oData.smartWorkerConfig.api_key || oData.geminiApiKey || "";
         ttsVoiceId = oData.smartWorkerConfig.tts_voice_id || ttsVoiceId;
         toneStyle = oData.smartWorkerConfig.tone_style || toneStyle;
@@ -167,7 +167,7 @@ async function getDeepDatabaseAnalytics(userId: string, slug: string): Promise<D
           allowedCollections = oData.smartWorkerConfig.allowed_collections;
         }
       } else if (oData) {
-        configuredModel = oData.geminiModel || "gemini-2.5-flash";
+        configuredModel = oData.geminiModel || "gemini-3.6-flash";
         configuredApiKey = oData.geminiApiKey || "";
       }
     }
@@ -481,16 +481,13 @@ async function generateGeminiResponse(
 
   const candidateModels = Array.from(new Set([
     targetModel,
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.1-pro-preview",
     "gemini-2.5-flash",
     "gemini-2.5-pro",
-    "gemini-2.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.1-pro",
     "gemini-1.5-flash-latest",
-    "gemini-1.5-pro-latest",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-2.0-flash-exp"
+    "gemini-1.5-pro-latest"
   ].filter(Boolean))) as string[];
 
   if (oauthToken) {

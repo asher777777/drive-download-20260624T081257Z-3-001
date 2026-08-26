@@ -1754,10 +1754,15 @@ DO NOT output any UI components in your text.`;
           toolResponsePayload = { success: true, count: allList.length, agents: allList };
         } else if (funcCall.name === "execute_system_function") {
            try {
-             const reqUrl = req.url ? new URL(req.url).origin : "http://localhost:3000";
+             const hostHeader = req.headers.get("x-forwarded-host") || req.headers.get("host");
+             const protoHeader = req.headers.get("x-forwarded-proto") || (hostHeader?.includes("localhost") ? "http" : "https");
+             const reqUrl = hostHeader ? `${protoHeader}://${hostHeader}` : (req.url ? new URL(req.url).origin : "http://localhost:3000");
              const res = await fetch(`${reqUrl}/api/system-map/execute`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                  "Content-Type": "application/json",
+                  ...(req.headers.get("cookie") ? { cookie: req.headers.get("cookie")! } : {})
+                },
                 body: JSON.stringify({
                   type: "action",
                   functionName: funcCall.args.functionName,

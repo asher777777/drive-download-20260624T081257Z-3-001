@@ -92,7 +92,7 @@ RULES:
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (oauthToken) {
-      for (const model of ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-2.5-flash"]) {
+      for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview"]) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
           const res = await fetch(url, {
@@ -124,7 +124,7 @@ RULES:
       try {
         const aiKey = new GoogleGenAI({ apiKey: geminiKey });
         const res = await aiKey.models.generateContent({
-          model: "gemini-1.5-flash-latest",
+          model: "gemini-3.6-flash",
           contents: promptAssistInstruction,
         });
         if (res.text?.trim()) refinedPrompt = res.text.trim();

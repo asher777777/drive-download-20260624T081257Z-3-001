@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     while (maxTurns > 0) {
       maxTurns--;
       currentResponse = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3.6-flash",
         contents,
         config: {
           systemInstruction,
