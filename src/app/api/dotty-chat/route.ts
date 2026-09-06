@@ -1582,29 +1582,9 @@ DO NOT output any UI components in your text.`;
             toolResponsePayload = { success: false, message: "agentId missing." };
           }
         } else if (funcCall.name === "read_file") {
-          try {
-            const targetPath = path.resolve(process.cwd(), funcCall.args.filepath);
-            if (!targetPath.startsWith(process.cwd())) {
-              toolResponsePayload = { success: false, message: "Access denied. Cannot read outside project directory." };
-            } else {
-              const content = fs.readFileSync(targetPath, "utf8");
-              toolResponsePayload = { success: true, content: content };
-            }
-          } catch (e: any) {
-            toolResponsePayload = { success: false, message: e.message };
-          }
+          toolResponsePayload = { success: false, message: "File operations are not supported in serverless environment." };
         } else if (funcCall.name === "write_file") {
-          try {
-            const targetPath = path.resolve(process.cwd(), funcCall.args.filepath);
-            if (!targetPath.startsWith(process.cwd())) {
-              toolResponsePayload = { success: false, message: "Access denied. Cannot write outside project directory." };
-            } else {
-              fs.writeFileSync(targetPath, funcCall.args.content, "utf8");
-              toolResponsePayload = { success: true, message: `Successfully wrote to ${funcCall.args.filepath}` };
-            }
-          } catch (e: any) {
-            toolResponsePayload = { success: false, message: e.message };
-          }
+          toolResponsePayload = { success: false, message: "File operations are not supported in serverless environment." };
         } else if (funcCall.name === "request_media_upload") {
            forceUIComponent = `[UI_COMPONENT:{"type":"MediaUploadCard","data":{"title":"${funcCall.args.title}","assetType":"${funcCall.args.assetType}"}}]`;
            suppressText = false;

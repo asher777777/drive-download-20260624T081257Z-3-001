@@ -56,7 +56,7 @@ export async function createCommunity(data: Partial<Community>) {
     
     const docRef = adminDb.collection("users").doc(ownerId).collection("settings").doc("global");
     const docSnap = await docRef.get();
-    const currentData = docSnap.exists ? docSnap.data() : {};
+    const currentData = docSnap.exists ? (docSnap.data() || {}) : {};
     const currentCommunities = currentData?.communities || [];
 
     const newId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
@@ -66,14 +66,21 @@ export async function createCommunity(data: Partial<Community>) {
       name: data.name || "",
       icon: data.icon || "Users",
       brandColor: data.color || "#4f46e5",
+      files: data.files || [],
+      purpose: data.purpose || "",
+      isDraft: data.isDraft || false,
       targetAudiences: [],
       goals: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
+
+    const cleanedCommunities = JSON.parse(JSON.stringify([newDoc, ...currentCommunities]));
 
     await docRef.set({
       ...currentData,
-      communities: [newDoc, ...currentCommunities]
-    });
+      communities: cleanedCommunities,
+    }, { merge: true });
     
     revalidatePath("/dashboard/communities");
     revalidatePath("/dashboard/crm");
@@ -110,11 +117,17 @@ export async function updateCommunity(id: string, data: Partial<Community>) {
     if (data.name !== undefined) updatedCommunity.name = data.name;
     if (data.icon !== undefined) updatedCommunity.icon = data.icon;
     if (data.color !== undefined) updatedCommunity.brandColor = data.color;
+    if (data.files !== undefined) updatedCommunity.files = data.files;
+    if (data.purpose !== undefined) updatedCommunity.purpose = data.purpose;
+    if (data.isDraft !== undefined) updatedCommunity.isDraft = data.isDraft;
+    updatedCommunity.updatedAt = new Date().toISOString();
     
     currentCommunities[index] = updatedCommunity;
 
+    const cleanedCommunities = JSON.parse(JSON.stringify(currentCommunities));
+
     await docRef.update({
-      communities: currentCommunities
+      communities: cleanedCommunities
     });
     
     revalidatePath("/dashboard/communities");
