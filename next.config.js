@@ -1,6 +1,7 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ["firebase-admin", "@google-cloud/text-to-speech", "puppeteer"],
+  turbopack: {},
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
