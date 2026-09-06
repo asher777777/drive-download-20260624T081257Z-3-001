@@ -1,4 +1,4 @@
-name: Deploy to Firebase Hosting on PR
+name: Build and Verify on PR
 on:
   pull_request:
 permissions:
@@ -6,7 +6,7 @@ permissions:
   contents: read
   pull-requests: write
 jobs:
-  build_and_deploy:
+  build_and_verify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -27,11 +27,5 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Deploy to Firebase Hosting (Preview)
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_C_G_LTD }}
-          projectId: c-g-ltd
-        env:
-          FIREBASE_CLI_EXPERIMENTS: webframeworks
+      - name: Build Next.js App
+        run: npm run build
