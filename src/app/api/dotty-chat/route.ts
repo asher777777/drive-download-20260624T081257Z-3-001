@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb, adminStorage } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminDb, adminStorage, FieldValue } from "@/lib/firebase-admin";
 import { GoogleGenAI } from "@google/genai";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 let geminiKey = process.env.GEMINI_API_KEY;

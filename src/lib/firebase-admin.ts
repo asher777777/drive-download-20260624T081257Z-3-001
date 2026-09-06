@@ -60,13 +60,9 @@ function initFirebaseAdmin() {
 
   try {
     const admin = require("firebase-admin");
-    const { getApps, getApp, initializeApp, cert } = require("firebase-admin/app");
-    const { getFirestore } = require("firebase-admin/firestore");
-    const { getAuth } = require("firebase-admin/auth");
-    const { getStorage } = require("firebase-admin/storage");
 
-    if (getApps().length > 0) {
-      app = getApp();
+    if (admin.apps.length > 0) {
+      app = admin.app();
     } else {
       const privateKeyB64 = process.env.FIREBASE_ADMIN_PRIVATE_KEY_B64;
       let privateKey = "";
@@ -82,8 +78,8 @@ function initFirebaseAdmin() {
       const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "c-g-ltd.firebasestorage.app";
 
       if (projectId && clientEmail && privateKey) {
-        app = initializeApp({
-          credential: cert({
+        app = admin.initializeApp({
+          credential: admin.credential.cert({
             projectId,
             clientEmail,
             privateKey,
@@ -92,7 +88,7 @@ function initFirebaseAdmin() {
           storageBucket,
         });
       } else if (process.env.NODE_ENV === "production" || process.env.K_SERVICE || process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || process.env.FIREBASE_CONFIG) {
-        app = initializeApp({
+        app = admin.initializeApp({
           projectId,
           storageBucket
         });
@@ -101,9 +97,9 @@ function initFirebaseAdmin() {
       }
     }
 
-    adminDb = getFirestore(app);
-    adminAuth = getAuth(app);
-    adminStorage = getStorage(app);
+    adminDb = admin.firestore(app);
+    adminAuth = admin.auth(app);
+    adminStorage = admin.storage(app);
   } catch (error: any) {
     console.warn("Notice: Firebase Admin initialized with mock fallback:", error?.message || error);
     adminDb = createMockDb();
@@ -161,6 +157,19 @@ export const adminStorageProxy: any = new Proxy({}, {
     const storage = getAdminStorage();
     const val = storage[prop];
     return typeof val === "function" ? val.bind(storage) : val;
+  }
+});
+
+export const FieldValue = new Proxy({}, {
+  get: (_, prop) => {
+    try {
+      const admin = require("firebase-admin");
+      const fv = admin.firestore.FieldValue;
+      const val = fv[prop];
+      return typeof val === "function" ? val.bind(fv) : val;
+    } catch {
+      return () => ({});
+    }
   }
 });
 
