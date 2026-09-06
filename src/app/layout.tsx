@@ -38,7 +38,12 @@ export default async function RootLayout({
 }>) {
   const settings = await getGlobalSettings("1");
   const faviconUrl = settings?.siteLogoUrl || "/favicon.ico";
-  const session = await auth();
+  let session = null;
+  try {
+    session = await auth();
+  } catch (e) {
+    console.warn("Notice: auth() failed in RootLayout:", e);
+  }
 
   return (
     <html

@@ -29,8 +29,14 @@ export default async function Home() {
   // We don't want the current regular user's settings to override the root page's branding.
   const globalSettings = await getGlobalSettings("1");
 
-  const { auth } = await import("@/lib/auth");
-  const session = await auth();
+  let session = null;
+  try {
+    const { auth } = await import("@/lib/auth");
+    session = await auth();
+  } catch (e) {
+    console.warn("Notice: auth() failed in Home:", e);
+  }
+
   const isAdmin = session?.user?.role === "SUPERADMIN" || session?.user?.id === "1";
 
   return (
