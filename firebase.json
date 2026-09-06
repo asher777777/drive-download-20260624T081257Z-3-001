@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "c-g-ltd",
+    "target": "hakel",
     "source": ".",
     "ignore": [
       "firebase.json",

@@ -97,7 +97,6 @@ export async function getUserLogoUrl(userId: string): Promise<string | null> {
     const snap = await adminDb.collection("companyAssets")
       .where("ownerId", "==", userId)
       .where("category", "==", "logo")
-      .orderBy("createdAt", "desc")
       .limit(1)
       .get();
     if (!snap.empty) {

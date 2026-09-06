@@ -85,8 +85,8 @@ try {
         projectId,
         storageBucket,
       });
-    } else if (process.env.NODE_ENV === "production" && (process.env.K_SERVICE || process.env.GCP_PROJECT)) {
-      // In production Cloud Functions / Cloud Run environment with IAM role ADC
+    } else if (process.env.NODE_ENV === "production" || process.env.K_SERVICE || process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || process.env.FIREBASE_CONFIG) {
+      // In production Cloud Functions / Cloud Run / App Hosting environment with IAM role ADC
       app = initializeApp({
         projectId,
         storageBucket
@@ -96,7 +96,7 @@ try {
     }
   }
 
-  adminDb = getFirestore(app, "default");
+  adminDb = getFirestore(app);
   adminAuth = getAuth(app);
   adminStorage = getStorage(app);
 } catch (error: any) {
