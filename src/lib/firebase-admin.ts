@@ -1,4 +1,4 @@
-﻿let app: any = null;
+let app: any = null;
 let adminDb: any = null;
 let adminAuth: any = null;
 let adminStorage: any = null;
@@ -160,7 +160,7 @@ export const adminStorageProxy: any = new Proxy({}, {
   }
 });
 
-export const FieldValue = new Proxy({}, {
+export const FieldValue: any = new Proxy({}, {
   get: (_, prop) => {
     try {
       const admin = require("firebase-admin");
