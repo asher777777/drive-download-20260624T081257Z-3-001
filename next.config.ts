@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["firebase-admin", "@google-cloud/text-to-speech", "puppeteer"],
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

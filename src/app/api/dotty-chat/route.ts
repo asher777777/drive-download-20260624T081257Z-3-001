@@ -3,8 +3,6 @@ import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
-import fs from "fs";
-import path from "path";
 let geminiKey = process.env.GEMINI_API_KEY;
 const aiConfig: any = {};
 if (geminiKey?.startsWith("AQ.")) {

@@ -248,9 +248,9 @@ export const RichContentSection = ({
                     </button>
                   </>
                 ) : (
-                  body
+                  (typeof body === "string" ? body : "")
                     .split(/\n\n+/)
-                    .filter((p: string) => p.trim().length > 0)
+                    .filter((p: string) => typeof p === "string" && p.trim().length > 0)
                     .map((paragraph: string, idx: number) => (
                       <div 
                         key={idx} 

@@ -56,7 +56,7 @@ export const VideoGallery = ({
 
   // Background gallery rotation
   useEffect(() => {
-    const validImages = images?.filter(img => img && img.trim() !== "") || [];
+    const validImages = images?.filter(img => typeof img === "string" && img.trim() !== "") || [];
     if (validImages.length <= 1 || isModalOpen) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % validImages.length);
@@ -125,7 +125,7 @@ export const VideoGallery = ({
   };
 
   const renderGalleryBackground = () => {
-    const validImages = images?.filter(img => img && img.trim() !== "") || [];
+    const validImages = images?.filter(img => typeof img === "string" && img.trim() !== "") || [];
 
     if (validImages.length === 0) {
       return (
